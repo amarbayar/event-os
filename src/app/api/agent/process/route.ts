@@ -70,13 +70,19 @@ export async function POST(req: NextRequest) {
       context
     );
 
+    // Resolve real org/edition IDs for action payloads
+    const { getActiveIds } = await import("@/lib/queries");
+    const ids = await getActiveIds();
+    const realOrgId = ids?.orgId || orgId;
+    const realEditionId = ids?.editionId || editionId;
+
     // Inject organizationId and editionId into all action payloads
     const enrichedActions = result.actions.map((action) => ({
       ...action,
       payload: {
         ...action.payload,
-        organizationId: orgId,
-        editionId,
+        organizationId: realOrgId,
+        editionId: realEditionId,
       },
     }));
 
