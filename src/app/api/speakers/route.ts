@@ -41,13 +41,25 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // CFP submissions are public — no auth required
   const body = await req.json();
-  const { editionId, organizationId, name, email, bio, company, title, talkTitle, talkAbstract, talkType, trackPreference } = body;
+  const { name, email, bio, company, title, talkTitle, talkAbstract, talkType, trackPreference } = body;
+
+  // Resolve editionId/organizationId — use provided values or fall back to active edition
+  let editionId = body.editionId;
+  let organizationId = body.organizationId;
+
+  if (!editionId || !organizationId || editionId === "active" || organizationId === "dev") {
+    const { getActiveIds } = await import("@/lib/queries");
+    const ids = await getActiveIds();
+    if (ids) {
+      editionId = editionId && editionId !== "active" ? editionId : ids.editionId;
+      organizationId = organizationId && organizationId !== "dev" ? organizationId : ids.orgId;
+    }
+  }
 
   if (!editionId || !organizationId || !name || !email || !talkTitle) {
     return NextResponse.json(
-      { error: "Missing required fields: editionId, organizationId, name, email, talkTitle" },
+      { error: "Missing required fields: name, email, talkTitle" },
       { status: 400 }
     );
   }
