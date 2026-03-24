@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { PipelineFilters, usePipelineFilters } from "@/components/pipeline-view";
 import { PipelineTable } from "@/components/pipeline-table";
+import { EntityDrawer } from "@/components/entity-drawer";
 import { Plus, Check, X } from "lucide-react";
 
 type Venue = {
@@ -23,21 +24,27 @@ type Venue = {
   name: string;
   address: string | null;
   contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
   capacity: number | null;
   priceQuote: string | null;
   status: string;
-  source: string;
-  stage: string;
   isFinalized: boolean;
   assignedTo: string | null;
   pros: string | null;
   cons: string | null;
+  notes: string | null;
+  source: string;
+  stage: string;
 };
 
 export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [venues, setVenues] = useState(initialVenues);
   const [showForm, setShowForm] = useState(false);
+  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
+  const [drawerSaving, setDrawerSaving] = useState(false);
+  const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
   const finalized = venues.find((v) => v.isFinalized);
   const filtered = filter(venues).filter((v) => !v.isFinalized);
 
@@ -95,6 +102,42 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
     }
   }, []);
 
+  const openDrawer = (venue: Venue) => {
+    setSelectedVenue(venue);
+    setDrawerForm({
+      name: venue.name || "",
+      address: venue.address || "",
+      contactName: venue.contactName || "",
+      contactEmail: venue.contactEmail || "",
+      contactPhone: venue.contactPhone || "",
+      capacity: venue.capacity != null ? String(venue.capacity) : "",
+      priceQuote: venue.priceQuote || "",
+      pros: venue.pros || "",
+      cons: venue.cons || "",
+      notes: venue.notes || "",
+      source: venue.source || "intake",
+      stage: venue.stage || "lead",
+      assignedTo: venue.assignedTo || "",
+    });
+  };
+
+  const updateField = (field: string, value: string | null) => {
+    setDrawerForm((prev) => ({ ...prev, [field]: value || "" }));
+  };
+
+  const handleDrawerSave = async () => {
+    if (!selectedVenue) return;
+    setDrawerSaving(true);
+    await fetch(`/api/venues/${selectedVenue.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "If-Match": "999" },
+      body: JSON.stringify(drawerForm),
+    });
+    setDrawerSaving(false);
+    setSelectedVenue(null);
+    refreshData();
+  };
+
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -112,6 +155,106 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
       setShowForm(false);
     }
   };
+
+  const drawerSections = selectedVenue
+    ? [
+        {
+          label: "Venue",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Name</Label>
+                  <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Address</Label>
+                  <Input value={(drawerForm.address as string) || ""} onChange={(e) => updateField("address", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Contact Name</Label>
+                  <Input value={(drawerForm.contactName as string) || ""} onChange={(e) => updateField("contactName", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Contact Email</Label>
+                  <Input value={(drawerForm.contactEmail as string) || ""} onChange={(e) => updateField("contactEmail", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Contact Phone</Label>
+                  <Input value={(drawerForm.contactPhone as string) || ""} onChange={(e) => updateField("contactPhone", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Capacity</Label>
+                  <Input type="number" value={(drawerForm.capacity as string) || ""} onChange={(e) => updateField("capacity", e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Price Quote</Label>
+                <Input value={(drawerForm.priceQuote as string) || ""} onChange={(e) => updateField("priceQuote", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+        {
+          label: "Evaluation",
+          content: (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Pros</Label>
+                <Textarea rows={4} placeholder="What makes this venue great..." value={(drawerForm.pros as string) || ""} onChange={(e) => updateField("pros", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Cons</Label>
+                <Textarea rows={4} placeholder="Any drawbacks..." value={(drawerForm.cons as string) || ""} onChange={(e) => updateField("cons", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notes</Label>
+                <Textarea rows={4} placeholder="Additional notes..." value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+        {
+          label: "Pipeline",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Stage</Label>
+                  <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="engaged">Engaged</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="declined">Declined</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Assigned To</Label>
+                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+      ]
+    : [];
 
   return (
     <div>
@@ -231,11 +374,23 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
         entityName="venue"
         apiEndpoint="/api/venues"
         onUpdate={refreshData}
+        onRowClick={(venue) => openDrawer(venue)}
       />
 
       {filtered.length === 0 && venues.length > 0 && (
         <p className="text-center text-sm text-muted-foreground py-8">No venues match the current filters.</p>
       )}
+
+      <EntityDrawer
+        key={selectedVenue?.id || "closed"}
+        isOpen={!!selectedVenue}
+        onClose={() => setSelectedVenue(null)}
+        title={selectedVenue?.name || ""}
+        subtitle={selectedVenue?.address || ""}
+        sections={drawerSections}
+        onSave={handleDrawerSave}
+        saving={drawerSaving}
+      />
     </div>
   );
 }

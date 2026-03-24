@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { PipelineFilters, usePipelineFilters } from "@/components/pipeline-view";
 import { PipelineTable } from "@/components/pipeline-table";
+import { EntityDrawer } from "@/components/entity-drawer";
 import { Plus, X } from "lucide-react";
 
 type Booth = {
@@ -22,18 +23,23 @@ type Booth = {
   name: string;
   location: string | null;
   size: string | null;
+  price: number | null;
   status: string;
+  equipment: string | null;
+  notes: string | null;
+  sponsorId: string | null;
   source: string;
   stage: string;
   assignedTo: string | null;
-  sponsorId: string | null;
-  equipment: string | null;
 };
 
 export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [booths, setBooths] = useState(initialBooths);
   const [showForm, setShowForm] = useState(false);
+  const [selectedBooth, setSelectedBooth] = useState<Booth | null>(null);
+  const [drawerSaving, setDrawerSaving] = useState(false);
+  const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
 
   const filtered = filter(booths);
 
@@ -90,6 +96,37 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
     }
   }, []);
 
+  const openDrawer = (booth: Booth) => {
+    setSelectedBooth(booth);
+    setDrawerForm({
+      name: booth.name || "",
+      location: booth.location || "",
+      size: booth.size || "standard",
+      equipment: booth.equipment || "",
+      notes: booth.notes || "",
+      source: booth.source || "intake",
+      stage: booth.stage || "lead",
+      assignedTo: booth.assignedTo || "",
+    });
+  };
+
+  const updateField = (field: string, value: string | null) => {
+    setDrawerForm((prev) => ({ ...prev, [field]: value || "" }));
+  };
+
+  const handleDrawerSave = async () => {
+    if (!selectedBooth) return;
+    setDrawerSaving(true);
+    await fetch(`/api/booths/${selectedBooth.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "If-Match": "999" },
+      body: JSON.stringify(drawerForm),
+    });
+    setDrawerSaving(false);
+    setSelectedBooth(null);
+    refreshData();
+  };
+
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -107,6 +144,82 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
       setShowForm(false);
     }
   };
+
+  const drawerSections = selectedBooth
+    ? [
+        {
+          label: "Booth",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Name</Label>
+                  <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Location</Label>
+                  <Input value={(drawerForm.location as string) || ""} onChange={(e) => updateField("location", e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Size</Label>
+                <Select value={String(drawerForm.size || "standard")} onValueChange={(v) => updateField("size", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="small">Small</SelectItem>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Equipment</Label>
+                <Textarea rows={4} placeholder="Power, wifi, table, chairs, etc." value={(drawerForm.equipment as string) || ""} onChange={(e) => updateField("equipment", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notes</Label>
+                <Textarea rows={4} placeholder="Additional notes about this booth..." value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+        {
+          label: "Pipeline",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Stage</Label>
+                  <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="engaged">Engaged</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="declined">Declined</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Assigned To</Label>
+                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+      ]
+    : [];
 
   return (
     <div>
@@ -194,11 +307,23 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
         entityName="booth"
         apiEndpoint="/api/booths"
         onUpdate={refreshData}
+        onRowClick={(booth) => openDrawer(booth)}
       />
 
       {filtered.length === 0 && booths.length > 0 && (
         <p className="text-center text-sm text-muted-foreground py-8">No booths match the current filters.</p>
       )}
+
+      <EntityDrawer
+        key={selectedBooth?.id || "closed"}
+        isOpen={!!selectedBooth}
+        onClose={() => setSelectedBooth(null)}
+        title={selectedBooth?.name || ""}
+        subtitle={selectedBooth?.location || ""}
+        sections={drawerSections}
+        onSave={handleDrawerSave}
+        saving={drawerSaving}
+      />
     </div>
   );
 }

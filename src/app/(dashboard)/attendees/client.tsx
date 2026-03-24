@@ -5,9 +5,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PipelineFilters, usePipelineFilters } from "@/components/pipeline-view";
 import { PipelineTable } from "@/components/pipeline-table";
+import { EntityDrawer } from "@/components/entity-drawer";
 import {
   Users,
   Upload,
@@ -46,6 +55,9 @@ export function AttendeesClient({
 }) {
   const { source, stage, setSource, setStage, filter: pipelineFilter } = usePipelineFilters();
   const [attendees, setAttendees] = useState(initialAttendees);
+  const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
+  const [drawerSaving, setDrawerSaving] = useState(false);
+  const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
   const [search, setSearch] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
@@ -119,6 +131,36 @@ export function AttendeesClient({
     }
   }, []);
 
+  const openDrawer = (attendee: Attendee) => {
+    setSelectedAttendee(attendee);
+    setDrawerForm({
+      name: attendee.name || "",
+      email: attendee.email || "",
+      ticketType: attendee.ticketType || "general",
+      qrHash: attendee.qrHash || "",
+      source: attendee.source || "intake",
+      stage: attendee.stage || "lead",
+      assignedTo: attendee.assignedTo || "",
+    });
+  };
+
+  const updateField = (field: string, value: string | null) => {
+    setDrawerForm((prev) => ({ ...prev, [field]: value || "" }));
+  };
+
+  const handleDrawerSave = async () => {
+    if (!selectedAttendee) return;
+    setDrawerSaving(true);
+    await fetch(`/api/attendees/${selectedAttendee.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "If-Match": "999" },
+      body: JSON.stringify(drawerForm),
+    });
+    setDrawerSaving(false);
+    setSelectedAttendee(null);
+    refreshData();
+  };
+
   const handleImport = async () => {
     if (!csvText.trim()) return;
     setImporting(true);
@@ -166,6 +208,81 @@ export function AttendeesClient({
       setImporting(false);
     }
   };
+
+  const drawerSections = selectedAttendee
+    ? [
+        {
+          label: "Attendee",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Name</Label>
+                  <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email</Label>
+                  <Input value={(drawerForm.email as string) || ""} onChange={(e) => updateField("email", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Ticket Type</Label>
+                  <Select value={String(drawerForm.ticketType || "general")} onValueChange={(v) => updateField("ticketType", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">General</SelectItem>
+                      <SelectItem value="professional">Professional</SelectItem>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="vip">VIP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>QR Hash</Label>
+                  <Input value={(drawerForm.qrHash as string) || ""} readOnly className="bg-muted" />
+                </div>
+              </div>
+            </div>
+          ),
+        },
+        {
+          label: "Pipeline",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Stage</Label>
+                  <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="engaged">Engaged</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="declined">Declined</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Assigned To</Label>
+                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+      ]
+    : [];
 
   return (
     <div>
@@ -273,6 +390,7 @@ export function AttendeesClient({
           entityName="attendee"
           apiEndpoint="/api/attendees"
           onUpdate={refreshData}
+          onRowClick={(attendee) => openDrawer(attendee)}
         />
       )}
 
@@ -281,6 +399,17 @@ export function AttendeesClient({
           No attendees match your search.
         </p>
       )}
+
+      <EntityDrawer
+        key={selectedAttendee?.id || "closed"}
+        isOpen={!!selectedAttendee}
+        onClose={() => setSelectedAttendee(null)}
+        title={selectedAttendee?.name || ""}
+        subtitle={selectedAttendee?.email || ""}
+        sections={drawerSections}
+        onSave={handleDrawerSave}
+        saving={drawerSaving}
+      />
     </div>
   );
 }

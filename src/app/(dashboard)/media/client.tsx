@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { PipelineFilters, usePipelineFilters } from "@/components/pipeline-view";
 import { PipelineTable } from "@/components/pipeline-table";
+import { EntityDrawer } from "@/components/entity-drawer";
 import { Plus, X } from "lucide-react";
 
 type MediaPartner = {
@@ -24,17 +25,23 @@ type MediaPartner = {
   contactEmail: string;
   type: string | null;
   reach: string | null;
+  proposal: string | null;
+  deliverables: string | null;
+  logoUrl: string | null;
+  notes: string | null;
   status: string;
   source: string;
   stage: string;
   assignedTo: string | null;
-  deliverables: string | null;
 };
 
 export function MediaClient({ initialPartners }: { initialPartners: MediaPartner[] }) {
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [partners, setPartners] = useState(initialPartners);
   const [showForm, setShowForm] = useState(false);
+  const [selectedPartner, setSelectedPartner] = useState<MediaPartner | null>(null);
+  const [drawerSaving, setDrawerSaving] = useState(false);
+  const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
 
   const filtered = filter(partners);
 
@@ -92,6 +99,40 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
     }
   }, []);
 
+  const openDrawer = (partner: MediaPartner) => {
+    setSelectedPartner(partner);
+    setDrawerForm({
+      companyName: partner.companyName || "",
+      contactName: partner.contactName || "",
+      contactEmail: partner.contactEmail || "",
+      type: partner.type || "online",
+      reach: partner.reach || "",
+      proposal: partner.proposal || "",
+      deliverables: partner.deliverables || "",
+      notes: partner.notes || "",
+      source: partner.source || "intake",
+      stage: partner.stage || "lead",
+      assignedTo: partner.assignedTo || "",
+    });
+  };
+
+  const updateField = (field: string, value: string | null) => {
+    setDrawerForm((prev) => ({ ...prev, [field]: value || "" }));
+  };
+
+  const handleDrawerSave = async () => {
+    if (!selectedPartner) return;
+    setDrawerSaving(true);
+    await fetch(`/api/media-partners/${selectedPartner.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "If-Match": "999" },
+      body: JSON.stringify(drawerForm),
+    });
+    setDrawerSaving(false);
+    setSelectedPartner(null);
+    refreshData();
+  };
+
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -109,6 +150,105 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
       setShowForm(false);
     }
   };
+
+  const drawerSections = selectedPartner
+    ? [
+        {
+          label: "Partner",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Company Name</Label>
+                  <Input value={(drawerForm.companyName as string) || ""} onChange={(e) => updateField("companyName", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Contact Name</Label>
+                  <Input value={(drawerForm.contactName as string) || ""} onChange={(e) => updateField("contactName", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Contact Email</Label>
+                  <Input value={(drawerForm.contactEmail as string) || ""} onChange={(e) => updateField("contactEmail", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Type</Label>
+                  <Select value={String(drawerForm.type || "online")} onValueChange={(v) => updateField("type", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tv">TV</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                      <SelectItem value="print">Print</SelectItem>
+                      <SelectItem value="podcast">Podcast</SelectItem>
+                      <SelectItem value="blog">Blog</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Reach</Label>
+                <Input value={(drawerForm.reach as string) || ""} onChange={(e) => updateField("reach", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+        {
+          label: "Deliverables",
+          content: (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Proposal</Label>
+                <Textarea rows={4} placeholder="Coverage plan or partnership proposal..." value={(drawerForm.proposal as string) || ""} onChange={(e) => updateField("proposal", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Deliverables</Label>
+                <Textarea rows={4} placeholder="What we provide to them..." value={(drawerForm.deliverables as string) || ""} onChange={(e) => updateField("deliverables", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notes</Label>
+                <Textarea rows={4} placeholder="Additional notes..." value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+        {
+          label: "Pipeline",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Stage</Label>
+                  <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="engaged">Engaged</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="declined">Declined</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Assigned To</Label>
+                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+      ]
+    : [];
 
   return (
     <div>
@@ -201,11 +341,23 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
         entityName="media partner"
         apiEndpoint="/api/media-partners"
         onUpdate={refreshData}
+        onRowClick={(partner) => openDrawer(partner)}
       />
 
       {filtered.length === 0 && partners.length > 0 && (
         <p className="text-center text-sm text-muted-foreground py-8">No media partners match the current filters.</p>
       )}
+
+      <EntityDrawer
+        key={selectedPartner?.id || "closed"}
+        isOpen={!!selectedPartner}
+        onClose={() => setSelectedPartner(null)}
+        title={selectedPartner?.companyName || ""}
+        subtitle={selectedPartner?.contactName || ""}
+        sections={drawerSections}
+        onSave={handleDrawerSave}
+        saving={drawerSaving}
+      />
     </div>
   );
 }

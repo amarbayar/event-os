@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -14,20 +15,24 @@ import {
 } from "@/components/ui/select";
 import { PipelineFilters, usePipelineFilters } from "@/components/pipeline-view";
 import { PipelineTable } from "@/components/pipeline-table";
+import { EntityDrawer } from "@/components/entity-drawer";
 import { Copy, Check, Plus, X } from "lucide-react";
 
 type Volunteer = {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   role: string | null;
   availability: string | null;
+  experience: string | null;
+  tshirtSize: string | null;
+  assignedShift: string | null;
+  notes: string | null;
   status: string;
   source: string;
   stage: string;
   assignedTo: string | null;
-  assignedShift: string | null;
-  tshirtSize: string | null;
 };
 
 export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Volunteer[] }) {
@@ -35,6 +40,9 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
   const [volunteers, setVolunteers] = useState(initialVolunteers);
   const [copied, setCopied] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
+  const [drawerSaving, setDrawerSaving] = useState(false);
+  const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
 
   const filtered = filter(volunteers);
 
@@ -98,6 +106,41 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
     }
   }, []);
 
+  const openDrawer = (volunteer: Volunteer) => {
+    setSelectedVolunteer(volunteer);
+    setDrawerForm({
+      name: volunteer.name || "",
+      email: volunteer.email || "",
+      phone: volunteer.phone || "",
+      role: volunteer.role || "General",
+      availability: volunteer.availability || "",
+      tshirtSize: volunteer.tshirtSize || "L",
+      assignedShift: volunteer.assignedShift || "",
+      experience: volunteer.experience || "",
+      notes: volunteer.notes || "",
+      source: volunteer.source || "intake",
+      stage: volunteer.stage || "lead",
+      assignedTo: volunteer.assignedTo || "",
+    });
+  };
+
+  const updateField = (field: string, value: string | null) => {
+    setDrawerForm((prev) => ({ ...prev, [field]: value || "" }));
+  };
+
+  const handleDrawerSave = async () => {
+    if (!selectedVolunteer) return;
+    setDrawerSaving(true);
+    await fetch(`/api/volunteers/${selectedVolunteer.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "If-Match": "999" },
+      body: JSON.stringify(drawerForm),
+    });
+    setDrawerSaving(false);
+    setSelectedVolunteer(null);
+    refreshData();
+  };
+
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -115,6 +158,121 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
       setShowForm(false);
     }
   };
+
+  const drawerSections = selectedVolunteer
+    ? [
+        {
+          label: "Profile",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Name</Label>
+                  <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email</Label>
+                  <Input value={(drawerForm.email as string) || ""} onChange={(e) => updateField("email", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Phone</Label>
+                  <Input value={(drawerForm.phone as string) || ""} onChange={(e) => updateField("phone", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Role</Label>
+                  <Select value={String(drawerForm.role || "General")} onValueChange={(v) => updateField("role", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Registration">Registration</SelectItem>
+                      <SelectItem value="Stage">Stage</SelectItem>
+                      <SelectItem value="Logistics">Logistics</SelectItem>
+                      <SelectItem value="Tech Support">Tech Support</SelectItem>
+                      <SelectItem value="General">General</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Availability</Label>
+                  <Input value={(drawerForm.availability as string) || ""} onChange={(e) => updateField("availability", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>T-Shirt Size</Label>
+                  <Select value={String(drawerForm.tshirtSize || "L")} onValueChange={(v) => updateField("tshirtSize", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="XS">XS</SelectItem>
+                      <SelectItem value="S">S</SelectItem>
+                      <SelectItem value="M">M</SelectItem>
+                      <SelectItem value="L">L</SelectItem>
+                      <SelectItem value="XL">XL</SelectItem>
+                      <SelectItem value="XXL">XXL</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          ),
+        },
+        {
+          label: "Assignment",
+          content: (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Assigned Shift</Label>
+                <Input value={(drawerForm.assignedShift as string) || ""} onChange={(e) => updateField("assignedShift", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Experience</Label>
+                <Textarea rows={4} placeholder="Previous volunteer experience..." value={(drawerForm.experience as string) || ""} onChange={(e) => updateField("experience", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notes</Label>
+                <Textarea rows={4} placeholder="Additional notes..." value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+        {
+          label: "Pipeline",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Stage</Label>
+                  <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="engaged">Engaged</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="declined">Declined</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Assigned To</Label>
+                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+      ]
+    : [];
 
   return (
     <div>
@@ -215,11 +373,23 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
         entityName="volunteer"
         apiEndpoint="/api/volunteers"
         onUpdate={refreshData}
+        onRowClick={(volunteer) => openDrawer(volunteer)}
       />
 
       {filtered.length === 0 && volunteers.length > 0 && (
         <p className="text-center text-sm text-muted-foreground py-8">No volunteers match the current filters.</p>
       )}
+
+      <EntityDrawer
+        key={selectedVolunteer?.id || "closed"}
+        isOpen={!!selectedVolunteer}
+        onClose={() => setSelectedVolunteer(null)}
+        title={selectedVolunteer?.name || ""}
+        subtitle={selectedVolunteer?.email || ""}
+        sections={drawerSections}
+        onSave={handleDrawerSave}
+        saving={drawerSaving}
+      />
     </div>
   );
 }
