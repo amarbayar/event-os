@@ -153,3 +153,63 @@ export async function getTeams() {
     orderBy: [asc(schema.teams.sortOrder)],
   });
 }
+
+export async function getBooths() {
+  const ids = await getActiveIds();
+  if (!ids) return [];
+
+  return db.query.booths.findMany({
+    where: eq(schema.booths.editionId, ids.editionId),
+    orderBy: [asc(schema.booths.name)],
+  });
+}
+
+export async function getVolunteers() {
+  const ids = await getActiveIds();
+  if (!ids) return [];
+
+  return db.query.volunteerApplications.findMany({
+    where: eq(schema.volunteerApplications.editionId, ids.editionId),
+    orderBy: desc(schema.volunteerApplications.createdAt),
+  });
+}
+
+export async function getOutreach() {
+  const ids = await getActiveIds();
+  if (!ids) return [];
+
+  return db.query.outreach.findMany({
+    where: eq(schema.outreach.editionId, ids.editionId),
+    orderBy: desc(schema.outreach.createdAt),
+  });
+}
+
+export async function getMediaPartners() {
+  const ids = await getActiveIds();
+  if (!ids) return [];
+
+  return db.query.mediaPartners.findMany({
+    where: eq(schema.mediaPartners.editionId, ids.editionId),
+    orderBy: desc(schema.mediaPartners.createdAt),
+  });
+}
+
+export async function getCampaigns() {
+  const ids = await getActiveIds();
+  if (!ids) return [];
+
+  return db.query.campaigns.findMany({
+    where: eq(schema.campaigns.editionId, ids.editionId),
+    orderBy: desc(schema.campaigns.createdAt),
+  });
+}
+
+export async function getInvitations() {
+  const ids = await getActiveIds();
+  if (!ids) return [];
+
+  return db.query.invitations.findMany({
+    where: eq(schema.invitations.editionId, ids.editionId),
+    orderBy: desc(schema.invitations.createdAt),
+  });
+}
