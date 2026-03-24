@@ -183,7 +183,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
                 <div className="space-y-1.5">
                   <Label>Type</Label>
                   <Select value={String(drawerForm.type || "online")} onValueChange={(v) => updateField("type", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tv">TV</SelectItem>
                       <SelectItem value="online">Online</SelectItem>
@@ -228,7 +228,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
                 <div className="space-y-1.5">
                   <Label>Source</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="intake">Intake</SelectItem>
                       <SelectItem value="outreach">Outreach</SelectItem>
@@ -238,7 +238,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
                 <div className="space-y-1.5">
                   <Label>Stage</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="lead">Lead</SelectItem>
                       <SelectItem value="engaged">Engaged</SelectItem>
@@ -291,7 +291,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
                 <div className="space-y-1.5">
                   <Label>Type</Label>
                   <Select name="type" defaultValue="online">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tv">TV</SelectItem>
                       <SelectItem value="online">Online</SelectItem>
@@ -310,7 +310,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
                 <div className="space-y-1.5">
                   <Label>Source</Label>
                   <Select name="source" defaultValue="outreach">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="intake">Intake</SelectItem>
                       <SelectItem value="outreach">Outreach</SelectItem>

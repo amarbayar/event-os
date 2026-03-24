@@ -188,7 +188,7 @@ export function AgendaClient({ initialSessions }: { initialSessions: Session[] }
                 <div className="space-y-1.5">
                   <Label>Type</Label>
                   <Select name="type" defaultValue="talk">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="talk">Talk</SelectItem>
                       <SelectItem value="keynote">Keynote</SelectItem>
@@ -204,7 +204,7 @@ export function AgendaClient({ initialSessions }: { initialSessions: Session[] }
                 <div className="space-y-1.5">
                   <Label>Day</Label>
                   <Select name="day" defaultValue={String(selectedDay)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1">Day 1</SelectItem>
                       <SelectItem value="2">Day 2</SelectItem>

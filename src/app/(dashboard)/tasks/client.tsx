@@ -128,7 +128,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
                 <div className="space-y-1.5">
                   <Label>Priority</Label>
                   <Select name="priority" defaultValue="medium">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">Low</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>

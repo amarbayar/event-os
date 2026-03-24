@@ -277,7 +277,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
                 <div className="space-y-1.5">
                   <Label>Source</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="intake">Intake</SelectItem>
                       <SelectItem value="outreach">Outreach</SelectItem>
@@ -287,7 +287,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
                 <div className="space-y-1.5">
                   <Label>Stage</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="lead">Lead</SelectItem>
                       <SelectItem value="engaged">Engaged</SelectItem>
@@ -356,7 +356,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
                 <div className="space-y-1.5">
                   <Label>Source</Label>
                   <Select name="source" defaultValue="outreach">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="intake">Intake</SelectItem>
                       <SelectItem value="outreach">Outreach</SelectItem>

@@ -192,7 +192,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
                 <div className="space-y-1.5">
                   <Label>Role</Label>
                   <Select value={String(drawerForm.role || "General")} onValueChange={(v) => updateField("role", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Registration">Registration</SelectItem>
                       <SelectItem value="Stage">Stage</SelectItem>
@@ -211,7 +211,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
                 <div className="space-y-1.5">
                   <Label>T-Shirt Size</Label>
                   <Select value={String(drawerForm.tshirtSize || "L")} onValueChange={(v) => updateField("tshirtSize", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="XS">XS</SelectItem>
                       <SelectItem value="S">S</SelectItem>
@@ -253,7 +253,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
                 <div className="space-y-1.5">
                   <Label>Source</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="intake">Intake</SelectItem>
                       <SelectItem value="outreach">Outreach</SelectItem>
@@ -263,7 +263,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
                 <div className="space-y-1.5">
                   <Label>Stage</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="lead">Lead</SelectItem>
                       <SelectItem value="engaged">Engaged</SelectItem>
@@ -331,7 +331,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
                 <div className="space-y-1.5">
                   <Label>T-Shirt Size</Label>
                   <Select name="tshirtSize" defaultValue="L">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="XS">XS</SelectItem>
                       <SelectItem value="S">S</SelectItem>
@@ -347,7 +347,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
                 <div className="space-y-1.5">
                   <Label>Source</Label>
                   <Select name="source" defaultValue="outreach">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="intake">Intake</SelectItem>
                       <SelectItem value="outreach">Outreach</SelectItem>

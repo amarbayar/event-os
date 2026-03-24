@@ -95,7 +95,7 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
                 <div className="space-y-1.5">
                   <Label>Type *</Label>
                   <Select name="type" defaultValue="speaker_announcement">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="speaker_announcement">Speaker Announcement</SelectItem>
                       <SelectItem value="sponsor_promo">Sponsor Promo</SelectItem>
@@ -107,7 +107,7 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
                 <div className="space-y-1.5">
                   <Label>Platform</Label>
                   <Select name="platform" defaultValue="twitter">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="twitter">Twitter/X</SelectItem>
                       <SelectItem value="facebook">Facebook</SelectItem>

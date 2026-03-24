@@ -114,7 +114,7 @@ export function InvitationsClient({ initialInvitations }: { initialInvitations: 
                 <div className="space-y-1.5">
                   <Label>Type</Label>
                   <Select name="type" defaultValue="special_guest">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="special_guest">Special Guest</SelectItem>
                       <SelectItem value="speaker_invitee">Speaker Invitee</SelectItem>

@@ -107,7 +107,7 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
                 <div className="space-y-1.5">
                   <Label>Target Type</Label>
                   <Select name="targetType" defaultValue="speaker">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="speaker">Speaker</SelectItem>
                       <SelectItem value="sponsor">Sponsor</SelectItem>

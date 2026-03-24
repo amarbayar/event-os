@@ -266,7 +266,7 @@ export function SpeakersClient({
                 <div className="space-y-1.5">
                   <Label>Track</Label>
                   <Select value={String(drawerForm.trackPreference || "")} onValueChange={(v) => updateField("trackPreference", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select track" /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" placeholder="Select track" /></SelectTrigger>
                     <SelectContent>
                       {tracks.map((t) => (
                         <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
@@ -277,7 +277,7 @@ export function SpeakersClient({
                 <div className="space-y-1.5">
                   <Label>Type</Label>
                   <Select value={String(drawerForm.talkType || "talk")} onValueChange={(v) => updateField("talkType", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="talk">Talk</SelectItem>
                       <SelectItem value="keynote">Keynote</SelectItem>
@@ -363,7 +363,7 @@ export function SpeakersClient({
                 <div className="space-y-1.5">
                   <Label>Source</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="intake">Intake</SelectItem>
                       <SelectItem value="outreach">Outreach</SelectItem>
@@ -374,7 +374,7 @@ export function SpeakersClient({
                 <div className="space-y-1.5">
                   <Label>Stage</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="lead">Lead</SelectItem>
                       <SelectItem value="engaged">Engaged</SelectItem>
@@ -441,7 +441,7 @@ export function SpeakersClient({
                 <div className="space-y-1.5">
                   <Label>Source</Label>
                   <Select name="source" defaultValue="outreach">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="intake">Intake (CFP)</SelectItem>
                       <SelectItem value="outreach">Outreach</SelectItem>

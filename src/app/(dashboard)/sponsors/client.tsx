@@ -139,7 +139,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                 <div className="space-y-1.5">
                   <Label>Package</Label>
                   <Select value={String(drawerForm.packagePreference || "gold")} onValueChange={(v) => updateField("packagePreference", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="platinum">Platinum</SelectItem>
                       <SelectItem value="gold">Gold</SelectItem>
@@ -175,7 +175,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                 <div className="space-y-1.5">
                   <Label>Source</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="intake">Intake</SelectItem>
                       <SelectItem value="outreach">Outreach</SelectItem>
@@ -185,7 +185,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                 <div className="space-y-1.5">
                   <Label>Stage</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="lead">Lead</SelectItem>
                       <SelectItem value="engaged">Engaged</SelectItem>
@@ -237,7 +237,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                 <div className="space-y-1.5">
                   <Label>Package</Label>
                   <Select name="packagePreference" defaultValue="gold">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="platinum">Platinum</SelectItem>
                       <SelectItem value="gold">Gold</SelectItem>
