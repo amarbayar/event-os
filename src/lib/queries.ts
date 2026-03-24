@@ -2,17 +2,31 @@ import { db } from "@/db";
 import { eq, and, desc, asc, count, sql } from "drizzle-orm";
 import * as schema from "@/db/schema";
 
-// Hardcoded for now — will come from session/cookie after onboarding flow
-const DEFAULT_ORG_ID = process.env.DEFAULT_ORG_ID || "";
-const DEFAULT_EDITION_ID = process.env.DEFAULT_EDITION_ID || "";
-
 export async function getActiveIds() {
-  // Try env vars first
-  if (DEFAULT_ORG_ID && DEFAULT_EDITION_ID) {
-    return { orgId: DEFAULT_ORG_ID, editionId: DEFAULT_EDITION_ID };
+  // Try cookie first (user's selected edition)
+  try {
+    const { getEditionFromCookie } = await import("@/lib/edition-cookie");
+    const cookieEditionId = await getEditionFromCookie();
+    if (cookieEditionId) {
+      const edition = await db.query.eventEditions.findFirst({
+        where: eq(schema.eventEditions.id, cookieEditionId),
+      });
+      if (edition) {
+        return { orgId: edition.organizationId, editionId: edition.id };
+      }
+    }
+  } catch {
+    // Cookie reading may fail in API routes — that's fine, fall through
   }
 
-  // Fall back to first org/edition in DB
+  // Try env vars
+  const envOrg = process.env.DEFAULT_ORG_ID || "";
+  const envEdition = process.env.DEFAULT_EDITION_ID || "";
+  if (envOrg && envEdition) {
+    return { orgId: envOrg, editionId: envEdition };
+  }
+
+  // Fall back to most recent edition in DB
   const org = await db.query.organizations.findFirst();
   if (!org) return null;
 

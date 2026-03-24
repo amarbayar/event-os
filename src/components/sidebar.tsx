@@ -69,12 +69,33 @@ const bottomItems = [
   { href: "/check-in", label: "Check-in", icon: ScanLine },
 ];
 
+type Edition = {
+  id: string;
+  name: string;
+};
+
 export function Sidebar({ onToggleChat }: { onToggleChat?: () => void }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["People", "Event", "Operations"])
   );
+  const [editions, setEditions] = useState<Edition[]>([]);
+  const [activeEdition, setActiveEdition] = useState<string>("");
+  const [showEditionPicker, setShowEditionPicker] = useState(false);
+
+  // Fetch editions on mount
+  useEffect(() => {
+    fetch("/api/editions")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.data?.length) {
+          setEditions(d.data);
+          setActiveEdition(d.data[0].name);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -120,11 +141,49 @@ export function Sidebar({ onToggleChat }: { onToggleChat?: () => void }) {
 
   const sidebarContent = (
     <>
-      {/* Brand */}
-      <div className="flex h-14 items-center border-b border-stone-800 px-4">
-        <span className="text-lg font-bold tracking-tight text-white">
+      {/* Brand + Edition Selector */}
+      <div className="border-b border-stone-800 px-4 py-3">
+        <span className="text-xs font-medium uppercase tracking-wider text-stone-500">
           Event OS
         </span>
+        {editions.length > 0 && (
+          <div className="relative mt-1">
+            <button
+              onClick={() => setShowEditionPicker(!showEditionPicker)}
+              className="flex w-full items-center justify-between rounded-md text-sm font-medium text-white hover:text-yellow-400 transition-colors"
+            >
+              <span className="truncate">{activeEdition || "Select event"}</span>
+              <ChevronDown className={cn("h-3 w-3 ml-1 shrink-0 transition-transform", showEditionPicker && "rotate-180")} />
+            </button>
+            {showEditionPicker && (
+              <div className="absolute left-0 right-0 top-full mt-1 rounded-md border border-stone-700 bg-stone-800 py-1 z-50">
+                {editions.map((ed) => (
+                  <button
+                    key={ed.id}
+                    onClick={async () => {
+                      await fetch("/api/editions/switch", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ editionId: ed.id }),
+                      });
+                      setActiveEdition(ed.name);
+                      setShowEditionPicker(false);
+                      window.location.reload();
+                    }}
+                    className={cn(
+                      "block w-full px-3 py-1.5 text-left text-sm transition-colors",
+                      ed.name === activeEdition
+                        ? "text-yellow-400 bg-yellow-500/10"
+                        : "text-stone-300 hover:bg-stone-700 hover:text-white"
+                    )}
+                  >
+                    {ed.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Nav */}
