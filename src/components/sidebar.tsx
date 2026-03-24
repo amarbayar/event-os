@@ -39,14 +39,13 @@ const navGroups: NavGroup[] = [
       { href: "/sponsors", label: "Sponsors", icon: Building2 },
       { href: "/volunteers", label: "Volunteers", icon: HandHelping },
       { href: "/media", label: "Media", icon: Tv },
-      { href: "/outreach", label: "Outreach", icon: Send },
     ],
   },
   {
     label: "Event",
     items: [
       { href: "/agenda", label: "Agenda", icon: Calendar },
-      { href: "/venue", label: "Venue", icon: MapPin },
+      { href: "/venue", label: "Venues", icon: MapPin },
       { href: "/booths", label: "Booths", icon: Store },
     ],
   },
@@ -56,7 +55,6 @@ const navGroups: NavGroup[] = [
       { href: "/tasks", label: "Tasks", icon: CheckSquare },
       { href: "/marketing", label: "Marketing", icon: Megaphone },
       { href: "/attendees", label: "Attendees", icon: Users },
-      { href: "/invitations", label: "Invitations", icon: Ticket },
     ],
   },
 ];
