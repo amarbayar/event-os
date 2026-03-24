@@ -14,8 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PipelineFilters, usePipelineFilters } from "@/components/pipeline-view";
-import { PipelineTable } from "@/components/pipeline-table";
 import { EntityDrawer } from "@/components/entity-drawer";
 import {
   Users,
@@ -35,8 +33,6 @@ type Attendee = {
   checkedIn: boolean;
   checkedInAt: Date | null;
   source: string;
-  stage: string;
-  assignedTo: string | null;
 };
 
 type Stats = {
@@ -53,7 +49,6 @@ export function AttendeesClient({
   initialAttendees: Attendee[];
   stats: Stats;
 }) {
-  const { source, stage, setSource, setStage, filter: pipelineFilter } = usePipelineFilters();
   const [attendees, setAttendees] = useState(initialAttendees);
   const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
@@ -64,8 +59,10 @@ export function AttendeesClient({
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [checkInFilter, setCheckInFilter] = useState<"all" | "checked_in" | "not_checked_in">("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
 
-  const filtered = pipelineFilter(attendees)
+  const filtered = attendees
+    .filter((a) => sourceFilter === "all" || a.source === sourceFilter)
     .filter((a) => {
       if (checkInFilter === "checked_in") return a.checkedIn;
       if (checkInFilter === "not_checked_in") return !a.checkedIn;
@@ -77,59 +74,14 @@ export function AttendeesClient({
         a.email.toLowerCase().includes(search.toLowerCase())
     );
 
-  const columns = [
-    {
-      key: "name",
-      label: "Name",
-      width: "160px",
-      render: (a: Attendee) => (
-        <p className="font-medium text-sm">{a.name}</p>
-      ),
-    },
-    {
-      key: "email",
-      label: "Email",
-      width: "200px",
-      render: (a: Attendee) => (
-        <span className="text-xs text-muted-foreground">{a.email || "—"}</span>
-      ),
-    },
-    {
-      key: "ticketType",
-      label: "Ticket Type",
-      width: "110px",
-      render: (a: Attendee) => (
-        <Badge variant="outline" className="text-[10px]">{a.ticketType}</Badge>
-      ),
-    },
-    {
-      key: "checkedIn",
-      label: "Check-in Status",
-      width: "130px",
-      render: (a: Attendee) =>
-        a.checkedIn ? (
-          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            {a.checkedInAt
-              ? new Date(a.checkedInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-              : "Checked in"}
-          </Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">Not checked in</span>
-        ),
-    },
-  ];
+  const ticketCounts = {
+    total: attendees.length,
+    professional: attendees.filter((a) => a.ticketType === "professional").length,
+    student: attendees.filter((a) => a.ticketType === "student").length,
+    vip: attendees.filter((a) => a.ticketType === "vip").length,
+  };
 
-  // Refresh data without full page reload
-  const refreshData = useCallback(async () => {
-    const res = await fetch("/api/attendees?editionId=all");
-    if (res.ok) {
-      const json = await res.json();
-      if (json.data) setAttendees(json.data);
-    } else {
-      window.location.reload();
-    }
-  }, []);
+  const refreshData = useCallback(() => { window.location.reload(); }, []);
 
   const openDrawer = (attendee: Attendee) => {
     setSelectedAttendee(attendee);
@@ -138,9 +90,7 @@ export function AttendeesClient({
       email: attendee.email || "",
       ticketType: attendee.ticketType || "general",
       qrHash: attendee.qrHash || "",
-      source: attendee.source || "intake",
-      stage: attendee.stage || "lead",
-      assignedTo: attendee.assignedTo || "",
+      source: attendee.source || "online",
     });
   };
 
@@ -166,42 +116,28 @@ export function AttendeesClient({
     setImporting(true);
     setImportResult(null);
 
-    // Parse CSV
     const lines = csvText.trim().split("\n");
     const header = lines[0].toLowerCase();
     const hasHeader = header.includes("name") || header.includes("email");
     const dataLines = hasHeader ? lines.slice(1) : lines;
-
     const separator = lines[0].includes("\t") ? "\t" : ",";
 
     const attendeeList = dataLines
       .filter((l) => l.trim())
       .map((line) => {
         const parts = line.split(separator).map((p) => p.trim());
-        return {
-          name: parts[0] || "",
-          email: parts[1] || "",
-          ticketType: parts[2] || "general",
-        };
+        return { name: parts[0] || "", email: parts[1] || "", ticketType: parts[2] || "general" };
       });
 
     try {
       const res = await fetch("/api/attendees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          editionId: "placeholder", // TODO: wire to real edition
-          organizationId: "placeholder",
-          attendeeList,
-        }),
+        body: JSON.stringify({ editionId: "placeholder", organizationId: "placeholder", attendeeList }),
       });
-
       const data = await res.json();
       setImportResult(data.message);
-
-      if (res.ok) {
-        setTimeout(() => refreshData(), 2000);
-      }
+      if (res.ok) setTimeout(() => refreshData(), 2000);
     } catch {
       setImportResult("Import failed. Please try again.");
     } finally {
@@ -209,10 +145,13 @@ export function AttendeesClient({
     }
   };
 
+  // Simple table — no pipeline stage/assignedTo columns
+  const tableRows = filtered;
+
   const drawerSections = selectedAttendee
     ? [
         {
-          label: "Attendee",
+          label: "Details",
           content: (
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -239,45 +178,30 @@ export function AttendeesClient({
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>QR Hash</Label>
-                  <Input value={(drawerForm.qrHash as string) || ""} readOnly className="bg-muted" />
-                </div>
-              </div>
-            </div>
-          ),
-        },
-        {
-          label: "Pipeline",
-          content: (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
                   <Label>Source</Label>
-                  <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
+                  <Select value={String(drawerForm.source || "online")} onValueChange={(v) => updateField("source", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Stage</Label>
-                  <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
-                    <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="engaged">Engaged</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="declined">Declined</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                      <SelectItem value="offline">Offline (Day-of)</SelectItem>
+                      <SelectItem value="internal">Internal (Guest)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Assigned To</Label>
-                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+                <Label>QR Hash</Label>
+                <Input value={(drawerForm.qrHash as string) || ""} readOnly className="bg-muted font-mono text-xs" />
               </div>
+              {selectedAttendee.checkedIn && (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-sm text-emerald-700 font-medium">
+                    Checked in {selectedAttendee.checkedInAt
+                      ? `at ${new Date(selectedAttendee.checkedInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                      : ""}
+                  </p>
+                </div>
+              )}
             </div>
           ),
         },
@@ -288,35 +212,31 @@ export function AttendeesClient({
     <div>
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">
-            Attendees
-          </h1>
-          <p className="text-sm text-muted-foreground">{attendees.length} total</p>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">Attendees</h1>
+          <p className="text-sm text-muted-foreground">{attendees.length} registered</p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowImport(!showImport)}
-          >
-            <Upload className="mr-2 h-3 w-3" /> Import CSV
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={() => setShowImport(!showImport)}>
+          <Upload className="mr-2 h-3 w-3" /> Import CSV
+        </Button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-4">
+        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums">{ticketCounts.total}</p><p className="text-xs text-muted-foreground">Total</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums text-emerald-600">{stats.checkedIn}</p><p className="text-xs text-muted-foreground">Checked In</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums">{ticketCounts.professional}</p><p className="text-xs text-muted-foreground">Professional</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums">{ticketCounts.student}</p><p className="text-xs text-muted-foreground">Student</p></CardContent></Card>
       </div>
 
       {/* CSV Import */}
       {showImport && (
-        <Card className="mb-6">
+        <Card className="mb-4">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">Import Attendees from CSV</h3>
-              <button onClick={() => setShowImport(false)} className="text-stone-400 hover:text-stone-600">
-                <X className="h-4 w-4" />
-              </button>
+              <button onClick={() => setShowImport(false)} className="text-stone-400 hover:text-stone-600"><X className="h-4 w-4" /></button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Paste CSV data: Name, Email, Ticket Type (one per line). Tab or comma separated. Header row optional.
-            </p>
+            <p className="text-xs text-muted-foreground">Name, Email, Ticket Type — one per line. Tab or comma separated.</p>
             <Textarea
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
@@ -330,74 +250,83 @@ export function AttendeesClient({
               </div>
             )}
             <Button onClick={handleImport} disabled={!csvText.trim() || importing} className="w-full">
-              {importing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importing...</> : `Import ${csvText.trim().split("\n").length - 1} attendees`}
+              {importing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importing...</> : "Import"}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Pipeline filters */}
-      <PipelineFilters
-        items={attendees}
-        sources={["all", "intake", "outreach", "sponsored"]}
-        activeSource={source}
-        activeStage={stage}
-        onSourceChange={setSource}
-        onStageChange={setStage}
-      />
-
-      {/* Check-in filters + Search */}
+      {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or email..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Search by name or email..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        {(["all", "online", "offline", "internal"] as const).map((s) => (
+          <Button key={s} variant={sourceFilter === s ? "default" : "outline"} size="sm" onClick={() => setSourceFilter(s)} className="capitalize">
+            {s === "all" ? "All" : s === "internal" ? "Guest" : s}
+          </Button>
+        ))}
+        <div className="h-4 w-px bg-border" />
         {(["all", "checked_in", "not_checked_in"] as const).map((f) => (
-          <Button
-            key={f}
-            variant={checkInFilter === f ? "default" : "outline"}
-            size="sm"
-            onClick={() => setCheckInFilter(f)}
-          >
-            {f === "all" ? "All" : f === "checked_in" ? "Checked In" : "Not Checked In"}
+          <Button key={f} variant={checkInFilter === f ? "secondary" : "ghost"} size="sm" onClick={() => setCheckInFilter(f)}>
+            {f === "all" ? "All Status" : f === "checked_in" ? "Checked In" : "Not Checked In"}
           </Button>
         ))}
       </div>
 
-      {/* Table view */}
+      {/* Attendee table — simple, no pipeline columns */}
       {attendees.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Users className="h-12 w-12 text-muted-foreground/30 mb-4" />
             <h3 className="text-lg font-medium mb-1">No attendees yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Import attendees from CSV or paste them into the agent chat.
-            </p>
-            <Button onClick={() => setShowImport(true)}>
-              <Upload className="mr-2 h-4 w-4" /> Import CSV
-            </Button>
+            <p className="text-sm text-muted-foreground mb-4">Import attendees from CSV or paste them into the agent chat.</p>
+            <Button onClick={() => setShowImport(true)}><Upload className="mr-2 h-4 w-4" /> Import CSV</Button>
           </CardContent>
         </Card>
       ) : (
-        <PipelineTable
-          items={filtered}
-          columns={columns}
-          entityName="attendee"
-          apiEndpoint="/api/attendees"
-          onUpdate={refreshData}
-          onRowClick={(attendee) => openDrawer(attendee)}
-        />
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-stone-50">
+                <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500">Name</th>
+                <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500">Email</th>
+                <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[100px]">Ticket</th>
+                <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[80px]">Source</th>
+                <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[130px]">Check-in</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableRows.map((a) => (
+                <tr
+                  key={a.id}
+                  onClick={() => openDrawer(a)}
+                  className="border-b last:border-0 hover:bg-yellow-50/30 transition-colors cursor-pointer"
+                >
+                  <td className="px-3 py-2 font-medium">{a.name}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{a.email}</td>
+                  <td className="px-3 py-2"><Badge variant="outline" className="text-[10px] capitalize">{a.ticketType}</Badge></td>
+                  <td className="px-3 py-2"><span className="text-xs capitalize text-muted-foreground">{a.source || "online"}</span></td>
+                  <td className="px-3 py-2">
+                    {a.checkedIn ? (
+                      <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                        {a.checkedInAt ? new Date(a.checkedInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Yes"}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {filtered.length === 0 && attendees.length > 0 && (
-        <p className="text-sm text-muted-foreground text-center py-8">
-          No attendees match your search.
-        </p>
+        <p className="text-sm text-muted-foreground text-center py-8">No attendees match your search.</p>
       )}
 
       <EntityDrawer
