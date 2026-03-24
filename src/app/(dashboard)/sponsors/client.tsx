@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { PipelineFilters, usePipelineFilters } from "@/components/pipeline-view";
 import { PipelineTable } from "@/components/pipeline-table";
+import { EntityDrawer } from "@/components/entity-drawer";
+import { FileUpload } from "@/components/file-upload";
 import { Building2, Plus, X } from "lucide-react";
 
 type Sponsor = {
@@ -35,80 +37,165 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [sponsors, setSponsors] = useState(initialSponsors);
   const [showForm, setShowForm] = useState(false);
+  const [selectedSponsor, setSelectedSponsor] = useState<Sponsor | null>(null);
+  const [drawerSaving, setDrawerSaving] = useState(false);
+  const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
 
   const filtered = filter(sponsors);
 
-  const columns = [
-    {
-      key: "companyName",
-      label: "Company Name",
-      width: "180px",
-      render: (s: Sponsor) => (
-        <p className="font-medium text-sm">{s.companyName}</p>
-      ),
-    },
-    {
-      key: "contactName",
-      label: "Contact",
-      width: "140px",
-      render: (s: Sponsor) => (
-        <span className="text-xs text-muted-foreground">{s.contactName || "—"}</span>
-      ),
-    },
-    {
-      key: "contactEmail",
-      label: "Email",
-      width: "180px",
-      render: (s: Sponsor) => (
-        <span className="text-xs text-muted-foreground">{s.contactEmail || "—"}</span>
-      ),
-    },
-    {
-      key: "packagePreference",
-      label: "Package",
-      width: "100px",
-      render: (s: Sponsor) => (
-        <span className="text-xs capitalize">{s.packagePreference || "—"}</span>
-      ),
-    },
-    {
-      key: "status",
-      label: "Status",
-      width: "90px",
-      render: (s: Sponsor) => (
-        <span className="text-xs">{s.status}</span>
-      ),
-    },
-  ];
+  const refreshData = useCallback(() => { window.location.reload(); }, []);
 
-  // Refresh data without full page reload
-  const refreshData = useCallback(async () => {
-    const res = await fetch("/api/sponsors");
-    if (res.ok) {
-      const json = await res.json();
-      if (json.data) setSponsors(json.data);
-    } else {
-      window.location.reload();
-    }
-  }, []);
+  const openDrawer = (sponsor: Sponsor) => {
+    setSelectedSponsor(sponsor);
+    setDrawerForm({
+      companyName: sponsor.companyName || "",
+      contactName: sponsor.contactName || "",
+      contactEmail: sponsor.contactEmail || "",
+      packagePreference: sponsor.packagePreference || "gold",
+      message: sponsor.message || "",
+      source: sponsor.source || "intake",
+      stage: sponsor.stage || "lead",
+      assignedTo: sponsor.assignedTo || "",
+    });
+  };
+
+  const updateField = (field: string, value: string | null) => {
+    setDrawerForm((prev) => ({ ...prev, [field]: value || "" }));
+  };
+
+  const handleDrawerSave = async () => {
+    if (!selectedSponsor) return;
+    setDrawerSaving(true);
+    await fetch(`/api/sponsors/${selectedSponsor.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "If-Match": "999" },
+      body: JSON.stringify(drawerForm),
+    });
+    setDrawerSaving(false);
+    setSelectedSponsor(null);
+    refreshData();
+  };
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
-
     const res = await fetch("/api/sponsors", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-
     if (res.ok) {
-      const json = await res.json();
-      setSponsors((prev) => [json.data, ...prev]);
       setShowForm(false);
+      refreshData();
     }
   };
+
+  const columns = [
+    {
+      key: "companyName",
+      label: "Company",
+      width: "180px",
+      render: (s: Sponsor) => <p className="font-medium text-sm">{s.companyName}</p>,
+    },
+    {
+      key: "contact",
+      label: "Contact",
+      width: "140px",
+      render: (s: Sponsor) => (
+        <div>
+          <p className="text-xs">{s.contactName || "—"}</p>
+          <p className="text-[10px] text-muted-foreground">{s.contactEmail || ""}</p>
+        </div>
+      ),
+    },
+    {
+      key: "package",
+      label: "Package",
+      width: "90px",
+      render: (s: Sponsor) => <span className="text-xs capitalize">{s.packagePreference || "—"}</span>,
+    },
+  ];
+
+  const drawerSections = selectedSponsor
+    ? [
+        {
+          label: "Company",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Company Name</Label>
+                  <Input value={(drawerForm.companyName as string) || ""} onChange={(e) => updateField("companyName", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Package</Label>
+                  <Select value={String(drawerForm.packagePreference || "gold")} onValueChange={(v) => updateField("packagePreference", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="platinum">Platinum</SelectItem>
+                      <SelectItem value="gold">Gold</SelectItem>
+                      <SelectItem value="silver">Silver</SelectItem>
+                      <SelectItem value="bronze">Bronze</SelectItem>
+                      <SelectItem value="community">Community</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Contact Name</Label>
+                  <Input value={(drawerForm.contactName as string) || ""} onChange={(e) => updateField("contactName", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Contact Email</Label>
+                  <Input value={(drawerForm.contactEmail as string) || ""} onChange={(e) => updateField("contactEmail", e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notes</Label>
+                <Textarea rows={4} placeholder="Sponsorship notes, negotiations, deliverables..." value={(drawerForm.message as string) || ""} onChange={(e) => updateField("message", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+        {
+          label: "Pipeline",
+          content: (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Stage</Label>
+                  <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="engaged">Engaged</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="declined">Declined</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Assigned To</Label>
+                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+              </div>
+            </div>
+          ),
+        },
+      ]
+    : [];
 
   return (
     <div>
@@ -122,7 +209,6 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
         </Button>
       </div>
 
-      {/* Create form */}
       {showForm && (
         <Card className="mb-4">
           <CardContent className="p-4">
@@ -133,12 +219,12 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                   <Input name="companyName" placeholder="e.g., Khan Bank" required />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Contact Name *</Label>
-                  <Input name="contactName" placeholder="e.g., Bat-Erdene D." required />
+                  <Label>Contact Name</Label>
+                  <Input name="contactName" placeholder="e.g., Bat-Erdene D." />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Contact Email *</Label>
-                  <Input name="contactEmail" type="email" placeholder="events@company.mn" required />
+                  <Label>Contact Email</Label>
+                  <Input name="contactEmail" type="email" placeholder="events@company.mn" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Package</Label>
@@ -154,33 +240,12 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Source</Label>
-                  <Select name="source" defaultValue="outreach">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Assigned To</Label>
-                  <Input name="assignedTo" placeholder="Team member name" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Notes</Label>
-                <Textarea name="message" placeholder="Any notes about the sponsorship..." rows={2} />
-              </div>
               <Button type="submit" className="w-full sm:w-auto">Create Sponsor</Button>
             </form>
           </CardContent>
         </Card>
       )}
 
-      {/* Pipeline filters */}
       <PipelineFilters
         items={sponsors}
         sources={["all", "intake", "outreach"]}
@@ -190,18 +255,13 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
         onStageChange={setStage}
       />
 
-      {/* Table view */}
       {sponsors.length === 0 && !showForm ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Building2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
             <h3 className="text-lg font-medium mb-1">No sponsors yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Add sponsors manually or paste their info into the agent chat.
-            </p>
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Add Sponsor
-            </Button>
+            <p className="text-sm text-muted-foreground mb-4">Add sponsors or paste info into agent chat.</p>
+            <Button onClick={() => setShowForm(true)}><Plus className="mr-2 h-4 w-4" /> Add Sponsor</Button>
           </CardContent>
         </Card>
       ) : (
@@ -211,12 +271,24 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
           entityName="sponsor"
           apiEndpoint="/api/sponsors"
           onUpdate={refreshData}
+          onRowClick={(sponsor) => openDrawer(sponsor)}
         />
       )}
 
       {filtered.length === 0 && sponsors.length > 0 && (
-        <p className="text-center text-sm text-muted-foreground py-8">No sponsors match the current filters.</p>
+        <p className="text-center text-sm text-muted-foreground py-8">No sponsors match filters.</p>
       )}
+
+      <EntityDrawer
+        key={selectedSponsor?.id || "closed"}
+        isOpen={!!selectedSponsor}
+        onClose={() => setSelectedSponsor(null)}
+        title={selectedSponsor?.companyName || ""}
+        subtitle={selectedSponsor?.contactName || ""}
+        sections={drawerSections}
+        onSave={handleDrawerSave}
+        saving={drawerSaving}
+      />
     </div>
   );
 }
