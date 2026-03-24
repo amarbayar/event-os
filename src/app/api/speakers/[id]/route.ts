@@ -72,6 +72,7 @@ export async function PATCH(
     "trackPreference",
     "slideUrl",
     "requirements",
+    "requirementsNotes",
     "source",
     "stage",
     "assignedTo",

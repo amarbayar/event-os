@@ -17,6 +17,7 @@ import { PipelineFilters, usePipelineFilters } from "@/components/pipeline-view"
 import { PipelineTable } from "@/components/pipeline-table";
 import { EntityDrawer } from "@/components/entity-drawer";
 import { Badge } from "@/components/ui/badge";
+import { FileUpload } from "@/components/file-upload";
 import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock } from "lucide-react";
 
 type Speaker = {
@@ -35,6 +36,7 @@ type Speaker = {
   website: string | null;
   slideUrl: string | null;
   requirements: string[] | null;
+  requirementsNotes: string | null;
   status: string;
   reviewScore: number | null;
   reviewNotes: string | null;
@@ -110,6 +112,7 @@ export function SpeakersClient({
       trackPreference: speaker.trackPreference || "",
       slideUrl: speaker.slideUrl || "",
       requirements: speaker.requirements || [],
+      requirementsNotes: speaker.requirementsNotes || "",
       source: speaker.source || "intake",
       stage: speaker.stage || "lead",
       assignedTo: speaker.assignedTo || "",
@@ -213,45 +216,42 @@ export function SpeakersClient({
         {
           label: "Profile",
           content: (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Name</Label>
-                  <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} />
+            <div className="space-y-4">
+              {/* Photo + Name header — profile card style */}
+              <div className="flex items-start gap-4">
+                <div className="shrink-0">
+                  <FileUpload
+                    value={(drawerForm.headshotUrl as string) || ""}
+                    onChange={(url) => updateField("headshotUrl", url)}
+                    folder="headshots"
+                    label="Photo"
+                  />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Email</Label>
-                  <Input value={(drawerForm.email as string) || ""} onChange={(e) => updateField("email", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Phone</Label>
-                  <Input value={(drawerForm.phone as string) || ""} onChange={(e) => updateField("phone", e.target.value)} placeholder="+976 8811 2233" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Company</Label>
-                  <Input value={(drawerForm.company as string) || ""} onChange={(e) => updateField("company", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Job Title</Label>
-                  <Input value={(drawerForm.title as string) || ""} onChange={(e) => updateField("title", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Profile Photo URL</Label>
-                  <Input value={(drawerForm.headshotUrl as string) || ""} onChange={(e) => updateField("headshotUrl", e.target.value)} placeholder="https://..." />
+                <div className="flex-1 space-y-2">
+                  <div className="space-y-1">
+                    <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} className="text-lg font-medium h-9" placeholder="Full name" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={(drawerForm.title as string) || ""} onChange={(e) => updateField("title", e.target.value)} placeholder="Job title" className="text-xs h-8" />
+                    <Input value={(drawerForm.company as string) || ""} onChange={(e) => updateField("company", e.target.value)} placeholder="Company" className="text-xs h-8" />
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>LinkedIn</Label>
-                  <Input value={(drawerForm.linkedin as string) || ""} onChange={(e) => updateField("linkedin", e.target.value)} placeholder="https://linkedin.com/in/..." />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Website</Label>
-                  <Input value={(drawerForm.website as string) || ""} onChange={(e) => updateField("website", e.target.value)} placeholder="https://..." />
-                </div>
-              </div>
+
+              {/* Contact info */}
               <div className="space-y-1.5">
-                <Label>Bio</Label>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Contact</Label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <Input value={(drawerForm.email as string) || ""} onChange={(e) => updateField("email", e.target.value)} placeholder="Email" />
+                  <Input value={(drawerForm.phone as string) || ""} onChange={(e) => updateField("phone", e.target.value)} placeholder="Phone" />
+                  <Input value={(drawerForm.linkedin as string) || ""} onChange={(e) => updateField("linkedin", e.target.value)} placeholder="LinkedIn URL" />
+                  <Input value={(drawerForm.website as string) || ""} onChange={(e) => updateField("website", e.target.value)} placeholder="Website URL" />
+                </div>
+              </div>
+
+              {/* Bio */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Bio</Label>
                 <Textarea rows={4} placeholder="Speaker bio for the event website..." value={(drawerForm.bio as string) || ""} onChange={(e) => updateField("bio", e.target.value)} />
               </div>
             </div>
@@ -261,15 +261,19 @@ export function SpeakersClient({
           label: "Talk",
           content: (
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Talk Title</Label>
-                <Input value={(drawerForm.talkTitle as string) || ""} onChange={(e) => updateField("talkTitle", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Abstract</Label>
-                <Textarea rows={6} placeholder="Talk abstract..." value={(drawerForm.talkAbstract as string) || ""} onChange={(e) => updateField("talkAbstract", e.target.value)} />
-              </div>
+              {/* Track + Type first */}
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Track</Label>
+                  <Select value={String(drawerForm.trackPreference || "")} onValueChange={(v) => updateField("trackPreference", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select track" /></SelectTrigger>
+                    <SelectContent>
+                      {tracks.map((t) => (
+                        <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-1.5">
                   <Label>Type</Label>
                   <Select value={String(drawerForm.talkType || "talk")} onValueChange={(v) => updateField("talkType", v)}>
@@ -282,18 +286,18 @@ export function SpeakersClient({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Track</Label>
-                  <Select value={String(drawerForm.trackPreference || "")} onValueChange={(v) => updateField("trackPreference", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select track" /></SelectTrigger>
-                    <SelectContent>
-                      {tracks.map((t) => (
-                        <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
+              {/* Topic */}
+              <div className="space-y-1.5">
+                <Label>Topic / Title</Label>
+                <Input value={(drawerForm.talkTitle as string) || ""} onChange={(e) => updateField("talkTitle", e.target.value)} />
+              </div>
+              {/* Abstract */}
+              <div className="space-y-1.5">
+                <Label>Abstract</Label>
+                <Textarea rows={5} placeholder="Talk abstract..." value={(drawerForm.talkAbstract as string) || ""} onChange={(e) => updateField("talkAbstract", e.target.value)} />
+              </div>
+              {/* Slides */}
               <div className="space-y-1.5">
                 <Label>Slide Link</Label>
                 <Input value={(drawerForm.slideUrl as string) || ""} onChange={(e) => updateField("slideUrl", e.target.value)} placeholder="https://docs.google.com/presentation/..." />
@@ -343,6 +347,10 @@ export function SpeakersClient({
                     <span>{req}</span>
                   </label>
                 ))}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Other Requirements</Label>
+                <Textarea rows={3} placeholder="Anything not covered above — special setup, dietary needs, accessibility requirements..." value={(drawerForm.requirementsNotes as string) || ""} onChange={(e) => updateField("requirementsNotes", e.target.value)} />
               </div>
             </div>
           ),

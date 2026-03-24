@@ -145,6 +145,7 @@ export const speakerApplications = pgTable(
     trackPreference: varchar("track_preference", { length: 255 }),
     slideUrl: text("slide_url"),
     requirements: jsonb("requirements").$type<string[]>(),
+    requirementsNotes: text("requirements_notes"),
     // Review
     status: speakerStatusEnum("status").default("pending").notNull(),
     reviewScore: integer("review_score"), // average score from reviewers
