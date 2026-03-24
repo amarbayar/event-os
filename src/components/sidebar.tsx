@@ -63,8 +63,8 @@ export function Sidebar() {
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex flex-col bg-stone-900 text-stone-400 transition-all duration-200",
-          // Desktop: always visible
-          "max-lg:translate-x-full max-lg:w-64",
+          // Mobile: off-screen right by default, slide in when open
+          "max-lg:-translate-x-full max-lg:w-64",
           mobileOpen && "max-lg:translate-x-0",
           // Desktop collapse behavior
           "lg:translate-x-0",
