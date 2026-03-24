@@ -1,21 +1,39 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    // In production: signIn("credentials", { email, password })
-    setTimeout(() => {
-      window.location.href = "/";
-    }, 1000);
+    setError("");
+
+    const form = new FormData(e.currentTarget);
+    const email = form.get("email") as string;
+    const password = form.get("password") as string;
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setError("Invalid email or password");
+      setLoading(false);
+      return;
+    }
+
+    window.location.href = "/";
   };
 
   return (
@@ -37,8 +55,9 @@ export default function LoginPage() {
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
-                  placeholder="organizer@devsummit.mn"
+                  placeholder="admin@devsummit.mn"
                   required
                 />
               </div>
@@ -46,17 +65,30 @@ export default function LoginPage() {
                 <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
+                  name="password"
                   type="password"
                   placeholder="Enter your password"
                   required
                 />
               </div>
+              {error && (
+                <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Signing in..." : "Sign in"}
               </Button>
             </form>
           </CardContent>
         </Card>
+
+        <p className="text-center text-sm text-muted-foreground mt-4">
+          Don&apos;t have a workspace?{" "}
+          <Link href="/onboarding" className="text-yellow-600 hover:underline">
+            Create one
+          </Link>
+        </p>
       </div>
     </div>
   );

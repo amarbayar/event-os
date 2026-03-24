@@ -2,6 +2,7 @@ import { LLMProvider } from "./types";
 import { GeminiProvider } from "./providers/gemini";
 import { OllamaProvider } from "./providers/ollama";
 import { XAIProvider } from "./providers/xai";
+import { ZAIProvider } from "./providers/zai";
 
 export function getProvider(): LLMProvider {
   const provider = process.env.LLM_PROVIDER || "gemini";
@@ -19,6 +20,12 @@ export function getProvider(): LLMProvider {
       return new XAIProvider(xaiKey, process.env.XAI_MODEL);
     }
 
+    case "zai": {
+      const zaiKey = process.env.ZAI_API_KEY;
+      if (!zaiKey) throw new Error("ZAI_API_KEY not set");
+      return new ZAIProvider(zaiKey, process.env.ZAI_MODEL);
+    }
+
     case "ollama":
       return new OllamaProvider(
         process.env.OLLAMA_URL || "http://localhost:11434",
@@ -26,7 +33,7 @@ export function getProvider(): LLMProvider {
       );
 
     default:
-      throw new Error(`Unknown LLM provider: ${provider}. Use: gemini, xai, ollama`);
+      throw new Error(`Unknown LLM provider: ${provider}. Use: gemini, xai, zai, ollama`);
   }
 }
 
