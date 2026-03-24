@@ -10,17 +10,30 @@ Event OS replaces all of that. One app. Speakers, schedule, sponsors, booths, vo
 
 Built by a 3-person team for 3-person teams. If you're running a tech conference with spreadsheets and prayers, this is for you. If you're a founder who can vibe-code, fork it and make it yours in an afternoon.
 
+## The agent-first difference
+
+Most event tools give you 14 forms and say "type everything in manually." Event OS gives you a chat panel. Paste a Viber conversation, drop a spreadsheet, type "just talked to Golomt Bank, they want Gold sponsorship" — the agent figures out what type of entity it is (speaker? sponsor? venue? volunteer?), extracts structured data, asks about anything missing, and creates the records. You confirm with one click.
+
+**Cmd+K** opens the agent from anywhere. The 14 entity pages still exist — but they're views you glance at, not forms you type into.
+
+Supports multiple LLM providers: **Gemini** (free tier, default), **Ollama/Qwen** (local, free), or add your own by implementing one interface.
+
 ## What's in the box
 
 | Module | What it does | What you'd otherwise use |
 |--------|-------------|------------------------|
+| **Agent Chat Panel** | Paste anything — CSV, chat logs, phone notes. Agent classifies, extracts, creates records. Cmd+K from anywhere. | Your brain + copy-paste + 14 different forms |
 | **Agenda Builder** | Multi-track schedule editor, conflict detection (speaker double-booked? room collision? 5-minute gap between talks?), draft/publish toggle | Google Sheets + hope |
 | **Speaker Pipeline** | CFP form, review scores, accept/reject/waitlist, application status tracking | Google Forms + another spreadsheet |
 | **Sponsor Pipeline** | Proposal to payment tracking | Email threads + memory |
+| **Venue Pipeline** | Venue candidates, negotiations, pricing, pros/cons, team assignment, finalization | "I think we decided on Chinggis Khaan?" |
 | **Booth Management** | Inventory grid, reservations, equipment lists, sponsor linking | A floor plan PDF and sticky notes |
 | **Volunteer Management** | Applications, shift assignments, t-shirt sizes | A WhatsApp group |
+| **Outreach CRM** | Proactive sourcing for speakers, sponsors, booths, volunteers, media. Pipeline funnel. Follow-up tracking. | A spreadsheet someone forgot to update |
 | **Media Partners** | TV/press/podcast pipeline with deliverables tracking | "I think Bayaraa said they'd cover it?" |
 | **Marketing Planner** | Campaign calendar, speaker announcements, schedule/publish per platform | Posting manually and forgetting LinkedIn |
+| **Invitations** | Special guests, speaker +1s, organizer +1s, student passes. Configurable allocations. QR codes for all. | An email chain and a prayer |
+| **Task Management** | Teams (Program, Logistics, Sponsors...), kanban board + list view, due dates, priority, linked entities | Trello that nobody checks |
 | **QR Check-in** | Scanner mode + dashboard mode, offline support, works when the venue WiFi inevitably dies | Paper lists and highlighters |
 | **Public Agenda** | Attendee-facing schedule with day/track filters | A PDF that's outdated by the time you export it |
 | **CFP Form** | Public speaker application with validation | Google Forms (again) |
@@ -188,7 +201,7 @@ Not trying to be clever here. Boring tech that works.
 | Database | PostgreSQL via Supabase | Free tier is generous, comes with storage |
 | ORM | Drizzle | Type-safe, no magic, SQL when you need it |
 | Auth | NextAuth.js | Credentials + service token for the agent |
-| Agent | OpenClaw + Telegram Bot API | Organizers already live in Telegram |
+| Agent LLM | Gemini (default), Ollama/Qwen (local) | Abstracted — add providers with one interface |
 | Icons | Lucide React | Consistent, tree-shakeable |
 
 ## Getting Started
@@ -212,6 +225,9 @@ That's it. Open `localhost:3000`. You have an event management platform.
 | `AUTH_SECRET` | Any random string. Run `openssl rand -base64 32` to generate one |
 | `NEXTAUTH_URL` | `http://localhost:3000` for dev, your domain for prod |
 | `SERVICE_TOKEN` | Random token for Telegram agent API auth |
+| `LLM_PROVIDER` | `gemini` (default) or `ollama` (local) |
+| `GEMINI_API_KEY` | Gemini API key (free at ai.google.dev) |
+| `OLLAMA_URL` | Ollama URL if using local model (default: localhost:11434) |
 
 ### Deploy
 
@@ -233,25 +249,41 @@ src/
       sponsors/         # Sponsor pipeline
       booths/           # Booth inventory
       volunteers/       # Volunteer management
+      venue/            # Venue pipeline
+      outreach/         # Proactive sourcing CRM
       media/            # Media partnerships
       marketing/        # Campaign planner
+      tasks/            # Task management with teams
       attendees/        # Registration list
+      invitations/      # Guest allocations
       check-in/         # QR scanner + dashboard
       settings/         # Event configuration
     (public)/           # No-auth pages
       agenda/[slug]/    # Public schedule
       apply/[slug]/     # CFP submission form
-    api/                # REST API routes
+    api/
+      agent/process/    # Agent chat LLM endpoint
+      speakers/         # Speaker CRUD
+      sessions/         # Session CRUD + conflicts
+      check-in/         # QR check-in + stats
   db/
-    schema.ts           # Drizzle schema (16 tables)
+    schema.ts           # Drizzle schema (22 tables)
     index.ts            # Database connection
   lib/
     auth.ts             # NextAuth configuration
     conflicts.ts        # Schedule conflict detection engine
     api-utils.ts        # Auth context, versioning, pagination
     service-token.ts    # Agent API authentication
+    agent/              # LLM provider abstraction
+      index.ts          # Provider factory (getProvider())
+      types.ts          # LLMProvider interface, entity types
+      prompt.ts         # System prompt + user prompt builder
+      providers/
+        gemini.ts       # Google Gemini (default, free tier)
+        ollama.ts       # Local Qwen/Llama via Ollama
   components/
-    sidebar.tsx         # App shell with responsive nav
+    sidebar.tsx         # Grouped nav (People/Event/Operations)
+    chat-panel.tsx      # Agent chat panel (Cmd+K)
     ui/                 # shadcn/ui components
 ```
 
