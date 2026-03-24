@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PipelineFilters, StageBadge, SourceBadge, usePipelineFilters } from "@/components/pipeline-view";
 import { Building2, Plus, X } from "lucide-react";
 
 type Sponsor = {
@@ -24,29 +25,18 @@ type Sponsor = {
   packagePreference: string | null;
   message: string | null;
   status: string;
+  source: string;
+  stage: string;
+  assignedTo: string | null;
   createdAt: Date;
 };
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  pending: { label: "Pending", variant: "secondary" },
-  confirmed: { label: "Confirmed", variant: "default" },
-  negotiating: { label: "Negotiating", variant: "outline" },
-  declined: { label: "Declined", variant: "destructive" },
-};
-
 export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[] }) {
-  const [filter, setFilter] = useState<string>("all");
+  const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [showForm, setShowForm] = useState(false);
   const sponsors = initialSponsors;
 
-  const filtered = filter === "all" ? sponsors : sponsors.filter((s) => s.status === filter);
-
-  const counts = {
-    total: sponsors.length,
-    confirmed: sponsors.filter((s) => s.status === "confirmed").length,
-    negotiating: sponsors.filter((s) => s.status === "negotiating").length,
-    pending: sponsors.filter((s) => s.status === "pending").length,
-  };
+  const filtered = filter(sponsors);
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -68,7 +58,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">Sponsors</h1>
-          <p className="text-sm text-muted-foreground">{counts.total} sponsors</p>
+          <p className="text-sm text-muted-foreground">{sponsors.length} total</p>
         </div>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
           {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Add Sponsor</>}
@@ -77,7 +67,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
 
       {/* Create form */}
       {showForm && (
-        <Card className="mb-6">
+        <Card className="mb-4">
           <CardContent className="p-4">
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -107,6 +97,22 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                   </Select>
                 </div>
               </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select name="source" defaultValue="outreach">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Assigned To</Label>
+                  <Input name="assignedTo" placeholder="Team member name" />
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label>Notes</Label>
                 <Textarea name="message" placeholder="Any notes about the sponsorship..." rows={2} />
@@ -117,22 +123,15 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
         </Card>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-6">
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums">{counts.total}</p><p className="text-xs text-muted-foreground">Total</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums text-emerald-600">{counts.confirmed}</p><p className="text-xs text-muted-foreground">Confirmed</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums text-yellow-600">{counts.negotiating}</p><p className="text-xs text-muted-foreground">Negotiating</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums text-stone-500">{counts.pending}</p><p className="text-xs text-muted-foreground">Pending</p></CardContent></Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {["all", "pending", "negotiating", "confirmed", "declined"].map((status) => (
-          <Button key={status} variant={filter === status ? "default" : "outline"} size="sm" onClick={() => setFilter(status)} className="capitalize">
-            {status}
-          </Button>
-        ))}
-      </div>
+      {/* Pipeline filters */}
+      <PipelineFilters
+        items={sponsors}
+        sources={["all", "intake", "outreach"]}
+        activeSource={source}
+        activeStage={stage}
+        onSourceChange={setSource}
+        onStageChange={setStage}
+      />
 
       {/* Sponsor list */}
       {sponsors.length === 0 && !showForm ? (
@@ -157,9 +156,8 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium">{sponsor.companyName}</p>
-                      <Badge variant={statusConfig[sponsor.status]?.variant || "secondary"}>
-                        {statusConfig[sponsor.status]?.label || sponsor.status}
-                      </Badge>
+                      <StageBadge stage={sponsor.stage} />
+                      <SourceBadge source={sponsor.source} />
                       {sponsor.packagePreference && (
                         <Badge variant="outline" className="text-[10px] capitalize">
                           {sponsor.packagePreference}
@@ -169,14 +167,20 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                     <p className="text-sm text-muted-foreground mt-0.5">
                       {sponsor.contactName} &middot; {sponsor.contactEmail}
                     </p>
-                    {sponsor.message && (
-                      <p className="text-xs text-muted-foreground mt-1">{sponsor.message}</p>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                      {sponsor.assignedTo && (
+                        <span className="text-yellow-600">Assigned: {sponsor.assignedTo}</span>
+                      )}
+                      {sponsor.message && <span>{sponsor.message}</span>}
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
+          {filtered.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-8">No sponsors match the current filters.</p>
+          )}
         </div>
       )}
     </div>

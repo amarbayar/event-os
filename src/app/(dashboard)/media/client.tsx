@@ -14,15 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PipelineFilters, StageBadge, SourceBadge, usePipelineFilters } from "@/components/pipeline-view";
 import { Plus, X } from "lucide-react";
-
-type MediaStatus = "pending" | "confirmed" | "declined";
-
-const statusConfig: Record<MediaStatus, { label: string; variant: "default" | "secondary" | "destructive" }> = {
-  pending: { label: "Pending", variant: "secondary" },
-  confirmed: { label: "Confirmed", variant: "default" },
-  declined: { label: "Declined", variant: "destructive" },
-};
 
 type MediaPartner = {
   id: string;
@@ -31,21 +24,18 @@ type MediaPartner = {
   type: string | null;
   reach: string | null;
   status: string;
+  source: string;
+  stage: string;
+  assignedTo: string | null;
   deliverables: string | null;
 };
 
 export function MediaClient({ initialPartners }: { initialPartners: MediaPartner[] }) {
-  const [filter, setFilter] = useState<MediaStatus | "all">("all");
+  const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [showForm, setShowForm] = useState(false);
 
   const partners = initialPartners;
-  const filtered = filter === "all" ? partners : partners.filter((p) => p.status === filter);
-
-  const counts = {
-    total: partners.length,
-    confirmed: partners.filter((p) => p.status === "confirmed").length,
-    pending: partners.filter((p) => p.status === "pending").length,
-  };
+  const filtered = filter(partners);
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -67,7 +57,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">Media Partners</h1>
-          <p className="text-sm text-muted-foreground">Manage TV, press, and media collaborations</p>
+          <p className="text-sm text-muted-foreground">{partners.length} total</p>
         </div>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
           {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Add Partner</>}
@@ -76,7 +66,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
 
       {/* Create form */}
       {showForm && (
-        <Card className="mb-6">
+        <Card className="mb-4">
           <CardContent className="p-4">
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -110,6 +100,22 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
                   <Input name="reach" placeholder="e.g., 50K monthly readers" />
                 </div>
               </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select name="source" defaultValue="outreach">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Assigned To</Label>
+                  <Input name="assignedTo" placeholder="Team member name" />
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label>Proposal</Label>
                 <Textarea name="proposal" placeholder="Coverage plan or partnership proposal..." rows={2} />
@@ -120,19 +126,15 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 mb-6">
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums">{counts.total}</p><p className="text-xs text-muted-foreground">Partners</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums text-emerald-600">{counts.confirmed}</p><p className="text-xs text-muted-foreground">Confirmed</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums text-yellow-600">{counts.pending}</p><p className="text-xs text-muted-foreground">Pending</p></CardContent></Card>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-4">
-        {(["all", "pending", "confirmed", "declined"] as const).map((status) => (
-          <Button key={status} variant={filter === status ? "default" : "outline"} size="sm" onClick={() => setFilter(status)} className="capitalize">
-            {status}
-          </Button>
-        ))}
-      </div>
+      {/* Pipeline filters */}
+      <PipelineFilters
+        items={partners}
+        sources={["all", "intake", "outreach"]}
+        activeSource={source}
+        activeStage={stage}
+        onSourceChange={setSource}
+        onStageChange={setStage}
+      />
 
       <div className="space-y-2">
         {filtered.map((partner) => (
@@ -142,14 +144,20 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{partner.companyName}</p>
-                    <Badge variant={statusConfig[partner.status as MediaStatus]?.variant ?? "secondary"}>{statusConfig[partner.status as MediaStatus]?.label ?? partner.status}</Badge>
+                    <StageBadge stage={partner.stage} />
+                    <SourceBadge source={partner.source} />
                     {partner.type && <Badge variant="outline" className="text-[10px]">{partner.type}</Badge>}
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">{partner.contactName} &middot; {partner.reach}</p>
-                  {partner.deliverables && <p className="text-xs text-muted-foreground mt-1">{partner.deliverables}</p>}
+                  <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                    {partner.assignedTo && (
+                      <span className="text-yellow-600">Assigned: {partner.assignedTo}</span>
+                    )}
+                    {partner.deliverables && <span>{partner.deliverables}</span>}
+                  </div>
                 </div>
               </div>
-              {partner.status === "pending" && (
+              {partner.stage === "lead" && (
                 <div className="flex gap-2 mt-3 sm:justify-end">
                   <Button size="sm" variant="outline" className="flex-1 sm:flex-none">Decline</Button>
                   <Button size="sm" className="flex-1 sm:flex-none">Confirm</Button>
@@ -158,6 +166,9 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
             </CardContent>
           </Card>
         ))}
+        {filtered.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-8">No media partners match the current filters.</p>
+        )}
       </div>
     </div>
   );

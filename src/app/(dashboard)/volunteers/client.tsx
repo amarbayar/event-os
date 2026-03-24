@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,15 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PipelineFilters, StageBadge, SourceBadge, usePipelineFilters } from "@/components/pipeline-view";
 import { Copy, Check, Plus, X } from "lucide-react";
-
-type VolunteerStatus = "pending" | "accepted" | "rejected";
-
-const statusConfig: Record<VolunteerStatus, { label: string; variant: "default" | "secondary" | "destructive" }> = {
-  pending: { label: "Pending", variant: "secondary" },
-  accepted: { label: "Accepted", variant: "default" },
-  rejected: { label: "Declined", variant: "destructive" },
-};
 
 type Volunteer = {
   id: string;
@@ -30,23 +22,20 @@ type Volunteer = {
   role: string | null;
   availability: string | null;
   status: string;
+  source: string;
+  stage: string;
+  assignedTo: string | null;
   assignedShift: string | null;
   tshirtSize: string | null;
 };
 
 export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Volunteer[] }) {
-  const [filter, setFilter] = useState<VolunteerStatus | "all">("all");
+  const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [copied, setCopied] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   const volunteers = initialVolunteers;
-  const filtered = filter === "all" ? volunteers : volunteers.filter((v) => v.status === filter);
-
-  const counts = {
-    total: volunteers.length,
-    accepted: volunteers.filter((v) => v.status === "accepted").length,
-    pending: volunteers.filter((v) => v.status === "pending").length,
-  };
+  const filtered = filter(volunteers);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}/volunteer/dev-summit-2026`);
@@ -74,7 +63,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">Volunteers</h1>
-          <p className="text-sm text-muted-foreground">Manage volunteer applications and shift assignments</p>
+          <p className="text-sm text-muted-foreground">{volunteers.length} total</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleCopyLink}>
@@ -88,10 +77,10 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
 
       {/* Create form */}
       {showForm && (
-        <Card className="mb-6">
+        <Card className="mb-4">
           <CardContent className="p-4">
             <form onSubmit={handleCreate} className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
                   <Input name="name" placeholder="e.g., Temuulen B." required />
@@ -104,6 +93,8 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
                   <Label>Phone</Label>
                   <Input name="phone" placeholder="+976 ..." />
                 </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Role</Label>
                   <Input name="role" placeholder="e.g., Registration Desk" />
@@ -127,25 +118,37 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
                   </Select>
                 </div>
               </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select name="source" defaultValue="outreach">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Assigned To</Label>
+                  <Input name="assignedTo" placeholder="Team member name" />
+                </div>
+              </div>
               <Button type="submit" className="w-full sm:w-auto">Create Volunteer</Button>
             </form>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 mb-6">
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums">{counts.total}</p><p className="text-xs text-muted-foreground">Applications</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums text-emerald-600">{counts.accepted}</p><p className="text-xs text-muted-foreground">Accepted</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-2xl font-semibold tabular-nums text-yellow-600">{counts.pending}</p><p className="text-xs text-muted-foreground">Pending</p></CardContent></Card>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-4">
-        {(["all", "pending", "accepted", "rejected"] as const).map((status) => (
-          <Button key={status} variant={filter === status ? "default" : "outline"} size="sm" onClick={() => setFilter(status)} className="capitalize">
-            {status}
-          </Button>
-        ))}
-      </div>
+      {/* Pipeline filters */}
+      <PipelineFilters
+        items={volunteers}
+        sources={["all", "intake", "outreach"]}
+        activeSource={source}
+        activeStage={stage}
+        onSourceChange={setSource}
+        onStageChange={setStage}
+      />
 
       <div className="space-y-2">
         {filtered.map((vol) => (
@@ -155,19 +158,25 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{vol.name}</p>
-                    <Badge variant={statusConfig[vol.status as VolunteerStatus]?.variant ?? "secondary"}>{statusConfig[vol.status as VolunteerStatus]?.label ?? vol.status}</Badge>
+                    <StageBadge stage={vol.stage} />
+                    <SourceBadge source={vol.source} />
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">{vol.role} &middot; {vol.availability}</p>
-                  {vol.assignedShift && (
-                    <p className="text-xs text-emerald-600 mt-0.5">Shift: {vol.assignedShift}</p>
-                  )}
+                  <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                    {vol.assignedTo && (
+                      <span className="text-yellow-600">Assigned: {vol.assignedTo}</span>
+                    )}
+                    {vol.assignedShift && (
+                      <span className="text-emerald-600">Shift: {vol.assignedShift}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs text-muted-foreground">T-shirt</p>
                   <p className="text-sm font-medium">{vol.tshirtSize}</p>
                 </div>
               </div>
-              {vol.status === "pending" && (
+              {vol.stage === "lead" && (
                 <div className="flex gap-2 mt-3 sm:justify-end">
                   <Button size="sm" variant="outline" className="flex-1 sm:flex-none">Decline</Button>
                   <Button size="sm" className="flex-1 sm:flex-none">Accept</Button>
@@ -176,6 +185,9 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
             </CardContent>
           </Card>
         ))}
+        {filtered.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-8">No volunteers match the current filters.</p>
+        )}
       </div>
     </div>
   );

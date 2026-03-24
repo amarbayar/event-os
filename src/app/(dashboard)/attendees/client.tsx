@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { PipelineFilters, StageBadge, SourceBadge, usePipelineFilters } from "@/components/pipeline-view";
 import {
   Users,
   Upload,
@@ -24,6 +25,9 @@ type Attendee = {
   qrHash: string;
   checkedIn: boolean;
   checkedInAt: Date | null;
+  source: string;
+  stage: string;
+  assignedTo: string | null;
 };
 
 type Stats = {
@@ -40,19 +44,20 @@ export function AttendeesClient({
   initialAttendees: Attendee[];
   stats: Stats;
 }) {
+  const { source, stage, setSource, setStage, filter: pipelineFilter } = usePipelineFilters();
   const [search, setSearch] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "checked_in" | "not_checked_in">("all");
+  const [checkInFilter, setCheckInFilter] = useState<"all" | "checked_in" | "not_checked_in">("all");
 
   const attendees = initialAttendees;
 
-  const filtered = attendees
+  const filtered = pipelineFilter(attendees)
     .filter((a) => {
-      if (filter === "checked_in") return a.checkedIn;
-      if (filter === "not_checked_in") return !a.checkedIn;
+      if (checkInFilter === "checked_in") return a.checkedIn;
+      if (checkInFilter === "not_checked_in") return !a.checkedIn;
       return true;
     })
     .filter(
@@ -60,13 +65,6 @@ export function AttendeesClient({
         a.name.toLowerCase().includes(search.toLowerCase()) ||
         a.email.toLowerCase().includes(search.toLowerCase())
     );
-
-  const ticketCounts = {
-    total: attendees.length,
-    professional: attendees.filter((a) => a.ticketType === "professional").length,
-    student: attendees.filter((a) => a.ticketType === "student").length,
-    vip: attendees.filter((a) => a.ticketType === "vip").length,
-  };
 
   const handleImport = async () => {
     if (!csvText.trim()) return;
@@ -123,7 +121,7 @@ export function AttendeesClient({
           <h1 className="font-heading text-2xl font-bold tracking-tight">
             Attendees
           </h1>
-          <p className="text-sm text-muted-foreground">{stats.total} registered</p>
+          <p className="text-sm text-muted-foreground">{attendees.length} total</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -134,34 +132,6 @@ export function AttendeesClient({
             <Upload className="mr-2 h-3 w-3" /> Import CSV
           </Button>
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-semibold tabular-nums">{ticketCounts.total}</p>
-            <p className="text-xs text-muted-foreground">Total</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-semibold tabular-nums">{ticketCounts.professional}</p>
-            <p className="text-xs text-muted-foreground">Professional</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-semibold tabular-nums">{ticketCounts.student}</p>
-            <p className="text-xs text-muted-foreground">Student</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-semibold tabular-nums text-emerald-600">{stats.checkedIn}</p>
-            <p className="text-xs text-muted-foreground">Checked In</p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* CSV Import */}
@@ -196,7 +166,17 @@ export function AttendeesClient({
         </Card>
       )}
 
-      {/* Filters + Search */}
+      {/* Pipeline filters */}
+      <PipelineFilters
+        items={attendees}
+        sources={["all", "intake", "outreach", "sponsored"]}
+        activeSource={source}
+        activeStage={stage}
+        onSourceChange={setSource}
+        onStageChange={setStage}
+      />
+
+      {/* Check-in filters + Search */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -210,9 +190,9 @@ export function AttendeesClient({
         {(["all", "checked_in", "not_checked_in"] as const).map((f) => (
           <Button
             key={f}
-            variant={filter === f ? "default" : "outline"}
+            variant={checkInFilter === f ? "default" : "outline"}
             size="sm"
-            onClick={() => setFilter(f)}
+            onClick={() => setCheckInFilter(f)}
           >
             {f === "all" ? "All" : f === "checked_in" ? "Checked In" : "Not Checked In"}
           </Button>
@@ -243,6 +223,8 @@ export function AttendeesClient({
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-sm font-medium truncate">{attendee.name}</span>
                 <span className="text-xs text-muted-foreground truncate hidden sm:inline">{attendee.email}</span>
+                <StageBadge stage={attendee.stage} />
+                <SourceBadge source={attendee.source} />
                 <Badge variant="outline" className="text-[10px] shrink-0">{attendee.ticketType}</Badge>
               </div>
               <div className="flex items-center gap-2 shrink-0">

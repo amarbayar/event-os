@@ -7,18 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PipelineFilters, StageBadge, SourceBadge, usePipelineFilters } from "@/components/pipeline-view";
 import { Plus, Star, Check, X } from "lucide-react";
-
-type VenueStatus = "identified" | "contacted" | "negotiating" | "proposal_received" | "finalized" | "declined";
-
-const statusFlow: { value: VenueStatus; label: string; color: string }[] = [
-  { value: "identified", label: "Identified", color: "bg-stone-100 text-stone-600" },
-  { value: "contacted", label: "Contacted", color: "bg-sky-50 text-sky-700" },
-  { value: "negotiating", label: "Negotiating", color: "bg-yellow-50 text-yellow-700" },
-  { value: "proposal_received", label: "Proposal Received", color: "bg-violet-50 text-violet-700" },
-  { value: "finalized", label: "Finalized", color: "bg-emerald-50 text-emerald-700" },
-  { value: "declined", label: "Declined", color: "bg-red-50 text-red-600" },
-];
 
 type Venue = {
   id: string;
@@ -28,6 +25,8 @@ type Venue = {
   capacity: number | null;
   priceQuote: string | null;
   status: string;
+  source: string;
+  stage: string;
   isFinalized: boolean;
   assignedTo: string | null;
   pros: string | null;
@@ -35,8 +34,11 @@ type Venue = {
 };
 
 export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
+  const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [showForm, setShowForm] = useState(false);
   const finalized = initialVenues.find((v) => v.isFinalized);
+  const venues = initialVenues;
+  const filtered = filter(venues).filter((v) => !v.isFinalized);
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -58,7 +60,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">Venue</h1>
-          <p className="text-sm text-muted-foreground">Find and lock in your event venue</p>
+          <p className="text-sm text-muted-foreground">{venues.length} total</p>
         </div>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
           {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Add Candidate</>}
@@ -67,7 +69,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
 
       {/* Create form */}
       {showForm && (
-        <Card className="mb-6">
+        <Card className="mb-4">
           <CardContent className="p-4">
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -99,6 +101,18 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
                   <Label>Price Quote</Label>
                   <Input name="priceQuote" placeholder="e.g., $5,000/day" />
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Select name="source" defaultValue="outreach">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intake">Intake</SelectItem>
+                      <SelectItem value="outreach">Outreach</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Assigned To</Label>
                   <Input name="assignedTo" placeholder="e.g., Team member name" />
@@ -142,30 +156,27 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
         </Card>
       )}
 
-      {/* Pipeline */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {statusFlow.map((s) => {
-          const count = initialVenues.filter((v) => v.status === s.value).length;
-          return (
-            <Badge key={s.value} className={`${s.color} cursor-pointer`}>
-              {s.label} ({count})
-            </Badge>
-          );
-        })}
-      </div>
+      {/* Pipeline filters */}
+      <PipelineFilters
+        items={venues}
+        sources={["all", "intake", "outreach"]}
+        activeSource={source}
+        activeStage={stage}
+        onSourceChange={setSource}
+        onStageChange={setStage}
+      />
 
       {/* Venue cards */}
       <div className="space-y-3">
-        {initialVenues.filter((v) => !v.isFinalized).map((venue) => (
+        {filtered.map((venue) => (
           <Card key={venue.id} className="hover:border-yellow-500/30 transition-colors">
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{venue.name}</p>
-                    <Badge className={statusFlow.find((s) => s.value === venue.status)?.color}>
-                      {statusFlow.find((s) => s.value === venue.status)?.label}
-                    </Badge>
+                    <StageBadge stage={venue.stage} />
+                    <SourceBadge source={venue.source} />
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">{venue.address}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 text-sm">
@@ -179,7 +190,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
                     </div>
                     <div>
                       <span className="text-muted-foreground">Assigned:</span>{" "}
-                      <span className="font-medium">{venue.assignedTo}</span>
+                      <span className="font-medium text-yellow-600">{venue.assignedTo}</span>
                     </div>
                   </div>
                   <p className="text-sm mt-1"><span className="text-muted-foreground">Quote:</span> {venue.priceQuote}</p>
@@ -198,6 +209,9 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
             </CardContent>
           </Card>
         ))}
+        {filtered.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-8">No venues match the current filters.</p>
+        )}
       </div>
     </div>
   );
