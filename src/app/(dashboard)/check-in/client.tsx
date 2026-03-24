@@ -99,85 +99,94 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
   if (mode === "scanner") {
     return (
       <div className="fixed inset-0 z-50 bg-stone-900 flex flex-col">
-        {/* Scanner header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-stone-950">
-          <div className="flex items-center gap-3">
-            <h1 className="text-white font-medium">QR Check-in</h1>
+        {/* Scanner header — prominent back button + live stats */}
+        <div className="flex items-center justify-between px-4 py-2 bg-stone-950 border-b border-stone-800">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="bg-white text-stone-900 hover:bg-stone-100 font-medium"
+            onClick={() => setMode("dashboard")}
+          >
+            <Monitor className="mr-2 h-4 w-4" /> Back to Dashboard
+          </Button>
+          <div className="flex items-center gap-4 text-sm">
+            <div className="text-center">
+              <p className="text-lg font-bold text-emerald-400 tabular-nums">{stats.checkedIn}</p>
+              <p className="text-[10px] text-stone-500 uppercase">In</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-bold text-white tabular-nums">{stats.remaining}</p>
+              <p className="text-[10px] text-stone-500 uppercase">Left</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-bold text-yellow-400 tabular-nums">{stats.percentage}%</p>
+              <p className="text-[10px] text-stone-500 uppercase">Rate</p>
+            </div>
             {!isOnline && (
               <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
                 <WifiOff className="mr-1 h-3 w-3" />
-                Offline — {queuedScans} queued
+                Offline
               </Badge>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-stone-300 border-stone-700 hover:bg-stone-800"
-            onClick={() => setMode("dashboard")}
-          >
-            <Monitor className="mr-2 h-3 w-3" /> Dashboard
-          </Button>
         </div>
 
-        {/* Camera area */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="relative w-80 h-80 border-2 border-dashed border-stone-600 rounded-lg flex items-center justify-center">
-            <p className="text-stone-500 text-sm">Camera preview</p>
-            <div className="absolute inset-4 border-2 border-yellow-500/50 rounded" />
+        {/* Camera area — larger */}
+        <div className="flex-1 flex items-center justify-center relative">
+          <div className="w-[90vw] max-w-lg aspect-square border-2 border-dashed border-stone-600 rounded-2xl flex items-center justify-center">
+            <p className="text-stone-500 text-sm">Point camera at QR code</p>
+            <div className="absolute inset-[15%] border-2 border-yellow-500/40 rounded-lg" />
           </div>
+
+          {/* Scan result overlay */}
+          {scanResult && (
+            <div
+              className={`absolute inset-x-4 top-4 mx-auto max-w-md rounded-xl p-6 text-center shadow-2xl ${
+                scanResult.status === "success"
+                  ? "bg-emerald-600 text-white"
+                  : scanResult.status === "already"
+                    ? "bg-yellow-500 text-stone-900"
+                    : "bg-red-600 text-white"
+              }`}
+            >
+              {scanResult.status === "success" ? (
+                <CheckCircle2 className="h-16 w-16 mx-auto mb-3" />
+              ) : scanResult.status === "already" ? (
+                <AlertTriangle className="h-16 w-16 mx-auto mb-3" />
+              ) : (
+                <XCircle className="h-16 w-16 mx-auto mb-3" />
+              )}
+              {scanResult.attendee && (
+                <p className="text-2xl font-bold">{scanResult.attendee.name}</p>
+              )}
+              <p className="text-base opacity-90 mt-1">{scanResult.message}</p>
+              {scanResult.attendee && (
+                <Badge className="mt-3 bg-white/20 text-sm px-3 py-1">
+                  {scanResult.attendee.ticketType}
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Scan result overlay */}
-        {scanResult && (
-          <div
-            className={`absolute inset-x-0 top-20 mx-auto max-w-md rounded-lg p-6 text-center shadow-xl ${
-              scanResult.status === "success"
-                ? "bg-emerald-600 text-white"
-                : scanResult.status === "already"
-                  ? "bg-yellow-500 text-stone-900"
-                  : "bg-red-600 text-white"
-            }`}
-          >
-            {scanResult.status === "success" ? (
-              <CheckCircle2 className="h-12 w-12 mx-auto mb-2" />
-            ) : scanResult.status === "already" ? (
-              <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
-            ) : (
-              <XCircle className="h-12 w-12 mx-auto mb-2" />
-            )}
-            {scanResult.attendee && (
-              <p className="text-xl font-bold">{scanResult.attendee.name}</p>
-            )}
-            <p className="text-sm opacity-90">{scanResult.message}</p>
-            {scanResult.attendee && (
-              <Badge className="mt-2 bg-white/20">
-                {scanResult.attendee.ticketType}
-              </Badge>
-            )}
-          </div>
-        )}
-
-        {/* Search fallback */}
-        <div className="p-4 bg-stone-950">
+        {/* Bottom bar — search + simulate */}
+        <div className="bg-stone-950 border-t border-stone-800 p-3 space-y-2">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-500" />
             <Input
-              placeholder="Search by name or email..."
+              placeholder="Search by name if QR fails..."
               className="pl-9 bg-stone-800 border-stone-700 text-white placeholder:text-stone-500"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-        </div>
-
-        {/* Quick test button for demo */}
-        <div className="p-4 bg-stone-950 border-t border-stone-800">
           <Button
             className="w-full"
+            variant="outline"
+            size="sm"
             onClick={() => handleScan("test-qr-hash")}
           >
-            <ScanLine className="mr-2 h-4 w-4" /> Simulate Scan
+            <ScanLine className="mr-2 h-4 w-4" /> Simulate Scan (Demo)
           </Button>
         </div>
       </div>
