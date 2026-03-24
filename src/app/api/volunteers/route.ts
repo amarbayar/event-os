@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (!ids) return NextResponse.json({ error: "No active edition" }, { status: 400 });
 
   const body = await req.json();
-  const { name, email, phone, role, availability, tshirtSize, experience } = body;
+  const { name, email, phone, role, availability, tshirtSize, experience, source, stage, assignedTo } = body;
 
   if (!name || !email) {
     return NextResponse.json(
@@ -42,6 +42,9 @@ export async function POST(req: NextRequest) {
       availability: availability || null,
       tshirtSize: tshirtSize || null,
       experience: experience || null,
+      source: source || "intake",
+      stage: stage || "lead",
+      assignedTo: assignedTo || null,
     })
     .returning();
 

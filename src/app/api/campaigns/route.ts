@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (!ids) return NextResponse.json({ error: "No active edition" }, { status: 400 });
 
   const body = await req.json();
-  const { title, type, platform, content, scheduledDate, speakerId, sponsorId } = body;
+  const { title, type, platform, content, scheduledDate, speakerId, sponsorId, source, assignedTo } = body;
 
   if (!title || !type) {
     return NextResponse.json(
@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
       scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
       speakerId: speakerId || null,
       sponsorId: sponsorId || null,
+      source: source || "intake",
+      assignedTo: assignedTo || null,
     })
     .returning();
 

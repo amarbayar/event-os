@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (!ids) return NextResponse.json({ error: "No active edition" }, { status: 400 });
 
   const body = await req.json();
-  const { title, description, status, priority, teamId, assigneeName, dueDate, linkedEntityType, linkedEntityId } = body;
+  const { title, description, status, priority, teamId, assigneeName, dueDate, linkedEntityType, linkedEntityId, source, assignedTo } = body;
 
   if (!title) {
     return NextResponse.json(
@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
       dueDate: dueDate ? new Date(dueDate) : null,
       linkedEntityType: linkedEntityType || null,
       linkedEntityId: linkedEntityId || null,
+      source: source || "intake",
+      assignedTo: assignedTo || null,
     })
     .returning();
 

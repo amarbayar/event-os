@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (!ids) return NextResponse.json({ error: "No active edition" }, { status: 400 });
 
   const body = await req.json();
-  const { companyName, contactName, contactEmail, packagePreference, message } = body;
+  const { companyName, contactName, contactEmail, packagePreference, message, source, stage, assignedTo } = body;
 
   if (!companyName) {
     return NextResponse.json(
@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
       packagePreference: packagePreference || null,
       message: message || null,
       status: "pending",
+      source: source || "intake",
+      stage: stage || "lead",
+      assignedTo: assignedTo || null,
     })
     .returning();
 

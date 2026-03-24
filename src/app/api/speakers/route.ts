@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { name, email, bio, company, title, talkTitle, talkAbstract, talkType, trackPreference } = body;
+  const { name, email, bio, company, title, talkTitle, talkAbstract, talkType, trackPreference, source, assignedTo } = body;
 
   // Resolve editionId/organizationId — use provided values or fall back to active edition
   let editionId = body.editionId;
@@ -78,6 +78,8 @@ export async function POST(req: NextRequest) {
       talkAbstract: talkAbstract || null,
       talkType: talkType || "talk",
       trackPreference: trackPreference || null,
+      source: source || "intake",
+      assignedTo: assignedTo || null,
     })
     .returning();
 
