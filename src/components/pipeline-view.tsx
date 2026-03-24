@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
@@ -81,27 +82,61 @@ export function PipelineFilters({
         ))}
       </div>
 
-      {/* Pipeline funnel */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1">
-        {(["lead", "engaged", "confirmed", "declined"] as const).map((stage, i) => (
-          <div key={stage} className="flex items-center shrink-0">
+      {/* Pipeline funnel — visual flow */}
+      <div className="flex items-stretch overflow-x-auto rounded-lg border bg-white">
+        {(["lead", "engaged", "confirmed", "declined"] as const).map((stage, i) => {
+          const isActive = activeStage === stage;
+          const isAll = activeStage === "all";
+          const count = stageCounts[stage];
+
+          // Use fully static class names so Tailwind can detect them
+          const activeClasses = {
+            lead: "bg-stone-100 border-b-2 border-stone-500 text-stone-800",
+            engaged: "bg-sky-50 border-b-2 border-sky-500 text-sky-800",
+            confirmed: "bg-emerald-50 border-b-2 border-emerald-500 text-emerald-800",
+            declined: "bg-red-50 border-b-2 border-red-500 text-red-700",
+          }[stage];
+
+          const countColors = {
+            lead: "text-stone-700",
+            engaged: "text-sky-700",
+            confirmed: "text-emerald-700",
+            declined: "text-red-600",
+          }[stage];
+
+          return (
             <button
-              onClick={() => onStageChange(activeStage === stage ? "all" : stage)}
-              className={`rounded-md px-3 py-1.5 text-center min-w-[80px] transition-colors ${
-                activeStage === stage ? "ring-2 ring-yellow-500" : ""
-              }`}
+              key={stage}
+              onClick={() => onStageChange(isActive ? "all" : stage)}
+              className={cn(
+                "flex-1 min-w-[100px] px-4 py-3 text-center transition-all relative",
+                "hover:bg-stone-50",
+                i > 0 && "border-l border-stone-200",
+                isActive
+                  ? activeClasses
+                  : "border-b-2 border-transparent"
+              )}
             >
-              <p className={`text-lg font-semibold tabular-nums ${
-                stage === "confirmed" ? "text-emerald-600" :
-                stage === "declined" ? "text-red-500" : ""
-              }`}>
-                {stageCounts[stage]}
+              <p className={cn(
+                "text-xl font-bold tabular-nums",
+                isActive || isAll ? countColors : "text-stone-300"
+              )}>
+                {count}
               </p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{stage}</p>
+              <p className={cn(
+                "text-[10px] uppercase tracking-wider font-medium",
+                isActive ? countColors : isAll && count > 0 ? "text-stone-500" : "text-stone-300"
+              )}>
+                {stage}
+              </p>
+              {i < 3 && (
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 text-stone-200">
+                  <ArrowRight className="h-3 w-3" />
+                </div>
+              )}
             </button>
-            {i < 3 && <ArrowRight className="h-3 w-3 text-stone-300 shrink-0 mx-0.5" />}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

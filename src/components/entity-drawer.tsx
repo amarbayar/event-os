@@ -137,9 +137,13 @@ export function EntityDrawer({
           </div>
         )}
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {sections[activeTab]?.content}
+        {/* Content — all tabs rendered, only active visible (preserves form state) */}
+        <div className="flex-1 overflow-y-auto">
+          {sections.map((section, i) => (
+            <div key={i} className={cn("p-4", activeTab !== i && "hidden")}>
+              {section.content}
+            </div>
+          ))}
         </div>
       </div>
     </>

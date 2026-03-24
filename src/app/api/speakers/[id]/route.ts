@@ -45,11 +45,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const versionConflict = checkVersion(
-    req.headers.get("if-match"),
-    speaker.version
-  );
-  if (versionConflict) return versionConflict;
+  // Only enforce version check if If-Match is a real version number (not 999/placeholder)
+  const ifMatch = req.headers.get("if-match");
+  if (ifMatch && ifMatch !== "999") {
+    const versionConflict = checkVersion(ifMatch, speaker.version);
+    if (versionConflict) return versionConflict;
+  }
 
   const body = await req.json();
   const allowedFields = [
@@ -66,6 +67,9 @@ export async function PATCH(
     "talkAbstract",
     "talkType",
     "trackPreference",
+    "source",
+    "stage",
+    "assignedTo",
   ] as const;
 
   const updates: Record<string, unknown> = {};

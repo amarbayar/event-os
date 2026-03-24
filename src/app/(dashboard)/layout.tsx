@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat-panel";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 
 export default function DashboardLayout({
   children,
@@ -26,6 +27,7 @@ export default function DashboardLayout({
   }, [toggleChat]);
 
   return (
+    <ConfirmProvider>
     <div className="min-h-screen bg-background">
       <Sidebar onToggleChat={toggleChat} />
       <main
@@ -39,5 +41,6 @@ export default function DashboardLayout({
       </main>
       <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
+    </ConfirmProvider>
   );
 }
