@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       title: title || null,
       talkTitle: talkTitle || "TBD",
       talkAbstract: talkAbstract || null,
-      talkType: talkType || "talk",
+      talkType: ["talk", "workshop", "panel", "keynote", "break", "networking"].includes(talkType) ? talkType : "talk",
       trackPreference: trackPreference || null,
       source: source || "intake",
       assignedTo: assignedTo || null,
