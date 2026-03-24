@@ -23,10 +23,15 @@ type Speaker = {
   name: string;
   email: string;
   talkTitle: string;
+  talkAbstract: string | null;
+  talkType: string | null;
   company: string | null;
   title: string | null;
+  bio: string | null;
+  headshotUrl: string | null;
   status: string;
   reviewScore: number | null;
+  reviewNotes: string | null;
   source: string;
   stage: string;
   assignedTo: string | null;
@@ -51,15 +56,8 @@ export function SpeakersClient({ initialSpeakers }: { initialSpeakers: Speaker[]
   };
 
   // Refresh data without full page reload
-  const refreshData = useCallback(async () => {
-    const res = await fetch("/api/speakers?editionId=all");
-    if (res.ok) {
-      const json = await res.json();
-      if (json.data) setSpeakers(json.data);
-    } else {
-      // Fallback: reload page
-      window.location.reload();
-    }
+  const refreshData = useCallback(() => {
+    window.location.reload();
   }, []);
 
   // Drawer save
@@ -107,7 +105,7 @@ export function SpeakersClient({ initialSpeakers }: { initialSpeakers: Speaker[]
               </div>
               <div className="space-y-1.5">
                 <Label>Bio</Label>
-                <Textarea name="bio" rows={4} placeholder="Speaker bio..." />
+                <Textarea name="bio" rows={4} placeholder="Speaker bio..." defaultValue={selectedSpeaker.bio || ""} />
               </div>
             </form>
           ),
@@ -122,12 +120,12 @@ export function SpeakersClient({ initialSpeakers }: { initialSpeakers: Speaker[]
               </div>
               <div className="space-y-1.5">
                 <Label>Abstract</Label>
-                <Textarea name="talkAbstract" rows={6} placeholder="Talk abstract..." form="speaker-drawer-form" />
+                <Textarea name="talkAbstract" rows={6} placeholder="Talk abstract..." defaultValue={selectedSpeaker.talkAbstract || ""} form="speaker-drawer-form" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Type</Label>
-                  <Select name="talkType" defaultValue="talk">
+                  <Select name="talkType" defaultValue={selectedSpeaker.talkType || "talk"}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="talk">Talk</SelectItem>
@@ -200,7 +198,7 @@ export function SpeakersClient({ initialSpeakers }: { initialSpeakers: Speaker[]
               </div>
               <div className="space-y-1.5">
                 <Label>Review Notes</Label>
-                <Textarea name="reviewNotes" rows={4} placeholder="Internal notes..." form="speaker-drawer-form" />
+                <Textarea name="reviewNotes" rows={4} placeholder="Internal notes..." defaultValue={selectedSpeaker.reviewNotes || ""} form="speaker-drawer-form" />
               </div>
             </div>
           ),
@@ -370,6 +368,7 @@ export function SpeakersClient({ initialSpeakers }: { initialSpeakers: Speaker[]
 
       {/* Detail drawer */}
       <EntityDrawer
+        key={selectedSpeaker?.id || "closed"}
         isOpen={!!selectedSpeaker}
         onClose={() => setSelectedSpeaker(null)}
         title={selectedSpeaker?.name || ""}
