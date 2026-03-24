@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,10 @@ export function PipelineFilters({
   onSourceChange: (s: Source) => void;
   onStageChange: (s: Stage) => void;
 }) {
+  // Avoid hydration mismatch by computing counts only after mount
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const stageCounts = {
     lead: items.filter((i) => i.stage === "lead").length,
     engaged: items.filter((i) => i.stage === "engaged").length,
@@ -83,7 +87,7 @@ export function PipelineFilters({
       </div>
 
       {/* Pipeline funnel — visual flow */}
-      <div className="flex items-stretch overflow-x-auto rounded-lg border bg-white">
+      <div className="flex items-stretch overflow-x-auto rounded-lg border bg-white" suppressHydrationWarning>
         {(["lead", "engaged", "confirmed", "declined"] as const).map((stage, i) => {
           const isActive = activeStage === stage;
           const isAll = activeStage === "all";
@@ -119,12 +123,14 @@ export function PipelineFilters({
             >
               <p className={cn(
                 "text-xl font-bold tabular-nums",
+                !mounted ? "text-stone-400" :
                 isActive || isAll ? countColors : "text-stone-300"
               )}>
                 {count}
               </p>
               <p className={cn(
                 "text-[10px] uppercase tracking-wider font-medium",
+                !mounted ? "text-stone-400" :
                 isActive ? countColors : isAll && count > 0 ? "text-stone-500" : "text-stone-300"
               )}>
                 {stage}
