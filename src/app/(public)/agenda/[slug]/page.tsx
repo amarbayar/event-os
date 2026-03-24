@@ -100,7 +100,7 @@ export default function PublicAgendaPage() {
 
       {/* Controls */}
       <div className="border-b sticky top-0 bg-background z-10">
-        <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-3">
+        <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-3 overflow-x-auto">
           <div className="flex gap-1.5">
             {[1, 2].map((day) => (
               <Button

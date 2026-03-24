@@ -136,7 +136,7 @@ export default function SpeakersPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">
             Speakers
@@ -162,7 +162,7 @@ export default function SpeakersPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-6">
         {[
           { label: "Applications", value: counts.total, color: "text-foreground" },
           { label: "Accepted", value: counts.accepted, color: "text-emerald-600" },
@@ -181,7 +181,7 @@ export default function SpeakersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         {(["all", "pending", "accepted", "waitlisted", "rejected"] as const).map(
           (status) => (
             <Button
@@ -206,28 +206,28 @@ export default function SpeakersPage() {
       <div className="space-y-2">
         {filtered.map((speaker) => (
           <Card key={speaker.id} className="hover:border-yellow-500/30 transition-colors">
-            <CardContent className="flex items-center justify-between p-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3">
-                  <p className="font-medium truncate">{speaker.name}</p>
-                  <Badge
-                    variant={statusConfig[speaker.status].variant}
-                    className="shrink-0"
-                  >
-                    {statusConfig[speaker.status].label}
-                  </Badge>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium truncate">{speaker.name}</p>
+                    <Badge
+                      variant={statusConfig[speaker.status].variant}
+                      className="shrink-0"
+                    >
+                      {statusConfig[speaker.status].label}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate mt-0.5">
+                    {speaker.talkTitle}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {speaker.company} &middot; Applied{" "}
+                    {new Date(speaker.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground truncate mt-0.5">
-                  {speaker.talkTitle}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {speaker.company} &middot; Applied{" "}
-                  {new Date(speaker.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="flex items-center gap-4 ml-4">
                 {speaker.reviewScore && (
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <p className="text-lg font-semibold tabular-nums">
                       {speaker.reviewScore}
                     </p>
@@ -236,15 +236,15 @@ export default function SpeakersPage() {
                     </p>
                   </div>
                 )}
-                {speaker.status === "pending" && (
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="outline">
-                      Reject
-                    </Button>
-                    <Button size="sm">Accept</Button>
-                  </div>
-                )}
               </div>
+              {speaker.status === "pending" && (
+                <div className="flex gap-2 mt-3 sm:justify-end">
+                  <Button size="sm" variant="outline" className="flex-1 sm:flex-none">
+                    Reject
+                  </Button>
+                  <Button size="sm" className="flex-1 sm:flex-none">Accept</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

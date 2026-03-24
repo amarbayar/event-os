@@ -188,7 +188,7 @@ export default function CheckInPage() {
   // Dashboard Mode
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">
             Check-in
@@ -214,7 +214,7 @@ export default function CheckInPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-6">
         {[
           { label: "Checked In", value: stats.checkedIn, color: "text-emerald-600" },
           { label: "Remaining", value: stats.remaining, color: "text-foreground" },

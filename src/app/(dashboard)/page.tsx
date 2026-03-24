@@ -14,7 +14,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-8">
         {[
           { label: "Sessions", value: "—", icon: Calendar },
           { label: "Speakers", value: "—", icon: Mic2 },

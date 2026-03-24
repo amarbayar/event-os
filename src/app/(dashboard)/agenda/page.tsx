@@ -149,7 +149,7 @@ export default function AgendaPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">
             Agenda
@@ -158,7 +158,7 @@ export default function AgendaPage() {
             Dev Summit 2026 — Day {selectedDay}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Badge
             variant={agendaStatus === "draft" ? "secondary" : "default"}
             className={

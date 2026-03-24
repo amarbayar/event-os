@@ -77,7 +77,7 @@ export default function CFPPage() {
         <Card>
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="name">Full Name *</Label>
                   <Input
@@ -105,7 +105,7 @@ export default function CFPPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="company">Company / Organization</Label>
                   <Input
@@ -147,7 +147,7 @@ export default function CFPPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Session Type</Label>
                   <Select name="talkType" defaultValue="talk">
