@@ -116,7 +116,7 @@ export function ChatPanel({
         body: JSON.stringify({
           input,
           inputType,
-          editionId: "placeholder-edition-id", // TODO: wire to real edition
+          editionId: "active", // resolved server-side via getActiveIds()
         }),
       });
 
@@ -158,27 +158,43 @@ export function ChatPanel({
 
   const handleAction = async (action: NonNullable<Message["actions"]>[0]) => {
     try {
-      await fetch(action.endpoint, {
+      const res = await fetch(action.endpoint, {
         method: action.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(action.payload),
       });
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          role: "assistant",
-          content: `Done! ${action.label} completed.`,
-          timestamp: new Date(),
-        },
-      ]);
+
+      const json = await res.json();
+
+      if (res.ok) {
+        const name = json.data?.name || json.data?.companyName || json.data?.title || "";
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Done! ${action.label} completed.${name ? ` Created: ${name}` : ""}\n\nRefresh the page to see the new record in the list.`,
+            timestamp: new Date(),
+          },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Error: ${json.error || "Something went wrong"}. The record was not created.`,
+            timestamp: new Date(),
+          },
+        ]);
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
           role: "assistant",
-          content: `Failed to execute: ${action.label}. Try again.`,
+          content: `Network error — couldn't reach the server. Try again.`,
           timestamp: new Date(),
         },
       ]);
@@ -290,6 +306,20 @@ export function ChatPanel({
                     {/* Action buttons */}
                     {msg.actions && msg.actions.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
+                        {msg.actions.length > 1 && (
+                          <Button
+                            size="sm"
+                            className="text-xs h-7"
+                            onClick={async () => {
+                              for (const action of msg.actions!) {
+                                await handleAction(action);
+                              }
+                            }}
+                          >
+                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                            Import All ({msg.actions.length})
+                          </Button>
+                        )}
                         {msg.actions.map((action, i) => (
                           <Button
                             key={i}
