@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Calendar, User, X } from "lucide-react";
+import { Plus, Calendar, User, X, Pencil, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 
 type TaskStatus = "todo" | "in_progress" | "done" | "blocked";
@@ -748,7 +748,7 @@ function TaskDetailDrawer({
             </Label>
 
             {notes.length > 0 && (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <div className="space-y-2.5 max-h-64 overflow-y-auto">
                 {notes.map((note) => {
                   const isOwn = currentUserEmail && note.authorEmail === currentUserEmail;
 
@@ -771,23 +771,23 @@ function TaskDetailDrawer({
                   }
 
                   return (
-                    <div key={note.id} className="rounded-md bg-stone-50 px-3 py-2 group">
+                    <div key={note.id} className="rounded-md bg-stone-50 px-3 py-3 group">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium">{note.authorName}</span>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                           {isOwn && (
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                               <button
                                 onClick={() => { setEditingNoteId(note.id); setEditContent(note.content); }}
-                                className="text-[10px] text-stone-400 hover:text-stone-600"
+                                className="rounded p-1 text-stone-400 hover:text-stone-600 hover:bg-stone-200 transition-colors"
                               >
-                                edit
+                                <Pencil className="h-3 w-3" />
                               </button>
                               <button
                                 onClick={() => handleDeleteNote(note.id)}
-                                className="text-[10px] text-stone-400 hover:text-red-500"
+                                className="rounded p-1 text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                               >
-                                delete
+                                <Trash2 className="h-3 w-3" />
                               </button>
                             </span>
                           )}
@@ -796,7 +796,7 @@ function TaskDetailDrawer({
                           </span>
                         </div>
                       </div>
-                      <p className="text-xs text-stone-600 mt-0.5 whitespace-pre-wrap">{note.content}</p>
+                      <p className="text-sm text-stone-600 mt-1.5 whitespace-pre-wrap leading-relaxed">{note.content}</p>
                     </div>
                   );
                 })}
