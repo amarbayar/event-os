@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   CheckCircle2,
   Circle,
@@ -13,6 +15,120 @@ import {
   Check,
   Clock,
 } from "lucide-react";
+
+// ─── Inline item actions (no system alerts) ─────────────
+
+function ChecklistItemActions({
+  item,
+  onSubmit,
+  onApprove,
+  onReject,
+}: {
+  item: { id: string; status: string; itemType: string; name: string };
+  onSubmit: (id: string, value: string) => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string, notes: string) => void;
+}) {
+  const [showInput, setShowInput] = useState(false);
+  const [showReject, setShowReject] = useState(false);
+  const [value, setValue] = useState("");
+  const [rejectNotes, setRejectNotes] = useState("");
+
+  if (item.status === "approved" || item.status === "archived") return null;
+
+  // Submit / re-submit form
+  if ((item.status === "pending" || item.status === "needs_revision") && showInput) {
+    return (
+      <div className="mt-2 space-y-2">
+        {item.itemType === "text_input" ? (
+          <Textarea
+            autoFocus
+            rows={2}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={`Enter ${item.name.toLowerCase()}...`}
+            className="text-xs"
+          />
+        ) : (
+          <Input
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={item.itemType === "file_upload" ? "Paste file URL..." : item.itemType === "link" ? "Paste URL..." : "Enter value..."}
+            className="text-xs h-8"
+          />
+        )}
+        <div className="flex gap-2">
+          <Button size="sm" className="h-7 text-xs" disabled={!value.trim()} onClick={() => {
+            onSubmit(item.id, value.trim());
+            setValue("");
+            setShowInput(false);
+          }}>
+            Submit
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowInput(false); setValue(""); }}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Reject form (organizer feedback)
+  if (item.status === "submitted" && showReject) {
+    return (
+      <div className="mt-2 space-y-2">
+        <Textarea
+          autoFocus
+          rows={2}
+          value={rejectNotes}
+          onChange={(e) => setRejectNotes(e.target.value)}
+          placeholder="What needs to be changed?"
+          className="text-xs"
+        />
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="h-7 text-xs text-orange-600" disabled={!rejectNotes.trim()} onClick={() => {
+            onReject(item.id, rejectNotes.trim());
+            setRejectNotes("");
+            setShowReject(false);
+          }}>
+            Send feedback
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowReject(false); setRejectNotes(""); }}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Action buttons
+  return (
+    <div className="flex gap-2 mt-2">
+      {(item.status === "pending" || item.status === "needs_revision") && (
+        item.itemType === "confirmation" ? (
+          <Button size="sm" className="h-7 text-xs" onClick={() => onSubmit(item.id, "true")}>
+            Confirm
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowInput(true)}>
+            {item.status === "needs_revision" ? "Re-submit" : "Submit"}
+          </Button>
+        )
+      )}
+      {item.status === "submitted" && (
+        <>
+          <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => onApprove(item.id)}>
+            Approve
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs text-orange-600" onClick={() => setShowReject(true)}>
+            Request revision
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
 
 type ChecklistItem = {
   id: string;
@@ -168,57 +284,13 @@ export function ChecklistPanel({
                   <p className="text-xs text-orange-600 mt-1">Feedback: {item.notes}</p>
                 )}
 
-                {/* Actions based on status */}
-                <div className="flex gap-2 mt-2">
-                  {item.status === "pending" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={() => {
-                        const value = prompt(`Enter value for "${item.name}":`);
-                        if (value) handleSubmit(item.id, value);
-                      }}
-                    >
-                      Submit
-                    </Button>
-                  )}
-                  {item.status === "submitted" && (
-                    <>
-                      <Button
-                        size="sm"
-                        className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
-                        onClick={() => handleApprove(item.id)}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs text-orange-600"
-                        onClick={() => {
-                          const notes = prompt("Feedback for revision:");
-                          if (notes) handleReject(item.id, notes);
-                        }}
-                      >
-                        Request revision
-                      </Button>
-                    </>
-                  )}
-                  {item.status === "needs_revision" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={() => {
-                        const value = prompt(`Re-submit "${item.name}":`);
-                        if (value) handleSubmit(item.id, value);
-                      }}
-                    >
-                      Re-submit
-                    </Button>
-                  )}
-                </div>
+                {/* Inline actions — no system alerts */}
+                <ChecklistItemActions
+                  item={item}
+                  onSubmit={handleSubmit}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                />
               </div>
             </div>
           );

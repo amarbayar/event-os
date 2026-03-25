@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import { PipelineTable } from "@/components/pipeline-table";
 import { EntityDrawer } from "@/components/entity-drawer";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/file-upload";
-import { ChecklistPanel, ChecklistProgress } from "@/components/checklist-panel";
+import { ChecklistPanel } from "@/components/checklist-panel";
 import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock, UserPlus } from "lucide-react";
 
 type Speaker = {
@@ -64,6 +64,100 @@ const REQUIREMENT_OPTIONS = [
   "Hand-held mic", "USB-C adapter", "HDMI adapter", "Whiteboard",
   "Internet access", "Clicker/pointer", "Audio playback",
 ];
+
+// ─── Portal Invite Section (on Profile tab) ─────────────
+
+function PortalInviteSection({ entityType, entityId, entityEmail }: { entityType: string; entityId: string; entityEmail: string }) {
+  const [status, setStatus] = useState<"idle" | "loading" | "invited" | "already" | "error">("idle");
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [password, setPassword] = useState("portal123");
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; password: string } | null>(null);
+
+  // Check if already invited on mount
+  useEffect(() => {
+    fetch("/api/portal/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entityType, entityId }),
+    }).then((r) => r.json()).then((d) => {
+      if (d.data?.alreadyInvited) {
+        setStatus("already");
+      }
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleInvite = async () => {
+    setStatus("loading");
+    const res = await fetch("/api/portal/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entityType, entityId }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      if (data.data.alreadyInvited) {
+        setStatus("already");
+      } else {
+        setInviteInfo({ email: entityEmail, password: data.data.tempPassword || password });
+        setStatus("invited");
+      }
+    } else {
+      setStatus("error");
+    }
+    setShowConfirm(false);
+  };
+
+  return (
+    <div className="pt-4 border-t space-y-2">
+      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Stakeholder Portal</Label>
+
+      {status === "already" && (
+        <div className="rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-700">
+          Already invited — {entityEmail} has portal access.
+          <Button size="sm" variant="outline" className="h-6 text-[10px] ml-2" onClick={() => { setStatus("idle"); setShowConfirm(true); }}>
+            Resend invite
+          </Button>
+        </div>
+      )}
+
+      {status === "invited" && inviteInfo && (
+        <div className="rounded-md bg-emerald-50 px-3 py-2 space-y-1">
+          <p className="text-xs font-medium text-emerald-800">Portal invite created!</p>
+          <p className="text-xs text-emerald-700">Email: {inviteInfo.email}</p>
+          <p className="text-xs text-emerald-700">Password: {inviteInfo.password}</p>
+          <p className="text-xs text-emerald-600">Share these credentials with the speaker.</p>
+        </div>
+      )}
+
+      {status === "error" && (
+        <p className="text-xs text-red-600">Failed to create invite. The email may already be in use.</p>
+      )}
+
+      {showConfirm && (
+        <div className="rounded-md border p-3 space-y-2">
+          <p className="text-xs text-stone-600">
+            This will create a portal login for <strong>{entityEmail}</strong> where they can self-service their checklist items and update their profile.
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" className="h-7 text-xs" onClick={handleInvite} disabled={status === "loading"}>
+              {status === "loading" ? "Inviting..." : "Confirm Invite"}
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowConfirm(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {status === "idle" && !showConfirm && (
+        <Button size="sm" className="w-full" onClick={() => setShowConfirm(true)}>
+          <UserPlus className="mr-2 h-3 w-3" /> Invite to Portal
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export function SpeakersClient({
   initialSpeakers,
@@ -255,6 +349,11 @@ export function SpeakersClient({
                 <Label className="text-xs text-muted-foreground uppercase tracking-wider">Bio</Label>
                 <Textarea rows={4} placeholder="Speaker bio for the event website..." value={(drawerForm.bio as string) || ""} onChange={(e) => updateField("bio", e.target.value)} />
               </div>
+
+              {/* Portal Invite — only for confirmed speakers with email */}
+              {selectedSpeaker?.stage === "confirmed" && selectedSpeaker?.email && (
+                <PortalInviteSection entityType="speaker" entityId={selectedSpeaker.id} entityEmail={selectedSpeaker.email} />
+              )}
             </div>
           ),
         },
@@ -393,33 +492,6 @@ export function SpeakersClient({
                 <Label>Review Notes</Label>
                 <Textarea rows={4} placeholder="Internal notes..." value={(drawerForm.reviewNotes as string) || ""} onChange={(e) => updateField("reviewNotes", e.target.value)} />
               </div>
-              {selectedSpeaker?.stage === "confirmed" && selectedSpeaker?.email && (
-                <div className="pt-3 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={async () => {
-                      const res = await fetch("/api/portal/invite", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ entityType: "speaker", entityId: selectedSpeaker.id }),
-                      });
-                      const data = await res.json();
-                      if (res.ok) {
-                        const msg = data.data.alreadyInvited
-                          ? `Already invited. Login: ${selectedSpeaker.email}`
-                          : `Portal invite created!\nEmail: ${selectedSpeaker.email}\nTemp password: ${data.data.tempPassword}\nURL: /portal`;
-                        alert(msg);
-                      } else {
-                        alert(data.error || "Failed to invite");
-                      }
-                    }}
-                  >
-                    <UserPlus className="mr-2 h-3 w-3" /> Invite to Portal
-                  </Button>
-                </div>
-              )}
             </div>
           ),
         },
@@ -439,9 +511,6 @@ export function SpeakersClient({
 
   return (
     <div>
-      {/* Checklist progress bars for confirmed speakers */}
-      <ChecklistProgress entityType="speaker" />
-
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">Speakers</h1>

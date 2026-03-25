@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/confirm-dialog";
 import { NotesButton, NotesPanel } from "@/components/notes-panel";
-import { Trash2, MoreHorizontal } from "lucide-react";
+import { Trash2, MoreHorizontal, CheckCircle2, ListChecks } from "lucide-react";
 
 type OrgUser = { id: string; name: string | null; email: string };
+type ChecklistCount = { done: number; total: number };
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -240,6 +241,7 @@ export function PipelineTable<
   const { confirm } = useConfirm();
   const [notesOpenFor, setNotesOpenFor] = useState<string | null>(null);
   const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
+  const [checklistCounts, setChecklistCounts] = useState<Record<string, ChecklistCount>>({});
 
   // Fetch org users for AssignedTo dropdown
   useEffect(() => {
@@ -248,6 +250,28 @@ export function PipelineTable<
       .then((d) => { if (d.data) setOrgUsers(d.data); })
       .catch(() => {});
   }, []);
+
+  // Fetch checklist counts for confirmed entities
+  useEffect(() => {
+    const confirmed = items.filter((i) => i.stage === "confirmed");
+    if (confirmed.length === 0) return;
+    Promise.all(
+      confirmed.map((item) =>
+        fetch(`/api/checklist-items?entityType=${entityName}&entityId=${item.id}`)
+          .then((r) => r.json())
+          .then((d) => {
+            const active = (d.data || []).filter((i: { status: string }) => i.status !== "archived");
+            const done = active.filter((i: { status: string }) => i.status === "submitted" || i.status === "approved").length;
+            return { id: item.id, done, total: active.length };
+          })
+          .catch(() => ({ id: item.id, done: 0, total: 0 }))
+      )
+    ).then((results) => {
+      const counts: Record<string, ChecklistCount> = {};
+      for (const r of results) counts[r.id] = { done: r.done, total: r.total };
+      setChecklistCounts(counts);
+    });
+  }, [items, entityName]);
 
   const handlePatch = async (id: string, field: string, value: string) => {
     await fetch(`${patchEndpoint}/${id}`, {
@@ -297,6 +321,9 @@ export function PipelineTable<
             <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[120px]">
               Assigned To
             </th>
+            <th className="px-3 py-2 text-center text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[60px]">
+              Checklist
+            </th>
             <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[50px]">
               Notes
             </th>
@@ -338,6 +365,19 @@ export function PipelineTable<
                     // TODO: also set assigneeId when PATCH supports it
                   }}
                 />
+              </td>
+              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                {checklistCounts[item.id] ? (
+                  checklistCounts[item.id].done === checklistCounts[item.id].total ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                  ) : (
+                    <span className="text-xs tabular-nums text-stone-500">
+                      {checklistCounts[item.id].done}/{checklistCounts[item.id].total}
+                    </span>
+                  )
+                ) : item.stage === "confirmed" ? (
+                  <span className="text-xs text-stone-300">...</span>
+                ) : null}
               </td>
               <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                 <NotesButton
