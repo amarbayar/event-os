@@ -537,15 +537,22 @@ function TaskDetailDrawer({
   onClose: () => void;
   onUpdate: (updates: Record<string, unknown>) => void;
 }) {
-  const [notes, setNotes] = useState<{ id: string; content: string; authorName: string; createdAt: string }[]>([]);
+  const [notes, setNotes] = useState<{ id: string; content: string; authorName: string; authorEmail: string | null; createdAt: string }[]>([]);
   const [newNote, setNewNote] = useState("");
   const [postingNote, setPostingNote] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
+  const { confirm: confirmDialog } = useConfirm();
 
-  // Fetch notes for this task
   useEffect(() => {
     fetch(`/api/notes?entityType=task&entityId=${task.id}`)
       .then((r) => r.json())
       .then((d) => { if (d.data) setNotes(d.data); })
+      .catch(() => {});
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => { if (d.data?.email) setCurrentUserEmail(d.data.email); })
       .catch(() => {});
   }, [task.id]);
 
@@ -563,6 +570,35 @@ function TaskDetailDrawer({
       setNewNote("");
     }
     setPostingNote(false);
+  };
+
+  const handleEditNote = async (noteId: string) => {
+    if (!editContent.trim()) return;
+    const res = await fetch(`/api/notes/${noteId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: editContent.trim() }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, content: d.data.content } : n));
+    }
+    setEditingNoteId(null);
+    setEditContent("");
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    const confirmed = await confirmDialog({
+      title: "Delete comment",
+      message: "Are you sure you want to delete this comment? This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+    const res = await fetch(`/api/notes/${noteId}`, { method: "DELETE" });
+    if (res.ok) {
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    }
   };
 
   const [form, setForm] = useState({
@@ -713,17 +749,57 @@ function TaskDetailDrawer({
 
             {notes.length > 0 && (
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {notes.map((note) => (
-                  <div key={note.id} className="rounded-md bg-stone-50 px-3 py-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium">{note.authorName}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {new Date(note.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                      </span>
+                {notes.map((note) => {
+                  const isOwn = currentUserEmail && note.authorEmail === currentUserEmail;
+
+                  if (editingNoteId === note.id) {
+                    return (
+                      <div key={note.id} className="rounded-md bg-yellow-50 px-3 py-2 space-y-2">
+                        <Input
+                          autoFocus
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="text-xs"
+                          onKeyDown={(e) => { if (e.key === "Enter") handleEditNote(note.id); if (e.key === "Escape") setEditingNoteId(null); }}
+                        />
+                        <div className="flex gap-1">
+                          <Button size="sm" className="h-6 text-[10px]" onClick={() => handleEditNote(note.id)}>Save</Button>
+                          <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setEditingNoteId(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={note.id} className="rounded-md bg-stone-50 px-3 py-2 group">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">{note.authorName}</span>
+                        <div className="flex items-center gap-1">
+                          {isOwn && (
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                              <button
+                                onClick={() => { setEditingNoteId(note.id); setEditContent(note.content); }}
+                                className="text-[10px] text-stone-400 hover:text-stone-600"
+                              >
+                                edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteNote(note.id)}
+                                className="text-[10px] text-stone-400 hover:text-red-500"
+                              >
+                                delete
+                              </button>
+                            </span>
+                          )}
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(note.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-stone-600 mt-0.5 whitespace-pre-wrap">{note.content}</p>
                     </div>
-                    <p className="text-xs text-stone-600 mt-0.5 whitespace-pre-wrap">{note.content}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
