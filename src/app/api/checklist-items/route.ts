@@ -4,7 +4,7 @@ import { checklistItems, checklistTemplates } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
-// GET — list checklist items for an entity
+// GET — list checklist items for an entity (auto-syncs new templates)
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const entityType = url.searchParams.get("entityType");
@@ -16,6 +16,39 @@ export async function GET(req: NextRequest) {
 
   const ctx = await requirePermission(req, entityType, "read");
   if (isRbacError(ctx)) return ctx;
+
+  // Auto-sync: check for new templates that don't have items yet
+  const existingItems = await db.query.checklistItems.findMany({
+    where: and(
+      eq(checklistItems.entityType, entityType),
+      eq(checklistItems.entityId, entityId),
+    ),
+  });
+
+  // Only sync if entity already has at least one item (i.e., was confirmed)
+  if (existingItems.length > 0) {
+    const existingTemplateIds = new Set(existingItems.map((i) => i.templateId));
+    const templates = await db.query.checklistTemplates.findMany({
+      where: and(
+        eq(checklistTemplates.editionId, ctx.editionId),
+        eq(checklistTemplates.entityType, entityType),
+      ),
+    });
+
+    // Create items for any templates that don't have items yet
+    for (const template of templates) {
+      if (!existingTemplateIds.has(template.id)) {
+        await db.insert(checklistItems).values({
+          templateId: template.id,
+          editionId: ctx.editionId,
+          entityType,
+          entityId,
+          organizationId: ctx.orgId,
+          status: "pending",
+        });
+      }
+    }
+  }
 
   const items = await db
     .select({
