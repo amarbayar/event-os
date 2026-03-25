@@ -60,6 +60,9 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [notesOpenFor, setNotesOpenFor] = useState<string | null>(null);
+  const [teams, setTeams] = useState(initialTeams);
+  const [showNewTeam, setShowNewTeam] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
 
   const refreshTasks = async () => {
     const res = await fetch("/api/tasks");
@@ -134,7 +137,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">Tasks</h1>
-          <p className="text-sm text-muted-foreground">{tasks.length} tasks across {initialTeams.length} teams</p>
+          <p className="text-sm text-muted-foreground">{tasks.length} tasks across {teams.length} teams</p>
         </div>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="mr-2 h-3 w-3" /> Add Task
@@ -151,7 +154,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
         >
           All Teams ({tasks.length})
         </button>
-        {initialTeams.map((team) => (
+        {teams.map((team) => (
           <button
             key={team.id}
             onClick={() => setTeamFilter(team.id)}
@@ -163,6 +166,43 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
             {team.name} ({tasks.filter((t) => t.teamId === team.id).length})
           </button>
         ))}
+        {showNewTeam ? (
+          <div className="flex items-center gap-1">
+            <Input
+              autoFocus
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              placeholder="Team name"
+              className="h-8 w-32 text-xs"
+              onKeyDown={async (e) => {
+                if (e.key === "Enter" && newTeamName.trim()) {
+                  const res = await fetch("/api/teams", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: newTeamName.trim() }),
+                  });
+                  if (res.ok) {
+                    const d = await res.json();
+                    setTeams((prev) => [...prev, d.data]);
+                  }
+                  setNewTeamName("");
+                  setShowNewTeam(false);
+                }
+                if (e.key === "Escape") { setShowNewTeam(false); setNewTeamName(""); }
+              }}
+            />
+            <button onClick={() => { setShowNewTeam(false); setNewTeamName(""); }} className="text-stone-400 hover:text-stone-600">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowNewTeam(true)}
+            className="px-3 py-1.5 rounded-md text-xs font-medium text-yellow-700 border border-dashed border-yellow-300 hover:bg-yellow-50 transition-colors"
+          >
+            + New Team
+          </button>
+        )}
       </div>
 
       {/* Board view (Kanban) */}
@@ -189,7 +229,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
               {/* Cards */}
               <div className="space-y-2">
                 {columnTasks.map((task) => {
-                  const team = initialTeams.find((t) => t.id === task.teamId);
+                  const team = teams.find((t) => t.id === task.teamId);
                   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
                   const pCfg = priorityConfig[task.priority as Priority] || priorityConfig.medium;
 
@@ -202,12 +242,12 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
                       onClick={() => setSelectedTask(task)}
                       className={`rounded-md border bg-white p-3 cursor-pointer hover:border-yellow-500/40 transition-all ${
                         dragging === task.id ? "opacity-40 scale-95" : ""
-                      } ${isOverdue ? "border-red-200" : ""}`}
+                      }`}
                     >
                       {/* Priority dot + title */}
                       <div className="flex items-start gap-2">
                         <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${pCfg.dot}`} />
-                        <p className="text-sm font-medium line-clamp-2 leading-snug">{task.title}</p>
+                        <p className="text-sm font-medium line-clamp-2 leading-snug min-h-[2.5rem]">{task.title}</p>
                       </div>
 
                       {/* Meta row */}
@@ -249,7 +289,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
       {/* Create Task Dialog */}
       {showCreate && (
         <CreateTaskDialog
-          teams={initialTeams}
+          teams={teams}
           onClose={() => setShowCreate(false)}
           onCreate={handleCreate}
         />
@@ -259,7 +299,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
       {selectedTask && (
         <TaskDetailDrawer
           task={selectedTask}
-          teams={initialTeams}
+          teams={teams}
           onClose={() => setSelectedTask(null)}
           onUpdate={(updates) => handleUpdateTask(selectedTask.id, updates)}
           onOpenNotes={() => setNotesOpenFor(selectedTask.id)}
