@@ -163,6 +163,57 @@ function ProfileSection({
   );
 }
 
+// ─── Portal Item Input (explicit Submit button, no keyboard shortcuts) ──
+
+function PortalItemInput({
+  itemId,
+  itemType,
+  onSubmit,
+}: {
+  itemId: string;
+  itemType: string;
+  onSubmit: (id: string, value: string) => void;
+}) {
+  const [value, setValue] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  if (itemType === "confirmation") {
+    return (
+      <div className="mt-3">
+        <Button size="sm" onClick={async () => { setSubmitting(true); await onSubmit(itemId, "true"); setSubmitting(false); }} disabled={submitting}>
+          {submitting ? "Confirming..." : "Confirm"}
+        </Button>
+      </div>
+    );
+  }
+
+  const placeholder = itemType === "file_upload" ? "Paste file URL or upload link..."
+    : itemType === "link" ? "Paste URL (Google Slides, Dropbox, etc.)..."
+    : "Enter your response...";
+
+  return (
+    <div className="mt-3 space-y-2">
+      {itemType === "text_input" ? (
+        <Textarea value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} rows={3} />
+      ) : (
+        <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} />
+      )}
+      <Button
+        size="sm"
+        disabled={!value.trim() || submitting}
+        onClick={async () => {
+          setSubmitting(true);
+          await onSubmit(itemId, value.trim());
+          setValue("");
+          setSubmitting(false);
+        }}
+      >
+        {submitting ? "Submitting..." : "Submit"}
+      </Button>
+    </div>
+  );
+}
+
 export default function PortalPage() {
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -296,58 +347,13 @@ export default function PortalPage() {
                       </div>
                     )}
 
-                    {/* Action buttons for pending / needs_revision */}
+                    {/* Action for pending / needs_revision */}
                     {(item.status === "pending" || item.status === "needs_revision") && (
-                      <div className="mt-3">
-                        {item.itemType === "file_upload" && (
-                          <div className="space-y-2">
-                            <Input
-                              placeholder="Paste file URL or upload link..."
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && (e.target as HTMLInputElement).value) {
-                                  handleSubmitItem(item.id, (e.target as HTMLInputElement).value);
-                                }
-                              }}
-                            />
-                            <p className="text-[10px] text-stone-400">Press Enter to submit</p>
-                          </div>
-                        )}
-                        {item.itemType === "text_input" && (
-                          <div className="space-y-2">
-                            <Textarea
-                              placeholder="Enter your response..."
-                              rows={3}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && e.metaKey && (e.target as HTMLTextAreaElement).value) {
-                                  handleSubmitItem(item.id, (e.target as HTMLTextAreaElement).value);
-                                }
-                              }}
-                            />
-                            <p className="text-[10px] text-stone-400">Cmd+Enter to submit</p>
-                          </div>
-                        )}
-                        {item.itemType === "link" && (
-                          <div className="space-y-2">
-                            <Input
-                              placeholder="Paste URL (Google Slides, Dropbox, etc.)..."
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && (e.target as HTMLInputElement).value) {
-                                  handleSubmitItem(item.id, (e.target as HTMLInputElement).value);
-                                }
-                              }}
-                            />
-                            <p className="text-[10px] text-stone-400">Press Enter to submit</p>
-                          </div>
-                        )}
-                        {item.itemType === "confirmation" && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleSubmitItem(item.id, "true")}
-                          >
-                            Confirm
-                          </Button>
-                        )}
-                      </div>
+                      <PortalItemInput
+                        itemId={item.id}
+                        itemType={item.itemType}
+                        onSubmit={handleSubmitItem}
+                      />
                     )}
                   </div>
                 </div>
