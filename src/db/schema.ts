@@ -739,6 +739,34 @@ export const checklistItems = pgTable(
   ]
 );
 
+// ─── Notifications ───────────────────────────────────────
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 100 }).notNull(), // assignment, checklist_submitted, stage_change, comment, team_added, entity_created
+    title: varchar("title", { length: 500 }).notNull(),
+    message: text("message"),
+    link: varchar("link", { length: 500 }), // e.g., /speakers?open=<id>
+    entityType: varchar("entity_type", { length: 50 }),
+    entityId: uuid("entity_id"),
+    actorName: varchar("actor_name", { length: 255 }), // who triggered the notification
+    read: boolean("read").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("notification_user_idx").on(table.userId, table.read),
+    index("notification_created_idx").on(table.createdAt),
+  ]
+);
+
 // ─── Audit Log ───────────────────────────────────────────
 
 export const auditLog = pgTable(

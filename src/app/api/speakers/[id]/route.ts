@@ -5,6 +5,8 @@ import { eq, and, sql } from "drizzle-orm";
 import { checkVersion } from "@/lib/api-utils";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { generateChecklistItems, archiveChecklistItems } from "@/lib/checklist";
+import { notify } from "@/lib/notify";
+import { users } from "@/db/schema";
 
 export async function GET(
   req: NextRequest,
@@ -119,6 +121,42 @@ export async function PATCH(
       await generateChecklistItems("speaker", id, ctx.editionId, ctx.orgId);
     } else if (speaker.stage === "confirmed" && updates.stage !== "confirmed") {
       await archiveChecklistItems("speaker", id);
+    }
+  }
+
+  // Notification triggers
+  const assigneeName = (updates.assignedTo as string) ?? (updated.assignedTo as string | null);
+  if (assigneeName) {
+    const assignee = await db.query.users.findFirst({
+      where: eq(users.name, assigneeName),
+    });
+    if (assignee && assignee.id !== ctx.user.id) {
+      // Assignment notification
+      if (updates.assignedTo && updates.assignedTo !== speaker.assignedTo) {
+        await notify({
+          userId: assignee.id,
+          orgId: ctx.orgId,
+          type: "assignment",
+          title: `You were assigned to ${updated.name}`,
+          link: "/speakers",
+          entityType: "speaker",
+          entityId: id,
+          actorName: ctx.user.name ?? undefined,
+        });
+      }
+      // Stage change notification
+      if (updates.stage && updates.stage !== speaker.stage) {
+        await notify({
+          userId: assignee.id,
+          orgId: ctx.orgId,
+          type: "stage_change",
+          title: `${updated.name} moved to ${updates.stage}`,
+          link: "/speakers",
+          entityType: "speaker",
+          entityId: id,
+          actorName: ctx.user.name ?? undefined,
+        });
+      }
     }
   }
 

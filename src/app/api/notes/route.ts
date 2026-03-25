@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { entityNotes } from "@/db/schema";
+import { entityNotes, users, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners, tasks } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
+import { notify } from "@/lib/notify";
 
 // GET notes for an entity
 export async function GET(req: NextRequest) {
@@ -51,6 +52,49 @@ export async function POST(req: NextRequest) {
       content,
     })
     .returning();
+
+  // Notification trigger: notify the entity's assignee about the new comment
+  let noteAssigneeName: string | null = null;
+  let noteEntityName: string | null = null;
+  if (entityType === "speaker") {
+    const e = await db.query.speakerApplications.findFirst({ where: eq(speakerApplications.id, entityId) });
+    if (e) { noteAssigneeName = e.assignedTo; noteEntityName = e.name; }
+  } else if (entityType === "sponsor") {
+    const e = await db.query.sponsorApplications.findFirst({ where: eq(sponsorApplications.id, entityId) });
+    if (e) { noteAssigneeName = e.assignedTo; noteEntityName = e.companyName; }
+  } else if (entityType === "venue") {
+    const e = await db.query.venues.findFirst({ where: eq(venues.id, entityId) });
+    if (e) { noteAssigneeName = e.assignedTo; noteEntityName = e.name; }
+  } else if (entityType === "booth") {
+    const e = await db.query.booths.findFirst({ where: eq(booths.id, entityId) });
+    if (e) { noteAssigneeName = e.assignedTo; noteEntityName = e.name; }
+  } else if (entityType === "volunteer") {
+    const e = await db.query.volunteerApplications.findFirst({ where: eq(volunteerApplications.id, entityId) });
+    if (e) { noteAssigneeName = e.assignedTo; noteEntityName = e.name; }
+  } else if (entityType === "media") {
+    const e = await db.query.mediaPartners.findFirst({ where: eq(mediaPartners.id, entityId) });
+    if (e) { noteAssigneeName = e.assignedTo; noteEntityName = e.companyName; }
+  } else if (entityType === "task") {
+    const e = await db.query.tasks.findFirst({ where: eq(tasks.id, entityId) });
+    if (e) { noteAssigneeName = e.assignedTo ?? e.assigneeName; noteEntityName = e.title; }
+  }
+  if (noteAssigneeName && noteEntityName) {
+    const assignee = await db.query.users.findFirst({
+      where: eq(users.name, noteAssigneeName),
+    });
+    if (assignee && assignee.id !== ctx.user.id) {
+      await notify({
+        userId: assignee.id,
+        orgId: ctx.orgId,
+        type: "comment",
+        title: `New comment on ${entityType} ${noteEntityName}`,
+        link: `/${entityType === "media" ? "media-partners" : entityType === "task" ? "tasks" : entityType + "s"}`,
+        entityType,
+        entityId,
+        actorName: ctx.user.name ?? undefined,
+      });
+    }
+  }
 
   return NextResponse.json({ data: note }, { status: 201 });
 }

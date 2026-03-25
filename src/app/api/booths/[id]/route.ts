@@ -4,6 +4,8 @@ import { booths } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { generateChecklistItems, archiveChecklistItems } from "@/lib/checklist";
+import { notify } from "@/lib/notify";
+import { users } from "@/db/schema";
 
 export async function PATCH(
   req: NextRequest,
@@ -57,6 +59,40 @@ export async function PATCH(
       await generateChecklistItems("booth", id, ctx.editionId, ctx.orgId);
     } else if (booth.stage === "confirmed" && updates.stage !== "confirmed") {
       await archiveChecklistItems("booth", id);
+    }
+  }
+
+  // Notification triggers
+  const assigneeName = (updates.assignedTo as string) ?? (updated.assignedTo as string | null);
+  if (assigneeName) {
+    const assignee = await db.query.users.findFirst({
+      where: eq(users.name, assigneeName),
+    });
+    if (assignee && assignee.id !== ctx.user.id) {
+      if (updates.assignedTo && updates.assignedTo !== booth.assignedTo) {
+        await notify({
+          userId: assignee.id,
+          orgId: ctx.orgId,
+          type: "assignment",
+          title: `You were assigned to ${updated.name}`,
+          link: "/booths",
+          entityType: "booth",
+          entityId: id,
+          actorName: ctx.user.name ?? undefined,
+        });
+      }
+      if (updates.stage && updates.stage !== booth.stage) {
+        await notify({
+          userId: assignee.id,
+          orgId: ctx.orgId,
+          type: "stage_change",
+          title: `${updated.name} moved to ${updates.stage}`,
+          link: "/booths",
+          entityType: "booth",
+          entityId: id,
+          actorName: ctx.user.name ?? undefined,
+        });
+      }
     }
   }
 

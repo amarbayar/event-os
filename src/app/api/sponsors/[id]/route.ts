@@ -4,6 +4,8 @@ import { sponsorApplications } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { generateChecklistItems, archiveChecklistItems } from "@/lib/checklist";
+import { notify } from "@/lib/notify";
+import { users } from "@/db/schema";
 
 export async function PATCH(
   req: NextRequest,
@@ -57,6 +59,40 @@ export async function PATCH(
       await generateChecklistItems("sponsor", id, ctx.editionId, ctx.orgId);
     } else if (sponsor.stage === "confirmed" && updates.stage !== "confirmed") {
       await archiveChecklistItems("sponsor", id);
+    }
+  }
+
+  // Notification triggers
+  const assigneeName = (updates.assignedTo as string) ?? (updated.assignedTo as string | null);
+  if (assigneeName) {
+    const assignee = await db.query.users.findFirst({
+      where: eq(users.name, assigneeName),
+    });
+    if (assignee && assignee.id !== ctx.user.id) {
+      if (updates.assignedTo && updates.assignedTo !== sponsor.assignedTo) {
+        await notify({
+          userId: assignee.id,
+          orgId: ctx.orgId,
+          type: "assignment",
+          title: `You were assigned to ${updated.companyName}`,
+          link: "/sponsors",
+          entityType: "sponsor",
+          entityId: id,
+          actorName: ctx.user.name ?? undefined,
+        });
+      }
+      if (updates.stage && updates.stage !== sponsor.stage) {
+        await notify({
+          userId: assignee.id,
+          orgId: ctx.orgId,
+          type: "stage_change",
+          title: `${updated.companyName} moved to ${updates.stage}`,
+          link: "/sponsors",
+          entityType: "sponsor",
+          entityId: id,
+          actorName: ctx.user.name ?? undefined,
+        });
+      }
     }
   }
 

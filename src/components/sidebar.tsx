@@ -23,6 +23,7 @@ import {
   Ticket,
   ChevronDown,
   MessageSquare,
+  Bell,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -83,6 +84,20 @@ export function Sidebar({ onToggleChat }: { onToggleChat?: () => void }) {
   const [showEditionPicker, setShowEditionPicker] = useState(false);
   const [showNewEvent, setShowNewEvent] = useState(false);
   const [newEventName, setNewEventName] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Poll for notification count every 30s
+  useEffect(() => {
+    const fetchCount = () => {
+      fetch("/api/notifications?count=true")
+        .then((r) => r.json())
+        .then((d) => { if (d.data?.unreadCount !== undefined) setUnreadCount(d.data.unreadCount); })
+        .catch(() => {});
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch editions on mount
   useEffect(() => {
@@ -283,6 +298,23 @@ export function Sidebar({ onToggleChat }: { onToggleChat?: () => void }) {
       {/* Bottom */}
       <div className="border-t border-stone-800 px-2 py-3 space-y-1">
         {bottomItems.map((item) => navLink(item))}
+        <Link
+          href="/notifications"
+          className={cn(
+            "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors relative",
+            isActive("/notifications")
+              ? "bg-yellow-500/15 font-medium text-yellow-500"
+              : "text-stone-400 hover:bg-white/5 hover:text-white"
+          )}
+        >
+          <Bell className="h-4 w-4 shrink-0" />
+          <span>Notifications</span>
+          {unreadCount > 0 && (
+            <span className="absolute left-7 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Link>
         <Link
           href="/settings"
           className={cn(

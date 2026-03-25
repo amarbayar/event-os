@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { checklistItems } from "@/db/schema";
+import { checklistItems, users, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
+import { notify } from "@/lib/notify";
 
 // PATCH — update checklist item (submit value, approve, reject, etc.)
 export async function PATCH(
@@ -70,6 +71,48 @@ export async function PATCH(
     })
     .where(eq(checklistItems.id, id))
     .returning();
+
+  // Notification trigger: when status changes to "submitted", notify the entity's assignee
+  if (body.status === "submitted" && item.status !== "submitted") {
+    let entityAssignedTo: string | null = null;
+    let entityName: string | null = null;
+    if (item.entityType === "speaker") {
+      const e = await db.query.speakerApplications.findFirst({ where: eq(speakerApplications.id, item.entityId) });
+      if (e) { entityAssignedTo = e.assignedTo; entityName = e.name; }
+    } else if (item.entityType === "sponsor") {
+      const e = await db.query.sponsorApplications.findFirst({ where: eq(sponsorApplications.id, item.entityId) });
+      if (e) { entityAssignedTo = e.assignedTo; entityName = e.companyName; }
+    } else if (item.entityType === "venue") {
+      const e = await db.query.venues.findFirst({ where: eq(venues.id, item.entityId) });
+      if (e) { entityAssignedTo = e.assignedTo; entityName = e.name; }
+    } else if (item.entityType === "booth") {
+      const e = await db.query.booths.findFirst({ where: eq(booths.id, item.entityId) });
+      if (e) { entityAssignedTo = e.assignedTo; entityName = e.name; }
+    } else if (item.entityType === "volunteer") {
+      const e = await db.query.volunteerApplications.findFirst({ where: eq(volunteerApplications.id, item.entityId) });
+      if (e) { entityAssignedTo = e.assignedTo; entityName = e.name; }
+    } else if (item.entityType === "media") {
+      const e = await db.query.mediaPartners.findFirst({ where: eq(mediaPartners.id, item.entityId) });
+      if (e) { entityAssignedTo = e.assignedTo; entityName = e.companyName; }
+    }
+    if (entityAssignedTo && entityName) {
+      const assignee = await db.query.users.findFirst({
+        where: eq(users.name, entityAssignedTo),
+      });
+      if (assignee && assignee.id !== ctx.user.id) {
+        await notify({
+          userId: assignee.id,
+          orgId: ctx.orgId,
+          type: "checklist_submitted",
+          title: `Checklist item submitted for ${item.entityType} ${entityName}`,
+          link: `/${item.entityType === "media" ? "media-partners" : item.entityType + "s"}`,
+          entityType: item.entityType,
+          entityId: item.entityId,
+          actorName: ctx.user.name ?? undefined,
+        });
+      }
+    }
+  }
 
   return NextResponse.json({ data: updated });
 }
