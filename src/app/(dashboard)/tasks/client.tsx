@@ -155,16 +155,26 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
           All Teams ({tasks.length})
         </button>
         {teams.map((team) => (
-          <button
+          <TeamPill
             key={team.id}
+            team={team}
+            count={tasks.filter((t) => t.teamId === team.id).length}
+            active={teamFilter === team.id}
             onClick={() => setTeamFilter(team.id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-              teamFilter === team.id ? "bg-yellow-500 text-stone-900" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color ?? "#999" }} />
-            {team.name} ({tasks.filter((t) => t.teamId === team.id).length})
-          </button>
+            onRename={async (name) => {
+              await fetch(`/api/teams/${team.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name }),
+              });
+              setTeams((prev) => prev.map((t) => t.id === team.id ? { ...t, name } : t));
+            }}
+            onDelete={async () => {
+              await fetch(`/api/teams/${team.id}`, { method: "DELETE" });
+              setTeams((prev) => prev.filter((t) => t.id !== team.id));
+              if (teamFilter === team.id) setTeamFilter("all");
+            }}
+          />
         ))}
         {showNewTeam ? (
           <div className="flex items-center gap-1">
@@ -313,6 +323,92 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
         isOpen={!!notesOpenFor}
         onClose={() => setNotesOpenFor(null)}
       />
+    </div>
+  );
+}
+
+// ─── Team Pill (with rename/delete) ──────────────────
+
+function TeamPill({
+  team,
+  count,
+  active,
+  onClick,
+  onRename,
+  onDelete,
+}: {
+  team: Team;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState(team.name);
+
+  if (renaming) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="h-8 w-32 text-xs"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && name.trim()) {
+              onRename(name.trim());
+              setRenaming(false);
+            }
+            if (e.key === "Escape") { setRenaming(false); setName(team.name); }
+          }}
+          onBlur={() => { setRenaming(false); setName(team.name); }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={onClick}
+        onContextMenu={(e) => { e.preventDefault(); setMenuOpen(!menuOpen); }}
+        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 group ${
+          active ? "bg-yellow-500 text-stone-900" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+        }`}
+      >
+        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color ?? "#999" }} />
+        {team.name} ({count})
+        <span
+          onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+          className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-stone-400 hover:text-stone-600"
+        >
+          ...
+        </span>
+      </button>
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+          <div className="absolute left-0 top-full z-50 mt-1 rounded-md border bg-white py-1 shadow-lg min-w-[120px]">
+            <button
+              onClick={() => { setMenuOpen(false); setRenaming(true); }}
+              className="block w-full px-3 py-1.5 text-left text-xs hover:bg-stone-50"
+            >
+              Rename
+            </button>
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                if (confirm(`Delete team "${team.name}"? Tasks won't be deleted.`)) onDelete();
+              }}
+              className="block w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50"
+            >
+              Delete
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
