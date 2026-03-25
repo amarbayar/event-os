@@ -206,28 +206,71 @@ Not trying to be clever here. Boring tech that works.
 
 ## Getting Started
 
+### 1. Clone and install
+
 ```bash
 git clone https://github.com/amarbayar/event-os.git
 cd event-os
 npm install
-cp .env.example .env.local
-# Edit .env.local — add your Supabase URL and a random AUTH_SECRET
+```
+
+### 2. Set up Supabase
+
+1. Create a free project at [supabase.com](https://supabase.com)
+2. Go to **Settings → Database** and copy the connection string (URI format)
+
+### 3. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in your values — at minimum `DATABASE_URL` and `AUTH_SECRET`:
+
+```bash
+DATABASE_URL="postgresql://postgres.[your-project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres"
+AUTH_SECRET="$(openssl rand -base64 32)"
+```
+
+### 4. Push schema and seed
+
+```bash
+# Create all tables in your Supabase database
+npx drizzle-kit push
+
+# Populate with sample data (Dev Summit 2026 — org, speakers, sessions, sponsors, attendees, etc.)
+node -r dotenv/config node_modules/.bin/tsx src/db/seed.ts
+```
+
+### 5. Run
+
+```bash
 npm run dev
 ```
 
-That's it. Open `localhost:3000`. You have an event management platform.
+Open `localhost:3000`. Log in with `admin@devsummit.mn` / `admin123` (or any of the 5 seeded users).
+
+### Database commands
+
+| Task | Command |
+|------|---------|
+| Push schema changes to DB | `npx drizzle-kit push` |
+| Seed with fixture data | `node -r dotenv/config node_modules/.bin/tsx src/db/seed.ts` |
+| Browse DB in browser | `npx drizzle-kit studio` |
+
+> **Note:** `drizzle-kit push` syncs your schema to the database without migration files — it compares `src/db/schema.ts` against the live DB and applies the diff. Good for development; for production, consider using `drizzle-kit generate` + `drizzle-kit migrate` for versioned migrations.
 
 ### Environment Variables
 
-| Variable | What it is |
-|----------|-----------|
-| `DATABASE_URL` | Your Supabase PostgreSQL connection string |
-| `AUTH_SECRET` | Any random string. Run `openssl rand -base64 32` to generate one |
-| `NEXTAUTH_URL` | `http://localhost:3000` for dev, your domain for prod |
-| `SERVICE_TOKEN` | Random token for Telegram agent API auth |
-| `LLM_PROVIDER` | `gemini` (default) or `ollama` (local) |
-| `GEMINI_API_KEY` | Gemini API key (free at ai.google.dev) |
-| `OLLAMA_URL` | Ollama URL if using local model (default: localhost:11434) |
+| Variable | Required | What it is |
+|----------|----------|-----------|
+| `DATABASE_URL` | Yes | Supabase PostgreSQL connection string |
+| `AUTH_SECRET` | Yes | Any random string — `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | Yes | `http://localhost:3000` for dev, your domain for prod |
+| `SERVICE_TOKEN` | No | Random token for Telegram agent API auth |
+| `LLM_PROVIDER` | No | `gemini` (default), `xai`, or `ollama` |
+| `GEMINI_API_KEY` | No | Free at [ai.google.dev](https://ai.google.dev) — needed if using the agent chat panel |
+| `OLLAMA_URL` | No | Ollama URL if using local model (default: `localhost:11434`) |
 
 ### Deploy
 
