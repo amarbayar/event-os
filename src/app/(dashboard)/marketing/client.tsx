@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,17 +48,13 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [createDate, setCreateDate] = useState("");
-  const router = useRouter();
 
-  const refreshCampaigns = () => {
-    // Force server component re-render to get fresh data
-    router.refresh();
+  const refreshCampaigns = async () => {
+    const res = await fetch("/api/campaigns");
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.data) setCampaigns(d.data);
   };
-
-  // Sync with server-provided data on re-render
-  useEffect(() => {
-    setCampaigns(initialCampaigns);
-  }, [initialCampaigns]);
 
   // Calendar grid
   const calendarDays = useMemo(() => {
@@ -223,8 +218,8 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
         <DetailDrawer
           campaign={selectedCampaign}
           onClose={() => setSelectedCampaign(null)}
-          onSaved={() => { setSelectedCampaign(null); refreshCampaigns(); }}
-          onDeleted={() => { setSelectedCampaign(null); refreshCampaigns(); }}
+          onSaved={async () => { await refreshCampaigns(); setSelectedCampaign(null); }}
+          onDeleted={async () => { setSelectedCampaign(null); await refreshCampaigns(); }}
         />
       )}
     </div>
@@ -352,7 +347,7 @@ function DetailDrawer({ campaign, onClose, onSaved, onDeleted }: {
         assignedTo: form.assignedTo || null,
       }),
     });
-    onSaved();
+    await onSaved();
   };
 
   const handleDelete = async () => {
