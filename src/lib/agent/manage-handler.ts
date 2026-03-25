@@ -104,11 +104,11 @@ export async function handleManage(
   try {
     switch (intent.action) {
       case "create":
-        return handleCreate(intent, ctx, config);
+        return await handleCreate(intent, ctx, config);
       case "update":
-        return handleUpdate(intent, ctx, config);
+        return await handleUpdate(intent, ctx, config);
       case "delete":
-        return handleDelete(intent, ctx, config);
+        return await handleDelete(intent, ctx, config);
       default:
         return { message: `I can create, update, or delete ${config.label}s. What would you like to do?`, success: true };
     }
@@ -176,8 +176,21 @@ async function handleCreate(
     if (!values.title && values.name) values.title = values.name;
     if (!values.title) values.title = "Untitled task";
   }
+  if (intent.entityType === "volunteer") {
+    if (!values.email) values.email = "";
+  }
   if (intent.entityType === "attendee") {
     if (!values.email) values.email = "";
+  }
+  if (intent.entityType === "campaign") {
+    if (!values.type) values.type = "event_update";
+  }
+
+  // Truncate string values to avoid DB varchar overflow
+  for (const [k, v] of Object.entries(values)) {
+    if (typeof v === "string" && v.length > 255 && k !== "bio" && k !== "content" && k !== "description" && k !== "talkAbstract" && k !== "notes" && k !== "message") {
+      values[k] = v.slice(0, 255);
+    }
   }
 
   const [created] = await db.insert(table).values(values).returning();

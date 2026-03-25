@@ -73,13 +73,13 @@ export async function handleQuery(
   try {
     switch (intent.action) {
       case "count":
-        return handleCount(intent, ctx, config);
+        return await handleCount(intent, ctx, config);
       case "list":
-        return handleList(intent, ctx, config);
+        return await handleList(intent, ctx, config);
       case "search":
-        return handleSearch(intent, ctx, config);
+        return await handleSearch(intent, ctx, config);
       default:
-        return handleCount(intent, ctx, config); // default to count
+        return await handleCount(intent, ctx, config); // default to count
     }
   } catch (error) {
     console.error("Query handler error:", error);
