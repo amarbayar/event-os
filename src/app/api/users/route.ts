@@ -10,20 +10,18 @@ export async function GET() {
   const ids = await getActiveIds();
   if (!ids) return NextResponse.json({ error: "No active organization" }, { status: 400 });
 
-  // Query via user_organizations join table
-  const memberships = await db.query.userOrganizations.findMany({
-    where: eq(userOrganizations.organizationId, ids.orgId),
-    with: { user: true },
-  });
-
-  const orgUsers = memberships.map((m) => ({
-    id: m.user.id,
-    name: m.user.name,
-    email: m.user.email,
-    role: m.role,
-    image: m.user.image,
-    createdAt: m.user.createdAt,
-  }));
+  const orgUsers = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: userOrganizations.role,
+      image: users.image,
+      createdAt: users.createdAt,
+    })
+    .from(userOrganizations)
+    .innerJoin(users, eq(userOrganizations.userId, users.id))
+    .where(eq(userOrganizations.organizationId, ids.orgId));
 
   return NextResponse.json({ data: orgUsers });
 }

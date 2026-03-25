@@ -1,10 +1,10 @@
 import { db } from "@/db";
 import { contacts } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 /**
  * Find or create a contact by email. Returns the contact ID.
- * If a contact with this email exists, returns it. Otherwise creates one.
+ * Uses INSERT ON CONFLICT to handle concurrent requests safely.
  */
 export async function findOrCreateContact(data: {
   email: string;
@@ -19,14 +19,7 @@ export async function findOrCreateContact(data: {
 }): Promise<string> {
   const email = data.email.trim().toLowerCase();
 
-  const existing = await db.query.contacts.findFirst({
-    where: eq(contacts.email, email),
-  });
-
-  if (existing) {
-    return existing.id;
-  }
-
+  // Upsert: insert if new, touch updatedAt if exists — always returns the ID
   const [contact] = await db
     .insert(contacts)
     .values({
@@ -40,7 +33,11 @@ export async function findOrCreateContact(data: {
       linkedin: data.linkedin || null,
       website: data.website || null,
     })
-    .returning();
+    .onConflictDoUpdate({
+      target: contacts.email,
+      set: { updatedAt: sql`now()` },
+    })
+    .returning({ id: contacts.id });
 
   return contact.id;
 }

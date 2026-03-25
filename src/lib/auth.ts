@@ -28,9 +28,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         );
         if (!valid) return null;
 
-        // Resolve org + role from user_organizations (preferred) or legacy users table
+        // Resolve org + role: prefer user_organizations, pick most recent membership
         const membership = await db.query.userOrganizations.findFirst({
           where: eq(userOrganizations.userId, user.id),
+          orderBy: (uo, { desc }) => [desc(uo.createdAt)],
         });
 
         const organizationId = membership?.organizationId ?? user.organizationId;

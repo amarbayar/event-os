@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, userOrganizations } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
@@ -48,6 +48,17 @@ export async function PATCH(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  // Keep user_organizations.role in sync
+  if (updates.role) {
+    await db
+      .update(userOrganizations)
+      .set({ role: updates.role })
+      .where(and(
+        eq(userOrganizations.userId, id),
+        eq(userOrganizations.organizationId, ctx.orgId)
+      ));
+  }
+
   return NextResponse.json({ data: updated });
 }
 
@@ -60,6 +71,15 @@ export async function DELETE(
   const ctx = await requirePermission(req, "user", "delete");
   if (isRbacError(ctx)) return ctx;
 
+  // Remove membership (user record stays for other orgs)
+  await db
+    .delete(userOrganizations)
+    .where(and(
+      eq(userOrganizations.userId, id),
+      eq(userOrganizations.organizationId, ctx.orgId)
+    ));
+
+  // Also clean up legacy field
   const [deleted] = await db
     .delete(users)
     .where(and(eq(users.id, id), eq(users.organizationId, ctx.orgId)))
