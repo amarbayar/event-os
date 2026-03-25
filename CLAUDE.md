@@ -81,6 +81,11 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 - `users.organizationId` is legacy — prefer `user_organizations` for role/org lookups
 - Auth resolves org from `user_organizations` first, falls back to legacy field
 
+## Type Safety
+- Never use `as any` — use proper type declarations instead
+- NextAuth types are extended via module augmentation in `src/types/next-auth.d.ts`
+- Prefer `as Record<string, unknown>` → proper interface extension over inline casts
+
 ## UI Rules
 
 ### NEVER use system alerts
