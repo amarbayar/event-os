@@ -76,15 +76,10 @@ function PortalInviteSection({ entityType, entityId, entityEmail }: { entityType
 
   // Check if already invited on mount
   useEffect(() => {
-    fetch("/api/portal/invite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entityType, entityId }),
-    }).then((r) => r.json()).then((d) => {
-      if (d.data?.alreadyInvited) {
-        setStatus("already");
-      }
-    }).catch(() => {});
+    fetch(`/api/portal/status?entityType=${entityType}&entityId=${entityId}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.data?.invited) setStatus("already"); })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
