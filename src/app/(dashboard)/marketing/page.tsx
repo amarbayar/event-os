@@ -6,5 +6,11 @@ export const dynamic = "force-dynamic";
 export default async function MarketingPage() {
   const campaigns = await getCampaigns();
 
-  return <MarketingClient initialCampaigns={campaigns} />;
+  // Serialize dates for client component
+  const serialized = campaigns.map((c) => ({
+    ...c,
+    scheduledDate: c.scheduledDate ? c.scheduledDate.toISOString() : null,
+  }));
+
+  return <MarketingClient initialCampaigns={serialized} />;
 }
