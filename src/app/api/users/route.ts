@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, userOrganizations } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getActiveIds } from "@/lib/queries";
 import { hash } from "@/lib/password";
 
@@ -10,17 +10,20 @@ export async function GET() {
   const ids = await getActiveIds();
   if (!ids) return NextResponse.json({ error: "No active organization" }, { status: 400 });
 
-  const orgUsers = await db.query.users.findMany({
-    where: eq(users.organizationId, ids.orgId),
-    columns: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      image: true,
-      createdAt: true,
-    },
+  // Query via user_organizations join table
+  const memberships = await db.query.userOrganizations.findMany({
+    where: eq(userOrganizations.organizationId, ids.orgId),
+    with: { user: true },
   });
+
+  const orgUsers = memberships.map((m) => ({
+    id: m.user.id,
+    name: m.user.name,
+    email: m.user.email,
+    role: m.role,
+    image: m.user.image,
+    createdAt: m.user.createdAt,
+  }));
 
   return NextResponse.json({ data: orgUsers });
 }
@@ -37,19 +40,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "email is required" }, { status: 400 });
   }
 
-  // Check if email already exists in this org
+  const validRoles = ["owner", "admin", "organizer", "coordinator", "viewer", "stakeholder"];
+  const userRole = validRoles.includes(role) ? role : "organizer";
+
+  // Check if user already exists
   const existing = await db.query.users.findFirst({
     where: eq(users.email, email),
   });
 
   if (existing) {
-    return NextResponse.json({ error: "A user with this email already exists" }, { status: 409 });
+    // Check if they're already a member of this org
+    const existingMembership = await db.query.userOrganizations.findFirst({
+      where: and(
+        eq(userOrganizations.userId, existing.id),
+        eq(userOrganizations.organizationId, ids.orgId)
+      ),
+    });
+
+    if (existingMembership) {
+      return NextResponse.json({ error: "User is already a member of this organization" }, { status: 409 });
+    }
+
+    // Add existing user to this org
+    await db.insert(userOrganizations).values({
+      userId: existing.id,
+      organizationId: ids.orgId,
+      role: userRole,
+      linkedEntityType: body.linkedEntityType || null,
+      linkedEntityId: body.linkedEntityId || null,
+    });
+
+    return NextResponse.json({
+      data: { id: existing.id, name: existing.name, email: existing.email, role: userRole, createdAt: existing.createdAt },
+    }, { status: 201 });
   }
 
-  const validRoles = ["owner", "admin", "organizer", "coordinator", "viewer", "stakeholder"];
-  const userRole = validRoles.includes(role) ? role : "organizer";
-
-  // Create with a temporary password — user should reset on first login
+  // Create new user + membership
   const tempPassword = await hash("changeme123");
 
   const [user] = await db
@@ -70,6 +96,14 @@ export async function POST(req: NextRequest) {
       role: users.role,
       createdAt: users.createdAt,
     });
+
+  await db.insert(userOrganizations).values({
+    userId: user.id,
+    organizationId: ids.orgId,
+    role: userRole,
+    linkedEntityType: body.linkedEntityType || null,
+    linkedEntityId: body.linkedEntityId || null,
+  });
 
   return NextResponse.json({ data: user }, { status: 201 });
 }

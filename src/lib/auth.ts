@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, userOrganizations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -21,7 +21,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!user || !user.passwordHash) return null;
 
-        // For v1, simple comparison. Replace with bcrypt in production.
         const { compare } = await import("@/lib/password");
         const valid = await compare(
           credentials.password as string,
@@ -29,12 +28,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         );
         if (!valid) return null;
 
+        // Resolve org + role from user_organizations (preferred) or legacy users table
+        const membership = await db.query.userOrganizations.findFirst({
+          where: eq(userOrganizations.userId, user.id),
+        });
+
+        const organizationId = membership?.organizationId ?? user.organizationId;
+        const role = membership?.role ?? user.role;
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role,
-          organizationId: user.organizationId,
+          role,
+          organizationId,
         };
       },
     }),

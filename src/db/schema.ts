@@ -129,6 +129,7 @@ export const speakerApplications = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
     // Speaker info
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
@@ -216,6 +217,7 @@ export const sponsorApplications = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
     companyName: varchar("company_name", { length: 255 }).notNull(),
     contactName: varchar("contact_name", { length: 255 }).notNull(),
     contactEmail: varchar("contact_email", { length: 255 }).notNull(),
@@ -246,6 +248,7 @@ export const attendees = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     ticketType: varchar("ticket_type", { length: 100 })
@@ -344,6 +347,7 @@ export const outreach = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
     targetType: varchar("target_type", { length: 50 }).notNull(), // speaker, sponsor, booth, volunteer, media
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }),
@@ -504,6 +508,7 @@ export const volunteerApplications = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     phone: varchar("phone", { length: 50 }),
@@ -754,6 +759,29 @@ export const auditLog = pgTable(
   ]
 );
 
+// ─── Contacts (cross-org person identity) ────────────────
+
+export const contacts = pgTable(
+  "contacts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull().unique(),
+    phone: varchar("phone", { length: 50 }),
+    bio: text("bio"),
+    headshotUrl: text("headshot_url"),
+    company: varchar("company", { length: 255 }),
+    title: varchar("title", { length: 255 }),
+    linkedin: varchar("linkedin", { length: 255 }),
+    website: varchar("website", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("contact_email_idx").on(table.email),
+  ]
+);
+
 // ─── Users (for NextAuth) ────────────────────────────────
 
 export const users = pgTable("users", {
@@ -763,13 +791,38 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified"),
   image: text("image"),
   passwordHash: text("password_hash"),
+  // DEPRECATED: use user_organizations for org membership + role
   organizationId: uuid("organization_id").references(() => organizations.id),
   role: varchar("role", { length: 50 }).default("organizer").notNull(),
-  // Stakeholder linking — connects a portal user to their entity record
-  linkedEntityType: varchar("linked_entity_type", { length: 50 }), // speaker, sponsor, booth, venue, etc.
-  linkedEntityId: uuid("linked_entity_id"), // the specific entity record
+  linkedEntityType: varchar("linked_entity_type", { length: 50 }),
+  linkedEntityId: uuid("linked_entity_id"),
+  contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ─── User ↔ Organization Membership ─────────────────────
+
+export const userOrganizations = pgTable(
+  "user_organizations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 50 }).default("organizer").notNull(),
+    linkedEntityType: varchar("linked_entity_type", { length: 50 }),
+    linkedEntityId: uuid("linked_entity_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_org_uniq").on(table.userId, table.organizationId),
+    index("user_org_user_idx").on(table.userId),
+    index("user_org_org_idx").on(table.organizationId),
+  ]
+);
 
 export const authSessions = pgTable("auth_sessions", {
   sessionToken: text("session_token").primaryKey(),
@@ -802,6 +855,7 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   series: many(eventSeries),
   editions: many(eventEditions),
   users: many(users),
+  userOrganizations: many(userOrganizations),
 }));
 
 export const eventSeriesRelations = relations(
@@ -855,13 +909,41 @@ export const speakerApplicationsRelations = relations(
       fields: [speakerApplications.editionId],
       references: [eventEditions.id],
     }),
+    contact: one(contacts, {
+      fields: [speakerApplications.contactId],
+      references: [contacts.id],
+    }),
     sessions: many(sessions),
   })
 );
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [users.organizationId],
     references: [organizations.id],
   }),
+  contact: one(contacts, {
+    fields: [users.contactId],
+    references: [contacts.id],
+  }),
+  memberships: many(userOrganizations),
+}));
+
+export const userOrganizationsRelations = relations(userOrganizations, ({ one }) => ({
+  user: one(users, {
+    fields: [userOrganizations.userId],
+    references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [userOrganizations.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const contactsRelations = relations(contacts, ({ many }) => ({
+  users: many(users),
+  speakers: many(speakerApplications),
+  attendees: many(attendees),
+  volunteers: many(volunteerApplications),
+  outreach: many(outreach),
 }));

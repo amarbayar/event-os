@@ -222,6 +222,18 @@ async function seed() {
     where: (u, { eq }) => eq(u.organizationId, org.id),
   });
   const userMap = Object.fromEntries(userRecords.map((u) => [u.name, u.id]));
+
+  // User ↔ Organization memberships (mirrors legacy users.organizationId + role)
+  for (const u of teamUsers) {
+    const userId = userMap[u.name];
+    if (userId) {
+      await db.insert(schema.userOrganizations).values({
+        userId,
+        organizationId: org.id,
+        role: u.role,
+      });
+    }
+  }
   console.log(`  Users: ${teamUsers.length} team members (all password: admin123)`);
 
   // Org-wide RBAC teams (editionId = null)

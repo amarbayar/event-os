@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { organizations, eventSeries, eventEditions, tracks, users } from "@/db/schema";
+import { organizations, eventSeries, eventEditions, tracks, users, userOrganizations } from "@/db/schema";
 import { hash } from "@/lib/password";
 
 export async function POST(req: NextRequest) {
@@ -87,6 +87,13 @@ export async function POST(req: NextRequest) {
       role: "owner",
     })
     .returning();
+
+  // Create membership in user_organizations
+  await db.insert(userOrganizations).values({
+    userId: user.id,
+    organizationId: org.id,
+    role: "owner",
+  });
 
   return NextResponse.json(
     {
