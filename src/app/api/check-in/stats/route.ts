@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { attendees } from "@/db/schema";
 import { eq, and, sql, count } from "drizzle-orm";
-import { getApiContext } from "@/lib/api-utils";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "attendee", "read");
+  if (isRbacError(ctx)) return ctx;
 
   const url = new URL(req.url);
   const editionId = url.searchParams.get("editionId");
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     .where(
       and(
         eq(attendees.editionId, editionId),
-        eq(attendees.organizationId, ctx.organizationId)
+        eq(attendees.organizationId, ctx.orgId)
       )
     );
 

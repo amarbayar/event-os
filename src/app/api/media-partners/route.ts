@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { mediaPartners } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { getActiveIds } from "@/lib/queries";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
-export async function GET() {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ data: [] });
+export async function GET(req: NextRequest) {
+  const ctx = await requirePermission(req, "media", "read");
+  if (isRbacError(ctx)) return ctx;
 
   const rows = await db.query.mediaPartners.findMany({
-    where: eq(mediaPartners.editionId, ids.editionId),
+    where: eq(mediaPartners.editionId, ctx.editionId),
     orderBy: desc(mediaPartners.createdAt),
   });
 
@@ -17,8 +17,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ error: "No active edition" }, { status: 400 });
+  const ctx = await requirePermission(req, "media", "create");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const { companyName, contactName, contactEmail, type, reach, proposal, deliverables, source, stage, assignedTo } = body;
@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
   const [partner] = await db
     .insert(mediaPartners)
     .values({
-      editionId: ids.editionId,
-      organizationId: ids.orgId,
+      editionId: ctx.editionId,
+      organizationId: ctx.orgId,
       companyName,
       contactName,
       contactEmail,

@@ -2,20 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sessions } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getApiContext, checkVersion } from "@/lib/api-utils";
+import { checkVersion } from "@/lib/api-utils";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "session", "update");
+  if (isRbacError(ctx)) return ctx;
 
   const session = await db.query.sessions.findFirst({
     where: and(
       eq(sessions.id, id),
-      eq(sessions.organizationId, ctx.organizationId)
+      eq(sessions.organizationId, ctx.orgId)
     ),
   });
 
@@ -70,15 +71,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "session", "delete");
+  if (isRbacError(ctx)) return ctx;
 
   const [deleted] = await db
     .delete(sessions)
     .where(
       and(
         eq(sessions.id, id),
-        eq(sessions.organizationId, ctx.organizationId)
+        eq(sessions.organizationId, ctx.orgId)
       )
     )
     .returning();

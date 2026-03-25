@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { attendees } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { createHash, randomBytes } from "crypto";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 function generateQrHash(editionId: string, email: string): string {
   const salt = randomBytes(4).toString("hex");
@@ -14,8 +15,11 @@ function generateQrHash(editionId: string, email: string): string {
 
 // GET — list attendees
 export async function GET(req: NextRequest) {
+  const ctx = await requirePermission(req, "attendee", "read");
+  if (isRbacError(ctx)) return ctx;
+
   const url = new URL(req.url);
-  const editionId = url.searchParams.get("editionId");
+  const editionId = url.searchParams.get("editionId") || ctx.editionId;
 
   if (!editionId) {
     return NextResponse.json({ error: "editionId required" }, { status: 400 });
@@ -31,10 +35,11 @@ export async function GET(req: NextRequest) {
 
 // POST — bulk import attendees
 export async function POST(req: NextRequest) {
+  const ctx = await requirePermission(req, "attendee", "create");
+  if (isRbacError(ctx)) return ctx;
+
   const body = await req.json();
-  const { editionId, organizationId, attendeeList } = body as {
-    editionId: string;
-    organizationId: string;
+  const { attendeeList } = body as {
     attendeeList: Array<{
       name: string;
       email: string;
@@ -42,9 +47,12 @@ export async function POST(req: NextRequest) {
     }>;
   };
 
-  if (!editionId || !organizationId || !attendeeList?.length) {
+  const editionId = body.editionId || ctx.editionId;
+  const organizationId = ctx.orgId;
+
+  if (!editionId || !attendeeList?.length) {
     return NextResponse.json(
-      { error: "editionId, organizationId, and attendeeList are required" },
+      { error: "editionId and attendeeList are required" },
       { status: 400 }
     );
   }

@@ -2,20 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { speakerApplications } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getApiContext, checkVersion } from "@/lib/api-utils";
+import { checkVersion } from "@/lib/api-utils";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "speaker", "read");
+  if (isRbacError(ctx)) return ctx;
 
   const speaker = await db.query.speakerApplications.findFirst({
     where: and(
       eq(speakerApplications.id, id),
-      eq(speakerApplications.organizationId, ctx.organizationId)
+      eq(speakerApplications.organizationId, ctx.orgId)
     ),
   });
 
@@ -31,13 +32,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "speaker", "update");
+  if (isRbacError(ctx)) return ctx;
 
   const speaker = await db.query.speakerApplications.findFirst({
     where: and(
       eq(speakerApplications.id, id),
-      eq(speakerApplications.organizationId, ctx.organizationId)
+      eq(speakerApplications.organizationId, ctx.orgId)
     ),
   });
 
@@ -119,6 +120,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const ctx = await requirePermission(req, "speaker", "delete");
+  if (isRbacError(ctx)) return ctx;
 
   const [deleted] = await db
     .delete(speakerApplications)

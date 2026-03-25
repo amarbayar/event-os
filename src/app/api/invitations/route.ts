@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invitations } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { getActiveIds } from "@/lib/queries";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
-export async function GET() {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ data: [] });
+export async function GET(req: NextRequest) {
+  const ctx = await requirePermission(req, "invitation", "read");
+  if (isRbacError(ctx)) return ctx;
 
   const rows = await db.query.invitations.findMany({
-    where: eq(invitations.editionId, ids.editionId),
+    where: eq(invitations.editionId, ctx.editionId),
     orderBy: desc(invitations.createdAt),
   });
 
@@ -17,8 +17,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ error: "No active edition" }, { status: 400 });
+  const ctx = await requirePermission(req, "invitation", "create");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const { name, type, email, invitedBy, sourceType, sourceId, notes, source, stage, assignedTo } = body;
@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
   const [invitation] = await db
     .insert(invitations)
     .values({
-      editionId: ids.editionId,
-      organizationId: ids.orgId,
+      editionId: ctx.editionId,
+      organizationId: ctx.orgId,
       name,
       type,
       email: email || null,

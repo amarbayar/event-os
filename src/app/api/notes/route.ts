@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { entityNotes } from "@/db/schema";
-import { eq, and, asc, desc } from "drizzle-orm";
-import { getActiveIds } from "@/lib/queries";
+import { eq, and, asc } from "drizzle-orm";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 // GET notes for an entity
 export async function GET(req: NextRequest) {
+  const ctx = await requirePermission(req, "note", "read");
+  if (isRbacError(ctx)) return ctx;
+
   const url = new URL(req.url);
   const entityType = url.searchParams.get("entityType");
   const entityId = url.searchParams.get("entityId");
@@ -27,8 +30,8 @@ export async function GET(req: NextRequest) {
 
 // POST a new note
 export async function POST(req: NextRequest) {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ error: "No active edition" }, { status: 400 });
+  const ctx = await requirePermission(req, "note", "create");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const { entityType, entityId, content, authorName, authorEmail } = body;
@@ -42,9 +45,9 @@ export async function POST(req: NextRequest) {
     .values({
       entityType,
       entityId,
-      organizationId: ids.orgId,
-      authorName: authorName || "Organizer",
-      authorEmail: authorEmail || null,
+      organizationId: ctx.orgId,
+      authorName: authorName || ctx.user.name || "Organizer",
+      authorEmail: authorEmail || ctx.user.email || null,
       content,
     })
     .returning();

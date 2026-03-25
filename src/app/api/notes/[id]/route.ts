@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { entityNotes } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 // DELETE a note
 export async function DELETE(
@@ -9,6 +10,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const ctx = await requirePermission(req, "note", "delete");
+  if (isRbacError(ctx)) return ctx;
 
   const [deleted] = await db
     .delete(entityNotes)
@@ -28,6 +31,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const ctx = await requirePermission(req, "note", "update");
+  if (isRbacError(ctx)) return ctx;
+
   const body = await req.json();
 
   const [updated] = await db

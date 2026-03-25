@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { eventEditions } from "@/db/schema";
 import { desc } from "drizzle-orm";
+import { getActiveIds } from "@/lib/queries";
 
 export async function GET() {
   const editions = await db.query.eventEditions.findMany({
     orderBy: desc(eventEditions.createdAt),
     with: { series: true, organization: true },
   });
+
+  // Determine which edition is currently active
+  const ids = await getActiveIds();
+  const activeEditionId = ids?.editionId || null;
 
   return NextResponse.json({
     data: editions.map((e) => ({
@@ -21,5 +26,6 @@ export async function GET() {
       organizationName: e.organization?.name,
       seriesName: e.series?.name,
     })),
+    activeEditionId,
   });
 }

@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sessions } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
-import { getApiContext, paginationParams } from "@/lib/api-utils";
+import { paginationParams } from "@/lib/api-utils";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "session", "read");
+  if (isRbacError(ctx)) return ctx;
 
   const url = new URL(req.url);
-  const editionId = url.searchParams.get("editionId");
+  const editionId = url.searchParams.get("editionId") || ctx.editionId;
   const day = url.searchParams.get("day");
   const { limit } = paginationParams(req);
 
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   const conditions = [
     eq(sessions.editionId, editionId),
-    eq(sessions.organizationId, ctx.organizationId),
+    eq(sessions.organizationId, ctx.orgId),
   ];
 
   if (day) {
@@ -37,19 +38,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "session", "create");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const { trackId, speakerId, title, description, type, startTime, endTime, room, day } = body;
 
   // Use provided editionId, or fall back to active edition
-  let editionId = body.editionId;
-  if (!editionId) {
-    const { getActiveIds } = await import("@/lib/queries");
-    const ids = await getActiveIds();
-    editionId = ids?.editionId;
-  }
+  const editionId = body.editionId || ctx.editionId;
 
   if (!editionId || !title) {
     return NextResponse.json(
@@ -62,7 +58,7 @@ export async function POST(req: NextRequest) {
     .insert(sessions)
     .values({
       editionId,
-      organizationId: ctx.organizationId,
+      organizationId: ctx.orgId,
       trackId: trackId || null,
       speakerId: speakerId || null,
       title,

@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sponsorApplications } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { getActiveIds } from "@/lib/queries";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ data: [] });
+  const ctx = await requirePermission(req, "sponsor", "read");
+  if (isRbacError(ctx)) return ctx;
 
   const url = new URL(req.url);
   const status = url.searchParams.get("status");
 
-  const conditions = [eq(sponsorApplications.editionId, ids.editionId)];
+  const conditions = [eq(sponsorApplications.editionId, ctx.editionId)];
   if (status && status !== "all") {
     conditions.push(eq(sponsorApplications.status, status));
   }
@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ error: "No active edition" }, { status: 400 });
+  const ctx = await requirePermission(req, "sponsor", "create");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const { companyName, contactName, contactEmail, packagePreference, message, source, stage, assignedTo } = body;
@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
   const [sponsor] = await db
     .insert(sponsorApplications)
     .values({
-      editionId: ids.editionId,
-      organizationId: ids.orgId,
+      editionId: ctx.editionId,
+      organizationId: ctx.orgId,
       companyName,
       contactName: contactName || "",
       contactEmail: contactEmail || "",

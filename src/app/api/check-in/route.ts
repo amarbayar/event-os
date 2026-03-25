@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { attendees } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getApiContext } from "@/lib/api-utils";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function POST(req: NextRequest) {
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "attendee", "update");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const { editionId, qrHash, stationId } = body;
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     where: and(
       eq(attendees.editionId, editionId),
       eq(attendees.qrHash, qrHash),
-      eq(attendees.organizationId, ctx.organizationId)
+      eq(attendees.organizationId, ctx.orgId)
     ),
   });
 
@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
 
 // Batch sync for offline check-ins
 export async function PUT(req: NextRequest) {
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "attendee", "update");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const { editionId, checkIns } = body as {
@@ -101,7 +101,7 @@ export async function PUT(req: NextRequest) {
         and(
           eq(attendees.editionId, editionId),
           eq(attendees.qrHash, ci.qrHash),
-          eq(attendees.organizationId, ctx.organizationId),
+          eq(attendees.organizationId, ctx.orgId),
           eq(attendees.checkedIn, false) // first-check-in-wins
         )
       )

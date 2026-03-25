@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { volunteerApplications } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getApiContext } from "@/lib/api-utils";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const ctx = await requirePermission(req, "volunteer", "update");
+  if (isRbacError(ctx)) return ctx;
+
   const body = await req.json();
 
   // Build updates from body — only include fields that are present
@@ -44,15 +47,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "volunteer", "delete");
+  if (isRbacError(ctx)) return ctx;
 
   const [deleted] = await db
     .delete(volunteerApplications)
     .where(
       and(
         eq(volunteerApplications.id, id),
-        eq(volunteerApplications.organizationId, ctx.organizationId)
+        eq(volunteerApplications.organizationId, ctx.orgId)
       )
     )
     .returning();
