@@ -847,6 +847,30 @@ export const userOrganizations = pgTable(
   ]
 );
 
+// ─── User ↔ Platform Links (OpenClaw identity mapping) ──
+
+export const userPlatformLinks = pgTable(
+  "user_platform_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    platform: varchar("platform", { length: 50 }).notNull(), // telegram | discord | whatsapp | slack
+    platformUserId: varchar("platform_user_id", { length: 255 }).notNull(),
+    displayName: varchar("display_name", { length: 255 }),
+    linkedAt: timestamp("linked_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("platform_link_uniq").on(table.platform, table.platformUserId),
+    index("platform_link_user_idx").on(table.userId),
+    index("platform_link_lookup_idx").on(table.platform, table.platformUserId),
+  ]
+);
+
 export const authSessions = pgTable("auth_sessions", {
   sessionToken: text("session_token").primaryKey(),
   userId: uuid("user_id")
@@ -945,6 +969,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [contacts.id],
   }),
   memberships: many(userOrganizations),
+  platformLinks: many(userPlatformLinks),
 }));
 
 export const userOrganizationsRelations = relations(userOrganizations, ({ one }) => ({
@@ -954,6 +979,17 @@ export const userOrganizationsRelations = relations(userOrganizations, ({ one })
   }),
   organization: one(organizations, {
     fields: [userOrganizations.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const userPlatformLinksRelations = relations(userPlatformLinks, ({ one }) => ({
+  user: one(users, {
+    fields: [userPlatformLinks.userId],
+    references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [userPlatformLinks.organizationId],
     references: [organizations.id],
   }),
 }));

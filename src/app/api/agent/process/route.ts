@@ -5,6 +5,7 @@ import { InputType } from "@/lib/agent/types";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
 import { getActiveIds } from "@/lib/queries";
 import { gateMention, sanitizeInput, isOffTopic } from "@/lib/agent/input-guard";
+import { validateServiceToken } from "@/lib/service-token";
 
 // Rate limiter
 const rateLimiter = new Map<string, { count: number; resetAt: number }>();
@@ -24,29 +25,66 @@ function checkRateLimit(userId: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  // Auth — get current user
+  let userId: string;
+  let orgId: string;
+  let role: string;
+  let userName: string | null;
+
+  // Auth: service token (OpenClaw) or session (web UI)
+  if (validateServiceToken(req)) {
+    // Service token path — OpenClaw passes the REAL user's identity
+    orgId = req.headers.get("x-organization-id") || "";
+    if (!orgId) {
+      return NextResponse.json({ error: "x-organization-id header required" }, { status: 400 });
+    }
+    // Body is parsed below; we'll read platform identity fields from it
+    const body = await req.json();
+    userId = (body.userId as string) || "service";
+    role = (body.userRole as string) || "viewer"; // REAL user's role, not admin
+    userName = (body.userName as string) || null;
+
+    if (!checkRateLimit(userId)) {
+      return NextResponse.json({ error: "Rate limited. Please wait a moment." }, { status: 429 });
+    }
+
+    // Re-attach body for downstream processing (req.json() can only be called once)
+    return handleRequest(req, body, userId, orgId, role, userName);
+  }
+
+  // Session auth path — web UI
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const sessionUser = session.user as Record<string, unknown>;
-  const userId = sessionUser.id as string;
-  const orgId = sessionUser.organizationId as string;
-  const role = (sessionUser.role as string) || "viewer";
-  const userName = (sessionUser.name as string) || null;
+  userId = sessionUser.id as string;
+  orgId = sessionUser.organizationId as string;
+  role = (sessionUser.role as string) || "viewer";
+  userName = (sessionUser.name as string) || null;
 
   if (!checkRateLimit(userId)) {
     return NextResponse.json({ error: "Rate limited. Please wait a moment." }, { status: 429 });
   }
 
   const body = await req.json();
+  return handleRequest(req, body, userId, orgId, role, userName);
+}
+
+async function handleRequest(
+  req: NextRequest,
+  body: Record<string, unknown>,
+  userId: string,
+  orgId: string,
+  role: string,
+  userName: string | null,
+) {
   const { input, inputType, editionId, context, mode } = body as {
     input: string;
     inputType?: InputType;
     editionId?: string;
     context?: string;
-    mode?: "classify" | "extract"; // explicit mode override
+    mode?: "classify" | "extract";
   };
 
   if (!input) {
