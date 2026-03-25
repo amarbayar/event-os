@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Plus, ArrowRight, X } from "lucide-react";
 
 type OutreachStatus = "identified" | "contacted" | "interested" | "negotiating" | "confirmed" | "declined" | "converted";
@@ -131,7 +132,7 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
                 </div>
                 <div className="space-y-1.5">
                   <Label>Assigned To</Label>
-                  <Input name="assignedTo" placeholder="e.g., Bold B." />
+                  <AssignedToSelect name="assignedTo" />
                 </div>
               </div>
               <div className="space-y-1.5">

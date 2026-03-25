@@ -18,6 +18,7 @@ import { PipelineTable } from "@/components/pipeline-table";
 import { EntityDrawer } from "@/components/entity-drawer";
 import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
+import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Building2, Plus, X, UserPlus } from "lucide-react";
 
 type Sponsor = {
@@ -288,7 +289,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
               </div>
               <div className="space-y-1.5">
                 <Label>Assigned To</Label>
-                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+                <AssignedToSelect value={(drawerForm.assignedTo as string) || ""} onChange={(val) => updateField("assignedTo", val)} />
               </div>
             </div>
           ),

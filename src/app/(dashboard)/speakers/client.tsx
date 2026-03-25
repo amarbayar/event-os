@@ -19,6 +19,7 @@ import { EntityDrawer } from "@/components/entity-drawer";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
+import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock, UserPlus } from "lucide-react";
 
 type Speaker = {
@@ -486,7 +487,7 @@ export function SpeakersClient({
               </div>
               <div className="space-y-1.5">
                 <Label>Assigned To</Label>
-                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+                <AssignedToSelect value={(drawerForm.assignedTo as string) || ""} onChange={(val) => updateField("assignedTo", val)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Review Notes</Label>
@@ -562,7 +563,7 @@ export function SpeakersClient({
                 </div>
                 <div className="space-y-1.5">
                   <Label>Assigned To</Label>
-                  <Input name="assignedTo" placeholder="Team member" />
+                  <AssignedToSelect name="assignedTo" />
                 </div>
               </div>
               <Button type="submit" className="w-full sm:w-auto">Add Speaker</Button>

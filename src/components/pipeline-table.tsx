@@ -299,7 +299,7 @@ export function PipelineTable<
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="overflow-visible rounded-lg border">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b bg-stone-50">

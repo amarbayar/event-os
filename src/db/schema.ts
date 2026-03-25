@@ -542,6 +542,9 @@ export const booths = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(), // e.g., "Booth A1"
+    companyName: varchar("company_name", { length: 255 }),
+    contactName: varchar("contact_name", { length: 255 }),
+    contactEmail: varchar("contact_email", { length: 255 }),
     companyLogoUrl: text("company_logo_url"),
     location: varchar("location", { length: 255 }), // e.g., "Hall B, Row 2"
     size: varchar("size", { length: 50 }), // small, medium, large, premium

@@ -18,6 +18,7 @@ import { PipelineTable } from "@/components/pipeline-table";
 import { EntityDrawer } from "@/components/entity-drawer";
 import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
+import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Plus, X, UserPlus } from "lucide-react";
 
 type MediaPartner = {
@@ -341,7 +342,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
               </div>
               <div className="space-y-1.5">
                 <Label>Assigned To</Label>
-                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+                <AssignedToSelect value={(drawerForm.assignedTo as string) || ""} onChange={(val) => updateField("assignedTo", val)} />
               </div>
             </div>
           ),
@@ -421,7 +422,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
                 </div>
                 <div className="space-y-1.5">
                   <Label>Assigned To</Label>
-                  <Input name="assignedTo" placeholder="Team member name" />
+                  <AssignedToSelect name="assignedTo" />
                 </div>
               </div>
               <div className="space-y-1.5">

@@ -20,6 +20,7 @@ import { EntityDrawer } from "@/components/entity-drawer";
 import { FileUpload } from "@/components/file-upload";
 import { ImageGalleryUpload } from "@/components/image-gallery-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
+import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Plus, Check, X, UserPlus } from "lucide-react";
 
 type Venue = {
@@ -390,7 +391,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
               </div>
               <div className="space-y-1.5">
                 <Label>Assigned To</Label>
-                <Input value={(drawerForm.assignedTo as string) || ""} onChange={(e) => updateField("assignedTo", e.target.value)} />
+                <AssignedToSelect value={(drawerForm.assignedTo as string) || ""} onChange={(val) => updateField("assignedTo", val)} />
               </div>
             </div>
           ),
@@ -469,7 +470,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Assigned To</Label>
-                  <Input name="assignedTo" placeholder="e.g., Team member name" />
+                  <AssignedToSelect name="assignedTo" />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
