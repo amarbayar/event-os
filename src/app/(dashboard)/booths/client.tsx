@@ -24,13 +24,15 @@ import { Plus, X, UserPlus } from "lucide-react";
 type Booth = {
   id: string;
   name: string;
+  companyName: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
   location: string | null;
   size: string | null;
   price: number | null;
   status: string;
   equipment: string | null;
   notes: string | null;
-  contactEmail?: string | null;
   sponsorId: string | null;
   source: string;
   stage: string;
@@ -190,6 +192,9 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
     setSelectedBooth(booth);
     setDrawerForm({
       name: booth.name || "",
+      companyName: booth.companyName || "",
+      contactName: booth.contactName || "",
+      contactEmail: booth.contactEmail || "",
       companyLogoUrl: booth.companyLogoUrl || "",
       location: booth.location || "",
       size: booth.size || "standard",
@@ -243,8 +248,22 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
           content: (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Name</Label>
+                <Label>Booth Name</Label>
                 <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Company Name</Label>
+                  <Input value={(drawerForm.companyName as string) || ""} onChange={(e) => updateField("companyName", e.target.value)} placeholder="Company running the booth" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Contact Name</Label>
+                  <Input value={(drawerForm.contactName as string) || ""} onChange={(e) => updateField("contactName", e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Contact Email</Label>
+                <Input type="email" value={(drawerForm.contactEmail as string) || ""} onChange={(e) => updateField("contactEmail", e.target.value)} placeholder="For portal invite" />
               </div>
               <FileUpload
                 value={(drawerForm.companyLogoUrl as string) || ""}

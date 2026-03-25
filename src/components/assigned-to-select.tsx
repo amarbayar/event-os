@@ -5,15 +5,23 @@ import { useState, useEffect } from "react";
 type OrgUser = { id: string; name: string | null; email: string };
 
 export function AssignedToSelect({
-  value,
+  value: controlledValue,
   onChange,
   name,
 }: {
   value?: string;
   onChange?: (name: string) => void;
-  name?: string; // for form submission
+  name?: string;
 }) {
   const [users, setUsers] = useState<OrgUser[]>([]);
+  const [internalValue, setInternalValue] = useState(controlledValue || "");
+
+  // Controlled mode: sync internal state with prop
+  useEffect(() => {
+    if (controlledValue !== undefined) {
+      setInternalValue(controlledValue);
+    }
+  }, [controlledValue]);
 
   useEffect(() => {
     fetch("/api/users")
@@ -22,11 +30,16 @@ export function AssignedToSelect({
       .catch(() => {});
   }, []);
 
+  const handleChange = (val: string) => {
+    setInternalValue(val);
+    onChange?.(val);
+  };
+
   return (
     <select
       name={name}
-      value={value || ""}
-      onChange={(e) => onChange?.(e.target.value)}
+      value={internalValue}
+      onChange={(e) => handleChange(e.target.value)}
       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
     >
       <option value="">Unassigned</option>
