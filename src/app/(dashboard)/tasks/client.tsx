@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Calendar, User, X, GripVertical, MessageSquare } from "lucide-react";
 import { NotesButton, NotesPanel } from "@/components/notes-panel";
+import { useConfirm } from "@/components/confirm-dialog";
 
 type TaskStatus = "todo" | "in_progress" | "done" | "blocked";
 type Priority = "low" | "medium" | "high" | "urgent";
@@ -344,6 +345,7 @@ function TeamPill({
   onRename: (name: string) => void;
   onDelete: () => void;
 }) {
+  const { confirm: confirmDialog } = useConfirm();
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(team.name);
@@ -398,9 +400,15 @@ function TeamPill({
               Rename
             </button>
             <button
-              onClick={() => {
+              onClick={async () => {
                 setMenuOpen(false);
-                if (confirm(`Delete team "${team.name}"? Tasks won't be deleted.`)) onDelete();
+                const confirmed = await confirmDialog({
+                  title: `Delete "${team.name}"`,
+                  message: "Tasks assigned to this team will keep their data but lose their team association.",
+                  confirmLabel: "Delete Team",
+                  variant: "danger",
+                });
+                if (confirmed) onDelete();
               }}
               className="block w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50"
             >

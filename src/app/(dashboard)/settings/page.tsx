@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { UserPlus, Trash2, Loader2, Plus, GripVertical } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { useConfirm } from "@/components/confirm-dialog";
 
 type Tab = "event" | "team" | "checklists" | "telegram";
 type User = {
@@ -85,8 +86,16 @@ function ChecklistTemplatesTab() {
     fetchTemplates();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this checklist template? Existing items won't be affected.")) return;
+  const { confirm: confirmDialog } = useConfirm();
+
+  const handleDelete = async (id: string, name: string) => {
+    const confirmed = await confirmDialog({
+      title: "Delete checklist template",
+      message: `Remove "${name}"? Existing checklist items from this template will also be removed.`,
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (!confirmed) return;
     await fetch(`/api/checklist-templates/${id}`, { method: "DELETE" });
     fetchTemplates();
   };
@@ -141,7 +150,7 @@ function ChecklistTemplatesTab() {
                 )}
               </div>
               <button
-                onClick={() => handleDelete(t.id)}
+                onClick={() => handleDelete(t.id, t.name)}
                 className="rounded p-1 text-stone-300 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -307,8 +316,16 @@ export default function SettingsPage() {
     fetchMembers();
   };
 
+  const { confirm: confirmDialog } = useConfirm();
+
   const handleRemove = async (userId: string, userName: string | null) => {
-    if (!confirm(`Remove ${userName || "this user"} from the organization?`)) return;
+    const confirmed = await confirmDialog({
+      title: "Remove team member",
+      message: `Remove ${userName || "this user"} from the organization? They will lose access to all event data.`,
+      confirmLabel: "Remove",
+      variant: "danger",
+    });
+    if (!confirmed) return;
     await fetch(`/api/users/${userId}`, { method: "DELETE" });
     fetchMembers();
   };
