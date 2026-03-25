@@ -14,7 +14,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { eq, and, ilike, sql, isNull } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
+import { ilikeFn as ilike } from "@/db/dialect";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
 import { AgentIntent, DispatchResult } from "@/lib/agent/types";
 

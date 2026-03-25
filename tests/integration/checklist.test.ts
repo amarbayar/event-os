@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { testDb } from "./setup";
-import * as schema from "../src/db/schema";
+import { testDb } from "../setup";
+import * as schema from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
 // ════════════════════════════════════════════════════════
@@ -123,7 +123,7 @@ describe("Checklist templates", () => {
 
 describe("Checklist item generation", () => {
   it("generates items when generateChecklistItems is called", async () => {
-    const { generateChecklistItems } = await import("../src/lib/checklist");
+    const { generateChecklistItems } = await import("@/lib/checklist");
 
     // Clean up any existing items for this speaker (from prior runs or UI usage)
     await testDb.delete(schema.checklistItems).where(
@@ -157,7 +157,7 @@ describe("Checklist item generation", () => {
   });
 
   it("skips generation if items already exist (no duplicates)", async () => {
-    const { generateChecklistItems } = await import("../src/lib/checklist");
+    const { generateChecklistItems } = await import("@/lib/checklist");
 
     // Count items before
     const before = await testDb.query.checklistItems.findMany({
@@ -182,7 +182,7 @@ describe("Checklist item generation", () => {
   });
 
   it("returns 0 for entity type with no templates", async () => {
-    const { generateChecklistItems } = await import("../src/lib/checklist");
+    const { generateChecklistItems } = await import("@/lib/checklist");
 
     const count = await generateChecklistItems("nonexistent", "fake-id", editionId, orgId);
     expect(count).toBe(0);
@@ -193,7 +193,7 @@ describe("Checklist item generation", () => {
 
 describe("Checklist item archival", () => {
   it("archives items when archiveChecklistItems is called", async () => {
-    const { archiveChecklistItems } = await import("../src/lib/checklist");
+    const { archiveChecklistItems } = await import("@/lib/checklist");
 
     const count = await archiveChecklistItems("speaker", speakerId);
     expect(count).toBeGreaterThan(0); // archives however many items exist
@@ -209,14 +209,14 @@ describe("Checklist item archival", () => {
   });
 
   it("is idempotent — archiving already archived items is a no-op", async () => {
-    const { archiveChecklistItems } = await import("../src/lib/checklist");
+    const { archiveChecklistItems } = await import("@/lib/checklist");
 
     const count = await archiveChecklistItems("speaker", speakerId);
     expect(count).toBe(0); // All already archived
   });
 
   it("returns 0 when entity has no items", async () => {
-    const { archiveChecklistItems } = await import("../src/lib/checklist");
+    const { archiveChecklistItems } = await import("@/lib/checklist");
 
     const count = await archiveChecklistItems("speaker", "nonexistent-id");
     expect(count).toBe(0);
@@ -227,7 +227,7 @@ describe("Checklist item archival", () => {
 
 describe("Re-confirmation restore", () => {
   it("restores archived items on re-confirmation", async () => {
-    const { generateChecklistItems } = await import("../src/lib/checklist");
+    const { generateChecklistItems } = await import("@/lib/checklist");
 
     // Items are currently archived from previous test
     // Re-generate should restore them
@@ -247,7 +247,7 @@ describe("Re-confirmation restore", () => {
   });
 
   it("restores submitted items with submitted status", async () => {
-    const { archiveChecklistItems, generateChecklistItems } = await import("../src/lib/checklist");
+    const { archiveChecklistItems, generateChecklistItems } = await import("@/lib/checklist");
 
     // Set a value on one item first
     const items = await testDb.query.checklistItems.findMany({

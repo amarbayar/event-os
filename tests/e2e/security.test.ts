@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { testDb } from "./setup";
-import * as schema from "../src/db/schema";
+import { testDb } from "../setup";
+import * as schema from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
 // ════════════════════════════════════════════════════════
@@ -35,21 +35,21 @@ beforeAll(async () => {
 
 describe("Finding 1: bcrypt password hashing", () => {
   it("new password hashes start with $2 (bcrypt format)", async () => {
-    const { hash } = await import("../src/lib/password");
+    const { hash } = await import("@/lib/password");
     const hashed = await hash("testpassword123");
     expect(hashed.startsWith("$2")).toBe(true);
     expect(hashed.length).toBeGreaterThan(50); // bcrypt hashes are ~60 chars
   });
 
   it("bcrypt hash can be verified", async () => {
-    const { hash, compare } = await import("../src/lib/password");
+    const { hash, compare } = await import("@/lib/password");
     const hashed = await hash("mySecurePass!");
     expect(await compare("mySecurePass!", hashed)).toBe(true);
     expect(await compare("wrongPassword", hashed)).toBe(false);
   });
 
   it("legacy SHA-256 hashes still work (backwards compatible)", async () => {
-    const { compare } = await import("../src/lib/password");
+    const { compare } = await import("@/lib/password");
     // Simulate a legacy SHA-256 hash: salt:sha256(password+salt)
     const { createHash, randomBytes } = await import("crypto");
     const salt = randomBytes(16).toString("hex");
@@ -156,7 +156,7 @@ describe("Finding 6: no hardcoded passwords in source", () => {
   it("portal invite generates unique passwords", async () => {
     // We can't call the API without auth, but we can verify the hash function
     // generates bcrypt (not a hardcoded value)
-    const { hash } = await import("../src/lib/password");
+    const { hash } = await import("@/lib/password");
     const hash1 = await hash("randomPass1");
     const hash2 = await hash("randomPass2");
     // Different inputs produce different hashes

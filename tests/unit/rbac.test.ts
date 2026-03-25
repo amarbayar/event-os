@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { testDb } from "./setup";
-import * as schema from "../src/db/schema";
+import { testDb } from "../setup";
+import * as schema from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 
 // ════════════════════════════════════════════════════════
