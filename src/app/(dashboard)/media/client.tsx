@@ -43,7 +43,7 @@ type MediaPartner = {
 function PortalInviteSection({ entityType, entityId, entityEmail }: { entityType: string; entityId: string; entityEmail: string }) {
   const [status, setStatus] = useState<"checking" | "idle" | "loading" | "invited" | "already" | "error">("checking");
   const [showConfirm, setShowConfirm] = useState(false);
-  const [password, setPassword] = useState("portal123");
+  const [password, setPassword] = useState("");
   const [inviteInfo, setInviteInfo] = useState<{ email: string; password: string } | null>(null);
 
   useEffect(() => {

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { eventEditions, eventSeries, tracks } from "@/db/schema";
-import { getActiveIds } from "@/lib/queries";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function POST(req: NextRequest) {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ error: "No active organization" }, { status: 400 });
+  const ctx = await requirePermission(req, "edition", "create");
+  if (isRbacError(ctx)) return ctx;
+  const ids = { orgId: ctx.orgId, editionId: ctx.editionId };
 
   const body = await req.json();
   const { name, startDate, endDate, venue } = body;

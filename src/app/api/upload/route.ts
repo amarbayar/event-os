@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { auth } from "@/lib/auth";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public/uploads");
 const MAX_SIZE = 20 * 1024 * 1024; // 20MB — modern phone cameras
 
 export async function POST(req: NextRequest) {
+  // Auth check — uploads require login
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const folder = (formData.get("folder") as string) || "general";

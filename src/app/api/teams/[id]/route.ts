@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { teams } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
 // PATCH — rename team or change color
@@ -38,14 +38,21 @@ export async function PATCH(
 
 // DELETE — remove team
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const ctx = await requirePermission(req, "task", "delete");
+  if (isRbacError(ctx)) return ctx;
 
   const [deleted] = await db
     .delete(teams)
-    .where(eq(teams.id, id))
+    .where(
+      and(
+        eq(teams.id, id),
+        eq(teams.organizationId, ctx.orgId)
+      )
+    )
     .returning();
 
   if (!deleted) {

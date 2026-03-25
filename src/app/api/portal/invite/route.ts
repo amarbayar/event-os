@@ -76,8 +76,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `User with email ${entityEmail} already exists` }, { status: 409 });
   }
 
-  // Create stakeholder user with temp password
-  const tempPassword = await hash("portal123");
+  // Create stakeholder user with random temp password
+  const { randomBytes } = await import("crypto");
+  const rawPassword = randomBytes(8).toString("base64url");
+  const tempPassword = await hash(rawPassword);
 
   const [user] = await db
     .insert(users)
@@ -100,7 +102,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     data: {
       ...user,
-      tempPassword: "portal123", // Show once to organizer so they can share it
+      tempPassword: rawPassword, // Show once to organizer so they can share it
       portalUrl: `/portal`,
     },
   }, { status: 201 });

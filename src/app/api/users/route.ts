@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, userOrganizations } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getActiveIds } from "@/lib/queries";
 import { hash } from "@/lib/password";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 // GET — list all users in the current organization
-export async function GET() {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ error: "No active organization" }, { status: 400 });
+export async function GET(req: NextRequest) {
+  const ctx = await requirePermission(req, "user", "read");
+  if (isRbacError(ctx)) return ctx;
 
   const orgUsers = await db
     .select({
@@ -21,15 +21,15 @@ export async function GET() {
     })
     .from(userOrganizations)
     .innerJoin(users, eq(userOrganizations.userId, users.id))
-    .where(eq(userOrganizations.organizationId, ids.orgId));
+    .where(eq(userOrganizations.organizationId, ctx.orgId));
 
   return NextResponse.json({ data: orgUsers });
 }
 
 // POST — invite a new user to the organization
 export async function POST(req: NextRequest) {
-  const ids = await getActiveIds();
-  if (!ids) return NextResponse.json({ error: "No active organization" }, { status: 400 });
+  const ctx = await requirePermission(req, "user", "create");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const { name, email, role } = body;
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     const existingMembership = await db.query.userOrganizations.findFirst({
       where: and(
         eq(userOrganizations.userId, existing.id),
-        eq(userOrganizations.organizationId, ids.orgId)
+        eq(userOrganizations.organizationId, ctx.orgId)
       ),
     });
 
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     // Add existing user to this org
     await db.insert(userOrganizations).values({
       userId: existing.id,
-      organizationId: ids.orgId,
+      organizationId: ctx.orgId,
       role: userRole,
       linkedEntityType: body.linkedEntityType || null,
       linkedEntityId: body.linkedEntityId || null,
@@ -74,7 +74,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Create new user + membership
-  const tempPassword = await hash("changeme123");
+  const { randomBytes } = await import("crypto");
+  const rawPassword = randomBytes(8).toString("base64url");
+  const tempPassword = await hash(rawPassword);
 
   const [user] = await db
     .insert(users)
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest) {
       name: name || email.split("@")[0],
       email,
       passwordHash: tempPassword,
-      organizationId: ids.orgId,
+      organizationId: ctx.orgId,
       role: userRole,
       linkedEntityType: body.linkedEntityType || null,
       linkedEntityId: body.linkedEntityId || null,
@@ -97,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   await db.insert(userOrganizations).values({
     userId: user.id,
-    organizationId: ids.orgId,
+    organizationId: ctx.orgId,
     role: userRole,
     linkedEntityType: body.linkedEntityType || null,
     linkedEntityId: body.linkedEntityId || null,
