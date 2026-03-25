@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { eq, and, ilike, sql } from "drizzle-orm";
+import { eq, and, ilike, sql, getTableColumns } from "drizzle-orm";
 import { AgentIntent, DispatchResult } from "./types";
 import { AgentContext } from "./dispatcher";
 import { notify } from "@/lib/notify";
@@ -9,74 +9,88 @@ import { notify } from "@/lib/notify";
 //
 //  Creates, updates, and deletes entities via natural language.
 //  All mutations go through org scoping + field validation.
+//
+//  Uses Drizzle's getTableColumns() for dynamic schema introspection
+//  so required-field defaults stay in sync with schema changes.
 
-// Table + config map (shared with query handler pattern)
+// Table + config map — allowedFields derived from schema at init time
 const ENTITY_CONFIG: Record<string, {
   table: any;
   nameField: string;
   label: string;
-  allowedCreateFields: string[];
-  allowedUpdateFields: string[];
 }> = {
-  speaker: {
-    table: schema.speakerApplications,
-    nameField: "name",
-    label: "speaker",
-    allowedCreateFields: ["name", "email", "phone", "company", "title", "bio", "talkTitle", "talkAbstract", "talkType", "trackPreference", "source", "stage", "assignedTo"],
-    allowedUpdateFields: ["name", "email", "phone", "company", "title", "bio", "talkTitle", "talkAbstract", "talkType", "trackPreference", "slideUrl", "headshotUrl", "source", "stage", "status", "assignedTo"],
-  },
-  sponsor: {
-    table: schema.sponsorApplications,
-    nameField: "companyName",
-    label: "sponsor",
-    allowedCreateFields: ["companyName", "contactName", "contactEmail", "logoUrl", "packagePreference", "message", "source", "stage", "assignedTo"],
-    allowedUpdateFields: ["companyName", "contactName", "contactEmail", "logoUrl", "packagePreference", "message", "source", "stage", "status", "assignedTo"],
-  },
-  venue: {
-    table: schema.venues,
-    nameField: "name",
-    label: "venue",
-    allowedCreateFields: ["name", "address", "contactName", "contactEmail", "contactPhone", "capacity", "priceQuote", "source", "stage", "assignedTo"],
-    allowedUpdateFields: ["name", "address", "contactName", "contactEmail", "contactPhone", "capacity", "priceQuote", "source", "stage", "status", "assignedTo"],
-  },
-  booth: {
-    table: schema.booths,
-    nameField: "name",
-    label: "booth",
-    allowedCreateFields: ["name", "companyName", "contactName", "contactEmail", "location", "size", "equipment", "source", "stage", "assignedTo"],
-    allowedUpdateFields: ["name", "companyName", "contactName", "contactEmail", "location", "size", "equipment", "source", "stage", "assignedTo"],
-  },
-  volunteer: {
-    table: schema.volunteerApplications,
-    nameField: "name",
-    label: "volunteer",
-    allowedCreateFields: ["name", "email", "phone", "source", "stage", "assignedTo"],
-    allowedUpdateFields: ["name", "email", "phone", "headshotUrl", "source", "stage", "assignedTo"],
-  },
-  media: {
-    table: schema.mediaPartners,
-    nameField: "companyName",
-    label: "media partner",
-    allowedCreateFields: ["companyName", "contactName", "contactEmail", "type", "source", "stage", "assignedTo"],
-    allowedUpdateFields: ["companyName", "contactName", "contactEmail", "type", "source", "stage", "assignedTo"],
-  },
-  task: {
-    table: schema.tasks,
-    nameField: "title",
-    label: "task",
-    allowedCreateFields: ["title", "description", "status", "priority", "assigneeName", "assignedTo", "dueDate"],
-    allowedUpdateFields: ["title", "description", "status", "priority", "assigneeName", "assignedTo", "dueDate"],
-  },
-  campaign: {
-    table: schema.campaigns,
-    nameField: "title",
-    label: "campaign",
-    allowedCreateFields: ["title", "type", "platform", "content", "scheduledDate", "assignedTo"],
-    allowedUpdateFields: ["title", "type", "platform", "content", "scheduledDate", "status", "assignedTo"],
-  },
+  speaker:   { table: schema.speakerApplications, nameField: "name",        label: "speaker" },
+  sponsor:   { table: schema.sponsorApplications, nameField: "companyName", label: "sponsor" },
+  venue:     { table: schema.venues,              nameField: "name",        label: "venue" },
+  booth:     { table: schema.booths,              nameField: "name",        label: "booth" },
+  volunteer: { table: schema.volunteerApplications, nameField: "name",      label: "volunteer" },
+  media:     { table: schema.mediaPartners,       nameField: "companyName", label: "media partner" },
+  task:      { table: schema.tasks,               nameField: "title",       label: "task" },
+  campaign:  { table: schema.campaigns,           nameField: "title",       label: "campaign" },
 };
 
-// Field aliases
+// ─── Dynamic schema introspection ─────────────────────
+//
+//  Instead of hardcoding allowedFields and required-field defaults,
+//  we read the Drizzle table definition at startup. This means:
+//  - New columns auto-appear in allowed fields
+//  - NOT NULL columns without defaults auto-get safe defaults
+//  - Schema changes don't require manage-handler updates
+
+// System-managed fields that the agent must NEVER accept from user input
+const SYSTEM_FIELDS = new Set([
+  "id", "editionId", "organizationId", "contactId", "assigneeId",
+  "version", "createdAt", "updatedAt", "reviewScore", "reviewNotes",
+  "publishedDate", "approvedBy", "approvedAt", "submittedAt",
+]);
+
+type ColumnMeta = { name: string; notNull: boolean; hasDefault: boolean; dataType: string };
+
+// Cache per table: { userFields: string[], requiredNoDefault: string[] }
+const _schemaCache = new Map<string, { userFields: string[]; requiredNoDefault: string[] }>();
+
+function getSchemaInfo(table: any): { userFields: string[]; requiredNoDefault: string[] } {
+  // Use the table's SQL name as cache key (unique per table)
+  const tableName = (table as any)[Symbol.for("drizzle:Name")] || (table as any)._.name || "";
+  const key = tableName || JSON.stringify(Object.keys(getTableColumns(table)));
+  if (_schemaCache.has(key)) return _schemaCache.get(key)!;
+
+  const cols = getTableColumns(table);
+  const userFields: string[] = [];
+  const requiredNoDefault: string[] = [];
+
+  for (const [name, col] of Object.entries(cols)) {
+    if (SYSTEM_FIELDS.has(name)) continue;
+    userFields.push(name);
+    const c = col as any;
+    if (c.notNull && !c.hasDefault && c.default === undefined) {
+      requiredNoDefault.push(name);
+    }
+  }
+
+  const result = { userFields, requiredNoDefault };
+  _schemaCache.set(key, result);
+  return result;
+}
+
+// Safe defaults for common NOT NULL string fields
+function safeDefault(fieldName: string, entityType: string, values: Record<string, unknown>): string {
+  // Name-like fields
+  if (fieldName === "contactName") return String(values.companyName || values.name || "TBD");
+  if (fieldName === "talkTitle") return "TBD";
+  if (fieldName === "title" && entityType === "task") return "Untitled task";
+  // Email fields
+  if (fieldName.toLowerCase().includes("email")) return "";
+  // Type/enum fields
+  if (fieldName === "type" && entityType === "campaign") return "event_update";
+  if (fieldName === "type") return "other";
+  if (fieldName === "status" && entityType === "task") return "todo";
+  if (fieldName === "priority") return "medium";
+  // Generic string
+  return "";
+}
+
+// Field aliases — maps LLM terms to actual DB column names
 const FIELD_ALIASES: Record<string, string> = {
   company: "companyName", "company_name": "companyName",
   "contact_email": "contactEmail", "contact_name": "contactName",
@@ -125,8 +139,9 @@ async function handleCreate(
   ctx: AgentContext,
   config: typeof ENTITY_CONFIG[string]
 ): Promise<DispatchResult> {
-  const { table, nameField, label, allowedCreateFields } = config;
+  const { table, nameField, label } = config;
   const params = intent.params || {};
+  const { userFields, requiredNoDefault } = getSchemaInfo(table);
 
   // Filter to allowed fields + resolve aliases
   const values: Record<string, unknown> = {
@@ -136,10 +151,9 @@ async function handleCreate(
 
   for (const [key, value] of Object.entries(params)) {
     const resolved = resolveField(key);
-    if (allowedCreateFields.includes(resolved) && value) {
+    if (userFields.includes(resolved) && value) {
       values[resolved] = value;
-    } else if (allowedCreateFields.includes(key) && value) {
-      // Fallback: use original key if alias doesn't match (e.g. speaker has "company" not "companyName")
+    } else if (userFields.includes(key) && value) {
       values[key] = value;
     }
   }
@@ -153,42 +167,21 @@ async function handleCreate(
     values[nameField] = nameValue;
   }
 
-  // Set defaults
-  if (!values.source) values.source = "intake";
-  if (!values.stage && "stage" in table) values.stage = "lead";
-  if (!values.status && label === "task") values.status = "todo";
-  if (!values.priority && label === "task") values.priority = "medium";
+  // Set common defaults
+  if (!values.source && userFields.includes("source")) values.source = "intake";
+  if (!values.stage && userFields.includes("stage")) values.stage = "lead";
 
-  // Required field defaults per entity type
-  if (intent.entityType === "speaker") {
-    if (!values.email) values.email = "";
-    if (!values.talkTitle) values.talkTitle = "TBD";
-  }
-  if (intent.entityType === "sponsor") {
-    if (!values.contactName) values.contactName = String(values.companyName || "TBD");
-    if (!values.contactEmail) values.contactEmail = "";
-  }
-  if (intent.entityType === "media") {
-    if (!values.contactName) values.contactName = String(values.companyName || "TBD");
-    if (!values.contactEmail) values.contactEmail = "";
-  }
-  if (intent.entityType === "task") {
-    if (!values.title && values.name) values.title = values.name;
-    if (!values.title) values.title = "Untitled task";
-  }
-  if (intent.entityType === "volunteer") {
-    if (!values.email) values.email = "";
-  }
-  if (intent.entityType === "attendee") {
-    if (!values.email) values.email = "";
-  }
-  if (intent.entityType === "campaign") {
-    if (!values.type) values.type = "event_update";
+  // Auto-fill required NOT NULL fields that have no DB default
+  for (const field of requiredNoDefault) {
+    if (!(field in values)) {
+      values[field] = safeDefault(field, intent.entityType!, values);
+    }
   }
 
-  // Truncate string values to avoid DB varchar overflow
+  // Truncate string values to avoid DB varchar overflow (text fields exempt)
+  const TEXT_FIELDS = new Set(["bio", "content", "description", "talkAbstract", "notes", "message", "experience", "availability", "requirements", "requirementsNotes"]);
   for (const [k, v] of Object.entries(values)) {
-    if (typeof v === "string" && v.length > 255 && k !== "bio" && k !== "content" && k !== "description" && k !== "talkAbstract" && k !== "notes" && k !== "message") {
+    if (typeof v === "string" && v.length > 255 && !TEXT_FIELDS.has(k)) {
       values[k] = v.slice(0, 255);
     }
   }
@@ -215,7 +208,8 @@ async function handleUpdate(
   ctx: AgentContext,
   config: typeof ENTITY_CONFIG[string]
 ): Promise<DispatchResult> {
-  const { table, nameField, label, allowedUpdateFields } = config;
+  const { table, nameField, label } = config;
+  const { userFields } = getSchemaInfo(table);
   const searchValue = intent.searchValue || (intent.params as any)?.name || (intent.params as any)?.[nameField];
 
   if (!searchValue) {
@@ -244,8 +238,7 @@ async function handleUpdate(
       const list = retryMatches.map((r: any, i: number) => `${i + 1}. **${r[nameField]}**`).join("\n");
       return { message: `Multiple matches for "${searchValue}":\n${list}\nWhich one? Reply with the number or full name.`, success: false };
     }
-    // Single match on retry
-    return applyUpdate(retryMatches[0], intent, ctx, config);
+    return applyUpdate(retryMatches[0], intent, ctx, config, userFields);
   }
 
   if (matches.length > 1) {
@@ -256,27 +249,28 @@ async function handleUpdate(
     return { message: `Multiple ${label}s match "${searchValue}":\n${list}\nWhich one did you mean?`, success: false };
   }
 
-  return applyUpdate(matches[0], intent, ctx, config);
+  return applyUpdate(matches[0], intent, ctx, config, userFields);
 }
 
 async function applyUpdate(
   entity: any,
   intent: AgentIntent,
   ctx: AgentContext,
-  config: typeof ENTITY_CONFIG[string]
+  config: typeof ENTITY_CONFIG[string],
+  userFields: string[]
 ): Promise<DispatchResult> {
-  const { table, nameField, label, allowedUpdateFields } = config;
+  const { table, nameField, label } = config;
   const params = intent.params || {};
 
   // Filter to allowed fields + resolve aliases, exclude search-related keys
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(params)) {
-    if (key === "name" && config.nameField !== "name") continue; // skip search key
-    if (key === nameField) continue; // don't update the name field from params (it's the search key)
+    if (key === "name" && config.nameField !== "name") continue;
+    if (key === nameField) continue;
     const resolved = resolveField(key);
-    if (allowedUpdateFields.includes(resolved) && value !== undefined) {
+    if (userFields.includes(resolved) && value !== undefined) {
       updates[resolved] = value;
-    } else if (allowedUpdateFields.includes(key) && value !== undefined) {
+    } else if (userFields.includes(key) && value !== undefined) {
       updates[key] = value;
     }
   }
@@ -319,7 +313,6 @@ export async function handleDelete(
 
   // Confirmation required
   if (intent.confirmation) {
-    // Find and delete
     const conditions: any[] = [];
     if ("editionId" in table) conditions.push(eq(table.editionId, ctx.editionId));
     if ("organizationId" in table) conditions.push(eq(table.organizationId, ctx.orgId));
@@ -335,11 +328,10 @@ export async function handleDelete(
       message: `Are you sure you want to delete **${entity[nameField]}**? This cannot be undone. Reply "yes" to confirm.`,
       success: true,
       requiresConfirmation: true,
-      pendingAction: { ...intent, searchValue: entity.id }, // store ID for confirmed delete
+      pendingAction: { ...intent, searchValue: entity.id },
     };
   }
 
-  // This shouldn't be reached — the dispatcher should handle confirmation
   return { message: `Delete requires confirmation. Please confirm to proceed.`, success: false };
 }
 

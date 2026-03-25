@@ -4,6 +4,7 @@ import { getProvider } from "@/lib/agent";
 import { InputType } from "@/lib/agent/types";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
 import { getActiveIds } from "@/lib/queries";
+import { gateMention, sanitizeInput, isOffTopic } from "@/lib/agent/input-guard";
 
 // Rate limiter
 const rateLimiter = new Map<string, { count: number; resetAt: number }>();
@@ -56,6 +57,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Input too long. Maximum 50,000 characters." }, { status: 400 });
   }
 
+  // Determine source platform (web UI by default, can be overridden by bots)
+  const source = (body.source as "web" | "telegram" | "discord" | "whatsapp" | "api") || "web";
+
+  // Layer 1: @mention gating — in group chats, only respond when mentioned
+  const gate = gateMention(input, source);
+  if (!gate.shouldProcess) {
+    return NextResponse.json({
+      data: { message: "", intent: "ignored", success: true, entities: [], actions: [], questions: [] },
+      provider: "none",
+    });
+  }
+  const gatedInput = gate.cleanedInput;
+
+  // Layer 2: Prompt injection defense — sanitize before sending to LLM
+  const sanitized = sanitizeInput(gatedInput);
+  if (sanitized.blocked) {
+    return NextResponse.json({
+      data: {
+        message: sanitized.blockReason || "I can only help with event management tasks.",
+        intent: "blocked", success: false, entities: [], actions: [], questions: [],
+      },
+      provider: "none",
+    });
+  }
+  if (sanitized.flags.length > 0) {
+    console.warn("Agent input guard flags:", sanitized.flags, "userId:", userId);
+  }
+
+  // Layer 3: Off-topic detection — reject non-event requests before spending tokens
+  const offTopic = isOffTopic(sanitized.sanitized);
+  if (offTopic.offTopic) {
+    return NextResponse.json({
+      data: {
+        message: offTopic.message, intent: "chitchat", success: true,
+        entities: [], actions: [], questions: [],
+      },
+      provider: "none",
+    });
+  }
+
   // Resolve edition
   const ids = await getActiveIds(orgId);
   const resolvedEditionId = editionId || ids?.editionId || "";
@@ -69,7 +110,7 @@ export async function POST(req: NextRequest) {
 
     if (useClassify) {
       // Smart agent: classify intent → dispatch
-      const intent = await provider.classify(input, context);
+      const intent = await provider.classify(sanitized.sanitized, context);
 
       // If the classifier says "extract", fall through to extraction
       if (intent.intent === "extract") {
