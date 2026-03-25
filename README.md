@@ -12,17 +12,19 @@ Built by a small team for small teams. If you're running a tech conference with 
 
 ## The agent-first difference
 
-Most event tools give you 14 forms and say "type everything in manually." Event OS gives you a chat panel. Paste a Viber conversation, drop a spreadsheet, type "just talked to Golomt Bank, they want Gold sponsorship" — the agent figures out what type of entity it is (speaker? sponsor? venue? volunteer?), extracts structured data, asks about anything missing, and creates the records. You confirm with one click.
+Most event tools give you 14 forms and say "type everything in manually." Event OS gives you a chat agent. Type naturally — "add speaker Sarah from Google, keynote on AI" — and the agent creates the record. Ask "how many sponsors are confirmed?" and it queries the database. Paste a spreadsheet and it bulk-imports everything.
+
+The agent understands English, Mongolian (Cyrillic), and transliterated Mongolian. It enforces the same RBAC as the web UI — a coordinator can't delete records via chat any more than they can via the dashboard.
 
 **Cmd+K** opens the agent from anywhere.
 
-Supports multiple LLM providers: **Gemini 2.5 Flash** (free tier, default), **xAI**, **z.ai** (ZhipuAI/GLM), **Ollama** (local, free), or add your own by implementing one interface.
+Supports **Gemini 2.5 Flash** (free tier, default), **xAI**, **z.ai**, **Ollama** (local), or add your own by implementing one interface.
 
 ## What's in the box
 
 | Module | What it does |
 |--------|-------------|
-| **Agent Chat Panel** | Paste anything — CSV, chat logs, phone notes. Agent classifies, extracts, creates records. Cmd+K from anywhere. |
+| **Agent Intelligence** | Natural language CRUD — create, update, search, count any entity type. Bulk import from CSV/chat logs. RBAC-enforced, prompt injection hardened, multilingual. Cmd+K from anywhere. |
 | **Speaker Pipeline** | CFP form → review → accept/reject. Pipeline table with inline stage/source/assignee editing. |
 | **Sponsor Pipeline** | Outreach to confirmation. Same unified pipeline model as speakers. |
 | **Venue Pipeline** | Multiple venue candidates, negotiations, pricing, finalization. |
@@ -37,7 +39,7 @@ Supports multiple LLM providers: **Gemini 2.5 Flash** (free tier, default), **xA
 | **QR Check-in** | Scanner mode + dashboard mode with live stats. |
 | **Post-Confirmation Checklists** | When an entity is confirmed, auto-generate checklist items from templates (upload photo, submit slides, confirm travel). Track progress per entity. Admins configure templates in Settings. |
 | **Stakeholder Portal** | Confirmed speakers/sponsors get a login to self-service their checklist items — upload photos, submit bios, confirm travel. Organizers see submissions and approve/reject. |
-| **RBAC & Team Management** | 6 roles (owner → admin → organizer → coordinator → viewer → stakeholder). Role-based access control on all API routes. Team management in Settings (invite, role assignment). Team-scoped entity permissions in the backend — UI for configuring which teams own which entity types is planned. |
+| **RBAC & Team Management** | 6 roles (owner → admin → organizer → coordinator → viewer → stakeholder). Team-scoped permissions — teams own entity types. Confirmed entities protected from non-admin deletion. Same rules enforced in web UI and agent. |
 | **Notifications** | In-app notifications for assignments, stage changes, checklist submissions, comments. Bell icon with unread badge. Mark read, bulk delete. |
 | **Settings** | Tabbed: Event details, Team management (invite/roles), Checklist templates (per entity type), Telegram connection (placeholder). |
 | **Public Agenda** | Attendee-facing schedule with day/track filters. |
@@ -201,14 +203,15 @@ src/
     password.ts           # bcrypt hash + compare (legacy SHA-256 compat)
     contacts.ts           # Cross-org person identity
     conflicts.ts          # Schedule conflict detection
-    api-utils.ts          # Version checking, pagination
+    api-utils.ts          # Version checking, pagination, stage protection
     queries.ts            # Server-side data fetching + getActiveIds()
-    agent/                # LLM provider abstraction
-      providers/
-        gemini.ts         # Google Gemini 2.5 Flash
-        xai.ts            # xAI
-        zai.ts            # z.ai (ZhipuAI/GLM)
-        ollama.ts         # Local Ollama
+    agent/                # Agent intelligence system
+      dispatcher.ts       # Intent routing + RBAC + bulk detection
+      manage-handler.ts   # Create/update/delete with dynamic schema
+      query-handler.ts    # Count/list/search with checklist status
+      input-guard.ts      # Prompt injection defense + @mention gating
+      prompt.ts           # LLM system prompts (classify + extract)
+      providers/          # Gemini, xAI, z.ai, Ollama
   components/
     sidebar.tsx           # Grouped nav + edition picker + notification bell
     pipeline-table.tsx    # Reusable table with inline editing + checklist counts
@@ -223,13 +226,12 @@ src/
 
 ## Security
 
-- **RBAC:** 6 roles (owner → admin → organizer → coordinator → viewer → stakeholder). Team-scoped permissions via `team_entity_types` junction table.
-- **Org isolation:** Every mutation WHERE clause includes `organizationId`. Cookie values validated against session. Cross-org access blocked.
-- **Password hashing:** bcrypt with 12 rounds. Legacy SHA-256 hashes auto-detected for migration.
-- **Auth middleware:** `requirePermission(req, entityType, action)` on all API routes. Service token validated against org existence.
-- **Pre-commit hook:** Scans every commit for API keys, tokens, credentials. See `.githooks/pre-commit`.
-- **No system alerts:** All confirmations use themed dialog components, never `window.confirm()` or `window.alert()`.
-- **Security regression tests:** Every CSO audit finding has a test that proves it stays fixed. Run `npx vitest run tests/security.test.ts` to verify.
+- **RBAC:** 6 roles with team-scoped permissions. Same rules enforced on web UI and agent.
+- **Org isolation:** Every mutation WHERE clause includes `organizationId`. Cross-org access blocked.
+- **Stage protection:** Confirmed entities can't be deleted by non-admins (web UI + agent).
+- **Agent hardening:** Prompt injection defense (multilingual), bulk operation blocking, sensitive field stripping, @mention gating for group chats.
+- **Password hashing:** bcrypt (12 rounds). Pre-commit hook scans for leaked credentials.
+- **205 automated tests** covering RBAC, agent CRUD, prompt injection, checklist lifecycle, security regressions.
 
 Never commit `.env.local`. The `.env.example` file has safe placeholders only.
 
@@ -238,50 +240,25 @@ Never commit `.env.local`. The `.env.example` file has safe placeholders only.
 ### Shipped
 
 - [x] Multi-org, multi-event support with edition switching
-- [x] Agent chat panel (Gemini, xAI, z.ai, Ollama)
-- [x] Unified pipeline model (source/stage) across all 7 entity types
-- [x] Pipeline tables with inline editing (stage, source, assignee dropdown)
-- [x] Entity drawers with tabs (profile, talk/details, pipeline, checklist)
-- [x] RBAC — 5 internal roles + stakeholder role, team-scoped permissions
-- [x] AssignedTo user dropdown (replaces free text)
-- [x] Settings: Team management, checklist templates, event details
-- [x] Post-confirmation checklists (auto-generate on confirm, archive on decline, restore on re-confirm)
-- [x] Stakeholder portal (self-service checklist + profile editing)
-- [x] Marketing content calendar (month view, drag to schedule)
-- [x] Task board (Kanban drag-drop, inline comments, team creation)
-- [x] Notifications (assignment, stage change, checklist submission, comments)
-- [x] QR check-in (scanner + dashboard)
-- [x] Public agenda + CFP form
-- [x] Notes/discussion threads on all entities
-- [x] File uploads (photos, logos, slides)
-- [x] Automated test suite — RBAC permissions, checklist lifecycle, security regression (run `npx vitest run` to see current count)
+- [x] Agent intelligence — natural language CRUD, query, bulk import across all entity types
+- [x] Agent security — RBAC enforcement, prompt injection defense, bulk operation blocking, stage protection
+- [x] Unified pipeline model (source/stage) across all entity types
+- [x] Pipeline tables with inline editing + entity drawers with tabs
+- [x] RBAC — 6 roles, team-scoped permissions, enforced on all API routes + agent
+- [x] Post-confirmation checklists (auto-generate, archive, restore)
+- [x] Stakeholder portal (self-service checklist + profile)
+- [x] Marketing content calendar + Kanban task board
+- [x] Notifications, QR check-in, public agenda, CFP form
+- [x] 205 automated tests (RBAC, agent, security, checklist)
 
-### Planned / In Progress
+### Planned
 
-**Messaging & Agent Intelligence**
-- [ ] OpenClaw integration — agent framework for structured entity management
-- [ ] Telegram/Discord/WhatsApp bot — agent in group chat, `/link` account verification, RBAC-enforced
-- [ ] Smart agent routing — classify user intents and route to entity handlers (create/edit/delete speakers, sponsors, booths, etc.) with permission checks and clear error messages for unauthorized access
-- [ ] Agent query answering — "Do we have any speaker from Mobicom?", "How many booths are confirmed?" — agent checks permissions, queries data, responds naturally
-
-**Payments**
-- [ ] Pluggable payment providers — Stripe (global), QPay (Mongolia). Configure provider + credentials in Settings, works out of the box. Abstract adapter pattern so contributors can add their local payment provider.
-
-**Communications**
-- [ ] Email communications (scheduled broadcasts via Resend, auto-reminders for checklist items)
-- [ ] Meeting management (date + link + attendees on entities)
-
-**Infrastructure**
-- [ ] Cloud deployment (Fly.io, Vercel, or Railway)
-- [ ] Offline check-in support with sync
-- [ ] Team → entity type configuration UI in Settings (backend exists, UI needed)
-- [ ] Checklist template editing (reorder, inline edit — currently create/delete only)
-
-**Product**
+- [ ] OpenClaw integration — Telegram/Discord/WhatsApp bot with @mention gating
+- [ ] Payments — Stripe + QPay (Mongolia) via pluggable adapter
+- [ ] Email communications — scheduled broadcasts, checklist reminders
+- [ ] Cloud deployment (Vercel, Fly.io, or Railway)
+- [ ] Dashboard analytics
 - [ ] Agenda drag-and-drop editor
-- [ ] Dashboard analytics (charts, trends, progress over time)
-- [ ] Multi-language support (English + Mongolian)
-- [ ] Public event website generator
 
 ## Key Design Decisions
 
@@ -291,7 +268,7 @@ Never commit `.env.local`. The `.env.example` file has safe placeholders only.
 
 **Why bcrypt, not Argon2?** bcrypt is well-tested, has zero native dependencies (bcryptjs is pure JS), and is sufficient for our threat model. Argon2 would require native compilation which breaks some deployment targets.
 
-**Why role-based access control?** 6 roles give clear permission boundaries without per-entity complexity. The backend supports team-scoped permissions (teams own entity types) — the UI for configuring team → entity type mappings is planned. For now, roles (owner/admin/organizer/coordinator/viewer/stakeholder) handle the 90% case.
+**Why role-based access control?** 6 roles with team-scoped permissions. Teams own entity types — an organizer on the "Program" team can edit speakers but not sponsors. Same rules apply on every surface: web UI, API, and agent chat.
 
 **Why checklist auto-generation on confirm?** The moment an entity is confirmed, the work begins — collect their photo, get their slides, confirm travel. Auto-generating checklist items from templates means organizers never forget a step.
 
