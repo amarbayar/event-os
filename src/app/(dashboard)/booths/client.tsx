@@ -20,6 +20,8 @@ import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Plus, X, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, getApiError } from "@/lib/validation";
 
 type Booth = {
   id: string;
@@ -129,6 +131,7 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
   const [selectedBooth, setSelectedBooth] = useState<Booth | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const filtered = filter(booths);
 
@@ -210,11 +213,16 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
   const handleDrawerSave = async () => {
     if (!selectedBooth) return;
     setDrawerSaving(true);
-    await fetch(`/api/booths/${selectedBooth.id}`, {
+    const res = await fetch(`/api/booths/${selectedBooth.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": "999" },
       body: JSON.stringify(drawerForm),
     });
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to save changes"));
+      setDrawerSaving(false);
+      return;
+    }
     setDrawerSaving(false);
     refreshData();
   };
@@ -224,17 +232,24 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
 
+    const newErrors = validateRequired(data, ["name"]);
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+
     const res = await fetch("/api/booths", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
 
-    if (res.ok) {
-      const json = await res.json();
-      setBooths((prev) => [json.data, ...prev]);
-      setShowForm(false);
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to create booth"));
+      return;
     }
+
+    const json = await res.json();
+    setBooths((prev) => [json.data, ...prev]);
+    setShowForm(false);
   };
 
   const drawerSections = selectedBooth
@@ -369,7 +384,8 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
-                  <Input name="name" placeholder="e.g., Booth A1" required />
+                  <Input name="name" placeholder="e.g., Booth A1" aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Location</Label>

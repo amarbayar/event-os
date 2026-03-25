@@ -20,6 +20,8 @@ import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Building2, Plus, X, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 
 type Sponsor = {
   id: string;
@@ -125,6 +127,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
   const [selectedSponsor, setSelectedSponsor] = useState<Sponsor | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const filtered = filter(sponsors);
 
@@ -152,11 +155,16 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
   const handleDrawerSave = async () => {
     if (!selectedSponsor) return;
     setDrawerSaving(true);
-    await fetch(`/api/sponsors/${selectedSponsor.id}`, {
+    const res = await fetch(`/api/sponsors/${selectedSponsor.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": "999" },
       body: JSON.stringify(drawerForm),
     });
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to save changes"));
+      setDrawerSaving(false);
+      return;
+    }
     setDrawerSaving(false);
     refreshData();
   };
@@ -165,15 +173,26 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
+
+    const newErrors = validateRequired(data, ["companyName"]);
+    const emailErr = validateEmail(data.contactEmail, "Contact email");
+    if (emailErr) newErrors.contactEmail = emailErr;
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+
     const res = await fetch("/api/sponsors", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (res.ok) {
-      setShowForm(false);
-      refreshData();
+
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to create sponsor"));
+      return;
     }
+
+    setShowForm(false);
+    refreshData();
   };
 
   const columns = [
@@ -323,7 +342,8 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Company Name *</Label>
-                  <Input name="companyName" placeholder="e.g., Khan Bank" required />
+                  <Input name="companyName" placeholder="e.g., Khan Bank" aria-invalid={!!errors.companyName} onChange={() => setErrors((prev) => { const { companyName: _, ...rest } = prev; return rest; })} />
+                  {errors.companyName && <p className="text-xs text-destructive">{errors.companyName}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Name</Label>
@@ -331,7 +351,8 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Email</Label>
-                  <Input name="contactEmail" type="email" placeholder="events@company.mn" />
+                  <Input name="contactEmail" type="email" placeholder="events@company.mn" aria-invalid={!!errors.contactEmail} onChange={() => setErrors((prev) => { const { contactEmail: _, ...rest } = prev; return rest; })} />
+                  {errors.contactEmail && <p className="text-xs text-destructive">{errors.contactEmail}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Package</Label>

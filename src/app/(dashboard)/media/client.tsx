@@ -20,6 +20,8 @@ import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Plus, X, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 
 type MediaPartner = {
   id: string;
@@ -127,6 +129,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
   const [selectedPartner, setSelectedPartner] = useState<MediaPartner | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const filtered = filter(partners);
 
@@ -209,11 +212,16 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
   const handleDrawerSave = async () => {
     if (!selectedPartner) return;
     setDrawerSaving(true);
-    await fetch(`/api/media-partners/${selectedPartner.id}`, {
+    const res = await fetch(`/api/media-partners/${selectedPartner.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": "999" },
       body: JSON.stringify(drawerForm),
     });
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to save changes"));
+      setDrawerSaving(false);
+      return;
+    }
     setDrawerSaving(false);
     refreshData();
   };
@@ -223,17 +231,28 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
 
+    const newErrors = validateRequired(data, ["companyName", "contactName", "contactEmail"]);
+    if (!newErrors.contactEmail) {
+      const emailErr = validateEmail(data.contactEmail, "Contact email");
+      if (emailErr) newErrors.contactEmail = emailErr;
+    }
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+
     const res = await fetch("/api/media-partners", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
 
-    if (res.ok) {
-      const json = await res.json();
-      setPartners((prev) => [json.data, ...prev]);
-      setShowForm(false);
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to create media partner"));
+      return;
     }
+
+    const json = await res.json();
+    setPartners((prev) => [json.data, ...prev]);
+    setShowForm(false);
   };
 
   const drawerSections = selectedPartner
@@ -377,15 +396,18 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Company Name *</Label>
-                  <Input name="companyName" placeholder="e.g., Eagle News" required />
+                  <Input name="companyName" placeholder="e.g., Eagle News" aria-invalid={!!errors.companyName} onChange={() => setErrors((prev) => { const { companyName: _, ...rest } = prev; return rest; })} />
+                  {errors.companyName && <p className="text-xs text-destructive">{errors.companyName}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Name *</Label>
-                  <Input name="contactName" placeholder="e.g., Oyunaa B." required />
+                  <Input name="contactName" placeholder="e.g., Oyunaa B." aria-invalid={!!errors.contactName} onChange={() => setErrors((prev) => { const { contactName: _, ...rest } = prev; return rest; })} />
+                  {errors.contactName && <p className="text-xs text-destructive">{errors.contactName}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Email *</Label>
-                  <Input name="contactEmail" type="email" placeholder="press@media.mn" required />
+                  <Input name="contactEmail" type="email" placeholder="press@media.mn" aria-invalid={!!errors.contactEmail} onChange={() => setErrors((prev) => { const { contactEmail: _, ...rest } = prev; return rest; })} />
+                  {errors.contactEmail && <p className="text-xs text-destructive">{errors.contactEmail}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Type</Label>

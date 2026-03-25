@@ -22,6 +22,8 @@ import {
   Pencil,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, getApiError } from "@/lib/validation";
 
 type SessionType = "talk" | "workshop" | "keynote" | "break" | "panel" | "networking";
 
@@ -59,11 +61,16 @@ export function AgendaClient({ initialSessions }: { initialSessions: Session[] }
   const [selectedDay, setSelectedDay] = useState(1);
   const [agendaStatus, setAgendaStatus] = useState<"draft" | "published">("draft");
   const [showForm, setShowForm] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleAddSession = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
+
+    const newErrors = validateRequired(data, ["title"]);
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
 
     const startTime = data.date && data.startTime
       ? new Date(`${data.date}T${data.startTime}:00`).toISOString()
@@ -72,7 +79,7 @@ export function AgendaClient({ initialSessions }: { initialSessions: Session[] }
       ? new Date(`${data.date}T${data.endTime}:00`).toISOString()
       : null;
 
-    await fetch("/api/sessions", {
+    const res = await fetch("/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -84,6 +91,11 @@ export function AgendaClient({ initialSessions }: { initialSessions: Session[] }
         room: data.room || null,
       }),
     });
+
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to add session"));
+      return;
+    }
 
     setShowForm(false);
     window.location.reload();
@@ -183,7 +195,8 @@ export function AgendaClient({ initialSessions }: { initialSessions: Session[] }
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Title *</Label>
-                  <Input name="title" placeholder="e.g., Opening Keynote" required />
+                  <Input name="title" placeholder="e.g., Opening Keynote" aria-invalid={!!errors.title} onChange={() => setErrors((prev) => { const { title: _, ...rest } = prev; return rest; })} />
+                  {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Type</Label>

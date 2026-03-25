@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Send, X } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 
 type InvitationType = "special_guest" | "speaker_invitee" | "organizer_invitee" | "student" | "vip";
 type InvitationStatus = "pending" | "sent" | "accepted" | "declined";
@@ -54,6 +56,7 @@ type Invitation = {
 export function InvitationsClient({ initialInvitations }: { initialInvitations: Invitation[] }) {
   const [typeFilter, setTypeFilter] = useState<InvitationType | "all">("all");
   const [showForm, setShowForm] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const filtered = typeFilter === "all" ? initialInvitations : initialInvitations.filter((i) => i.type === typeFilter);
 
@@ -76,11 +79,22 @@ export function InvitationsClient({ initialInvitations }: { initialInvitations: 
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
 
-    await fetch("/api/invitations", {
+    const newErrors = validateRequired(data, ["name"]);
+    const emailErr = validateEmail(data.email, "Email");
+    if (emailErr) newErrors.email = emailErr;
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+
+    const res = await fetch("/api/invitations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to create invitation"));
+      return;
+    }
 
     setShowForm(false);
     window.location.reload();
@@ -109,7 +123,8 @@ export function InvitationsClient({ initialInvitations }: { initialInvitations: 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
-                  <Input name="name" placeholder="e.g., Bat-Erdene D." required />
+                  <Input name="name" placeholder="e.g., Bat-Erdene D." aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Type</Label>
@@ -126,7 +141,8 @@ export function InvitationsClient({ initialInvitations }: { initialInvitations: 
                 </div>
                 <div className="space-y-1.5">
                   <Label>Email</Label>
-                  <Input name="email" type="email" placeholder="guest@email.mn" />
+                  <Input name="email" type="email" placeholder="guest@email.mn" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const { email: _, ...rest } = prev; return rest; })} />
+                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Invited By</Label>

@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { Plus, Calendar, User, X, Pencil, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { toast } from "sonner";
+import { validateRequired, getApiError } from "@/lib/validation";
 
 type TaskStatus = "todo" | "in_progress" | "done" | "blocked";
 type Priority = "low" | "medium" | "high" | "urgent";
@@ -113,20 +115,25 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (res.ok) {
-      setShowCreate(false);
-      refreshTasks();
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to create task"));
+      return;
     }
+    setShowCreate(false);
+    refreshTasks();
   };
 
   // ─── Update Task ───────────────────────────────────
 
   const handleUpdateTask = async (taskId: string, updates: Record<string, unknown>) => {
-    await fetch(`/api/tasks/${taskId}`, {
+    const res = await fetch(`/api/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": "999" },
       body: JSON.stringify(updates),
     });
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to save changes"));
+    }
     refreshTasks();
   };
 
@@ -429,6 +436,7 @@ function CreateTaskDialog({
     assigneeName: "",
     dueDate: "",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   return (
     <>
@@ -447,9 +455,11 @@ function CreateTaskDialog({
             <Input
               autoFocus
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((prev) => { const { title: _, ...rest } = prev; return rest; }); }}
               placeholder="What needs to be done?"
+              aria-invalid={!!errors.title}
             />
+            {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -512,8 +522,12 @@ function CreateTaskDialog({
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button
-              disabled={!form.title.trim()}
-              onClick={() => onCreate(form)}
+              onClick={() => {
+                const newErrors = validateRequired(form, ["title"]);
+                if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+                setErrors({});
+                onCreate(form);
+              }}
             >
               Create Task
             </Button>

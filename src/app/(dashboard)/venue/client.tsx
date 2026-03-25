@@ -22,6 +22,8 @@ import { ImageGalleryUpload } from "@/components/image-gallery-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Plus, Check, X, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 
 type Venue = {
   id: string;
@@ -135,6 +137,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [drawerForm, setDrawerForm] = useState<Record<string, string | null | string[]>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const finalized = venues.find((v) => v.isFinalized);
   const filtered = filter(venues).filter((v) => !v.isFinalized);
 
@@ -222,11 +225,16 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
   const handleDrawerSave = async () => {
     if (!selectedVenue) return;
     setDrawerSaving(true);
-    await fetch(`/api/venues/${selectedVenue.id}`, {
+    const res = await fetch(`/api/venues/${selectedVenue.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": "999" },
       body: JSON.stringify(drawerForm),
     });
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to save changes"));
+      setDrawerSaving(false);
+      return;
+    }
     setDrawerSaving(false);
     refreshData();
   };
@@ -236,17 +244,26 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
 
+    const newErrors = validateRequired(data, ["name"]);
+    const emailErr = validateEmail(data.contactEmail, "Contact email");
+    if (emailErr) newErrors.contactEmail = emailErr;
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+
     const res = await fetch("/api/venues", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
 
-    if (res.ok) {
-      const json = await res.json();
-      setVenues((prev) => [json.data, ...prev]);
-      setShowForm(false);
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to create venue"));
+      return;
     }
+
+    const json = await res.json();
+    setVenues((prev) => [json.data, ...prev]);
+    setShowForm(false);
   };
 
   const drawerSections = selectedVenue
@@ -426,7 +443,8 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
-                  <Input name="name" placeholder="e.g., Shangri-La Hotel" required />
+                  <Input name="name" placeholder="e.g., Shangri-La Hotel" aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Address</Label>
@@ -438,7 +456,8 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Email</Label>
-                  <Input name="contactEmail" type="email" placeholder="contact@venue.mn" />
+                  <Input name="contactEmail" type="email" placeholder="contact@venue.mn" aria-invalid={!!errors.contactEmail} onChange={() => setErrors((prev) => { const { contactEmail: _, ...rest } = prev; return rest; })} />
+                  {errors.contactEmail && <p className="text-xs text-destructive">{errors.contactEmail}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Phone</Label>

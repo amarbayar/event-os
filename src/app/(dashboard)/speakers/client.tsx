@@ -21,6 +21,8 @@ import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 
 type Speaker = {
   id: string;
@@ -171,6 +173,7 @@ export function SpeakersClient({
   const [selectedSpeaker, setSelectedSpeaker] = useState<Speaker | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [drawerForm, setDrawerForm] = useState<Record<string, string | string[]>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const filtered = filter(speakers);
 
@@ -226,11 +229,16 @@ export function SpeakersClient({
   const handleDrawerSave = async () => {
     if (!selectedSpeaker) return;
     setDrawerSaving(true);
-    await fetch(`/api/speakers/${selectedSpeaker.id}`, {
+    const res = await fetch(`/api/speakers/${selectedSpeaker.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": "999" },
       body: JSON.stringify(drawerForm),
     });
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to save changes"));
+      setDrawerSaving(false);
+      return;
+    }
     setDrawerSaving(false);
     refreshData();
   };
@@ -239,15 +247,26 @@ export function SpeakersClient({
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
+
+    const newErrors = validateRequired(data, ["name"]);
+    const emailErr = validateEmail(data.email, "Email");
+    if (emailErr) newErrors.email = emailErr;
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+
     const res = await fetch("/api/speakers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (res.ok) {
-      setShowForm(false);
-      refreshData();
+
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to add speaker"));
+      return;
     }
+
+    setShowForm(false);
+    refreshData();
   };
 
   // Find assigned session for a speaker
@@ -528,11 +547,13 @@ export function SpeakersClient({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
-                  <Input name="name" placeholder="e.g., Batbold T." required />
+                  <Input name="name" placeholder="e.g., Batbold T." aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Email</Label>
-                  <Input name="email" type="email" placeholder="batbold@example.com" />
+                  <Input name="email" type="email" placeholder="batbold@example.com" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const { email: _, ...rest } = prev; return rest; })} />
+                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Company</Label>

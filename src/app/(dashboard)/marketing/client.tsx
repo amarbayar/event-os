@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Plus, ChevronLeft, ChevronRight, X, Trash2, Calendar, Check } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, getApiError } from "@/lib/validation";
 
 type Campaign = {
   id: string;
@@ -205,10 +207,12 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(data),
             });
-            if (res.ok) {
-              setShowCreate(false);
-              refreshCampaigns();
+            if (!res.ok) {
+              toast.error(await getApiError(res, "Failed to create campaign"));
+              return;
             }
+            setShowCreate(false);
+            refreshCampaigns();
           }}
         />
       )}
@@ -248,6 +252,7 @@ function CreateDialog({ initialDate, onClose, onCreate }: {
     assignedTo: "",
     status: initialDate ? "scheduled" : "draft",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Escape to close
   useEffect(() => {
@@ -267,7 +272,8 @@ function CreateDialog({ initialDate, onClose, onCreate }: {
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Title *</Label>
-            <Input autoFocus value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g., Speaker Spotlight: Sarah K." />
+            <Input autoFocus value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((prev) => { const { title: _, ...rest } = prev; return rest; }); }} placeholder="e.g., Speaker Spotlight: Sarah K." aria-invalid={!!errors.title} />
+            {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
           </div>
           <div className="space-y-1.5">
             <Label>Notes / Content</Label>
@@ -306,7 +312,12 @@ function CreateDialog({ initialDate, onClose, onCreate }: {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button disabled={!form.title.trim()} onClick={() => onCreate(form)}>Create</Button>
+            <Button onClick={() => {
+              const newErrors = validateRequired(form, ["title"]);
+              if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+              setErrors({});
+              onCreate(form);
+            }}>Create</Button>
           </div>
         </div>
       </div>
@@ -357,7 +368,7 @@ function DetailDrawer({ campaign, onClose, onSaved, onDeleted }: {
     if (res.ok && d.data) {
       onSaved(d.data);
     } else {
-      console.error("Save failed:", res.status, d);
+      toast.error(d.message || d.error || "Failed to save changes");
     }
   };
 

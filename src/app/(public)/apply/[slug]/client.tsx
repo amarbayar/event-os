@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CheckCircle2, Loader2 } from "lucide-react";
+import { isValidEmail } from "@/lib/validation";
 
 type FormState = "editing" | "submitting" | "success" | "error";
 
@@ -48,6 +49,7 @@ export function CFPFormClient({
     const newErrors: Record<string, string> = {};
     if (!data.name) newErrors.name = "Name is required";
     if (!data.email) newErrors.email = "Email is required";
+    else if (!isValidEmail(data.email as string)) newErrors.email = "Email must be a valid email address";
     if (!data.talkTitle) newErrors.talkTitle = "Talk title is required";
 
     if (Object.keys(newErrors).length > 0) {
@@ -134,9 +136,9 @@ export function CFPFormClient({
                     id="name"
                     name="name"
                     placeholder="Batbold Tumendelger"
-                    className={errors.name ? "border-red-500" : ""}
+                    aria-invalid={!!errors.name}
                   />
-                  {errors.name && <p className="text-xs text-red-600">{errors.name}</p>}
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="email">Email *</Label>
@@ -145,9 +147,9 @@ export function CFPFormClient({
                     name="email"
                     type="email"
                     placeholder="batbold@example.com"
-                    className={errors.email ? "border-red-500" : ""}
+                    aria-invalid={!!errors.email}
                   />
-                  {errors.email && <p className="text-xs text-red-600">{errors.email}</p>}
+                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
               </div>
 
@@ -168,9 +170,9 @@ export function CFPFormClient({
                   id="talkTitle"
                   name="talkTitle"
                   placeholder="e.g., Building ML Pipelines in Mongolia"
-                  className={errors.talkTitle ? "border-red-500" : ""}
+                  aria-invalid={!!errors.talkTitle}
                 />
-                {errors.talkTitle && <p className="text-xs text-red-600">{errors.talkTitle}</p>}
+                {errors.talkTitle && <p className="text-xs text-destructive">{errors.talkTitle}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -208,7 +210,7 @@ export function CFPFormClient({
               </div>
 
               {serverError && (
-                <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</div>
+                <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{serverError}</div>
               )}
 
               <Button type="submit" className="w-full" disabled={state === "submitting"}>

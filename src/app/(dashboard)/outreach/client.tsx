@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/select";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Plus, ArrowRight, X } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 
 type OutreachStatus = "identified" | "contacted" | "interested" | "negotiating" | "confirmed" | "declined" | "converted";
 type TargetType = "speaker" | "sponsor" | "booth" | "volunteer" | "media";
@@ -55,6 +57,7 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
   const [typeFilter, setTypeFilter] = useState<TargetType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<OutreachStatus | "all">("all");
   const [showForm, setShowForm] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const filtered = initialOutreach
     .filter((o) => typeFilter === "all" || o.targetType === typeFilter)
@@ -73,11 +76,22 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
 
-    await fetch("/api/outreach", {
+    const newErrors = validateRequired(data, ["name"]);
+    const emailErr = validateEmail(data.email, "Email");
+    if (emailErr) newErrors.email = emailErr;
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+
+    const res = await fetch("/api/outreach", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to create lead"));
+      return;
+    }
 
     setShowForm(false);
     window.location.reload();
@@ -103,7 +117,8 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
-                  <Input name="name" placeholder="e.g., Jane Doe" required />
+                  <Input name="name" placeholder="e.g., Jane Doe" aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Target Type</Label>
@@ -120,7 +135,8 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
                 </div>
                 <div className="space-y-1.5">
                   <Label>Email</Label>
-                  <Input name="email" type="email" placeholder="jane@company.com" />
+                  <Input name="email" type="email" placeholder="jane@company.com" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const { email: _, ...rest } = prev; return rest; })} />
+                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Company</Label>

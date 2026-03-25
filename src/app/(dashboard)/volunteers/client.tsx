@@ -20,6 +20,8 @@ import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Copy, Check, Plus, X, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 
 type Volunteer = {
   id: string;
@@ -129,6 +131,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const filtered = filter(volunteers);
 
@@ -218,11 +221,16 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
   const handleDrawerSave = async () => {
     if (!selectedVolunteer) return;
     setDrawerSaving(true);
-    await fetch(`/api/volunteers/${selectedVolunteer.id}`, {
+    const res = await fetch(`/api/volunteers/${selectedVolunteer.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": "999" },
       body: JSON.stringify(drawerForm),
     });
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to save changes"));
+      setDrawerSaving(false);
+      return;
+    }
     setDrawerSaving(false);
     refreshData();
   };
@@ -232,17 +240,28 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
     const form = new FormData(e.currentTarget);
     const data = Object.fromEntries(form);
 
+    const newErrors = validateRequired(data, ["name", "email"]);
+    if (!newErrors.email) {
+      const emailErr = validateEmail(data.email, "Email");
+      if (emailErr) newErrors.email = emailErr;
+    }
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+
     const res = await fetch("/api/volunteers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
 
-    if (res.ok) {
-      const json = await res.json();
-      setVolunteers((prev) => [json.data, ...prev]);
-      setShowForm(false);
+    if (!res.ok) {
+      toast.error(await getApiError(res, "Failed to create volunteer"));
+      return;
     }
+
+    const json = await res.json();
+    setVolunteers((prev) => [json.data, ...prev]);
+    setShowForm(false);
   };
 
   const drawerSections = selectedVolunteer
@@ -407,11 +426,13 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
-                  <Input name="name" placeholder="e.g., Temuulen B." required />
+                  <Input name="name" placeholder="e.g., Temuulen B." aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Email *</Label>
-                  <Input name="email" type="email" placeholder="volunteer@email.mn" required />
+                  <Input name="email" type="email" placeholder="volunteer@email.mn" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const { email: _, ...rest } = prev; return rest; })} />
+                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Phone</Label>
