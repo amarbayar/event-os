@@ -199,17 +199,69 @@ async function seed() {
   }
   console.log(`  Tasks: ${taskData.length} added`);
 
-  // Admin user
+  // Team members
   const { hash } = await import("../lib/password");
   const passwordHash = await hash("admin123");
-  await db.insert(schema.users).values({
-    name: "Amarbayar",
-    email: "admin@devsummit.mn",
-    passwordHash,
-    organizationId: org.id,
-    role: "owner",
+  const teamUsers = [
+    { name: "Amarbayar", email: "admin@devsummit.mn", role: "owner" },
+    { name: "Tuvshin", email: "tuvshin@devsummit.mn", role: "organizer" },
+    { name: "Oyungerel", email: "oyungerel@devsummit.mn", role: "organizer" },
+    { name: "Bat-Erdene", email: "baterdene@devsummit.mn", role: "coordinator" },
+    { name: "Sarnai", email: "sarnai@devsummit.mn", role: "coordinator" },
+  ];
+  for (const u of teamUsers) {
+    await db.insert(schema.users).values({
+      name: u.name,
+      email: u.email,
+      passwordHash,
+      organizationId: org.id,
+      role: u.role,
+    });
+  }
+  const userRecords = await db.query.users.findMany({
+    where: (u, { eq }) => eq(u.organizationId, org.id),
   });
-  console.log("  Admin user: admin@devsummit.mn / admin123");
+  const userMap = Object.fromEntries(userRecords.map((u) => [u.name, u.id]));
+  console.log(`  Users: ${teamUsers.length} team members (all password: admin123)`);
+
+  // Org-wide RBAC teams (editionId = null)
+  const rbacTeams = [
+    { name: "Program", color: "#eab308", entityTypes: ["speaker", "session"], members: ["Amarbayar", "Tuvshin"] },
+    { name: "Logistics", color: "#047857", entityTypes: ["venue", "booth"], members: ["Tuvshin", "Bat-Erdene"] },
+    { name: "Sponsor/Partnership", color: "#0284c7", entityTypes: ["sponsor", "outreach"], members: ["Oyungerel"] },
+    { name: "Operations", color: "#ea580c", entityTypes: ["volunteer", "media", "attendee"], members: ["Sarnai", "Bat-Erdene"] },
+    { name: "Marketing", color: "#7c3aed", entityTypes: ["campaign"], members: ["Oyungerel", "Sarnai"] },
+  ];
+
+  for (const t of rbacTeams) {
+    const [team] = await db.insert(schema.teams).values({
+      organizationId: org.id,
+      name: t.name,
+      color: t.color,
+      sortOrder: rbacTeams.indexOf(t),
+    }).returning();
+
+    // Entity type mappings
+    for (const et of t.entityTypes) {
+      await db.insert(schema.teamEntityTypes).values({
+        teamId: team.id,
+        entityType: et,
+      });
+    }
+
+    // Team members
+    for (const memberName of t.members) {
+      const userId = userMap[memberName];
+      if (userId) {
+        await db.insert(schema.teamMembers).values({
+          teamId: team.id,
+          userId,
+          name: memberName,
+        });
+      }
+    }
+  }
+  console.log(`  Teams: ${rbacTeams.length} org-wide RBAC teams with entity type mappings`);
 
   console.log("\nSeed complete!");
   console.log(`  Org: ${org.id}`);
