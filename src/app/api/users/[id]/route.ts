@@ -15,51 +15,62 @@ export async function PATCH(
 
   const body = await req.json();
 
-  const allowedFields = ["name", "role", "image"] as const;
-  const updates: Record<string, string> = {};
+  const validRoles = ["owner", "admin", "organizer", "coordinator", "viewer"];
 
-  for (const field of allowedFields) {
-    if (body[field] !== undefined) {
-      updates[field] = body[field];
+  // Split updates: name/image go to users table, role goes to user_organizations
+  const userUpdates: Record<string, string> = {};
+  if (body.name !== undefined) userUpdates.name = body.name;
+  if (body.image !== undefined) userUpdates.image = body.image;
+
+  let roleUpdate: string | undefined;
+  if (body.role !== undefined) {
+    if (!validRoles.includes(body.role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
+    roleUpdate = body.role;
   }
 
-  if (Object.keys(updates).length === 0) {
+  if (Object.keys(userUpdates).length === 0 && !roleUpdate) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  const validRoles = ["owner", "admin", "organizer", "coordinator", "viewer"];
-  if (updates.role && !validRoles.includes(updates.role)) {
-    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
-  }
+  // Verify membership exists
+  const membership = await db.query.userOrganizations.findFirst({
+    where: and(
+      eq(userOrganizations.userId, id),
+      eq(userOrganizations.organizationId, ctx.orgId)
+    ),
+    with: { user: true },
+  });
 
-  const [updated] = await db
-    .update(users)
-    .set(updates)
-    .where(and(eq(users.id, id), eq(users.organizationId, ctx.orgId)))
-    .returning({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-    });
-
-  if (!updated) {
+  if (!membership) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  // Keep user_organizations.role in sync
-  if (updates.role) {
+  // Update user profile fields
+  if (Object.keys(userUpdates).length > 0) {
+    await db.update(users).set(userUpdates).where(eq(users.id, id));
+  }
+
+  // Update role on membership
+  if (roleUpdate) {
     await db
       .update(userOrganizations)
-      .set({ role: updates.role })
+      .set({ role: roleUpdate })
       .where(and(
         eq(userOrganizations.userId, id),
         eq(userOrganizations.organizationId, ctx.orgId)
       ));
   }
 
-  return NextResponse.json({ data: updated });
+  return NextResponse.json({
+    data: {
+      id: membership.user.id,
+      name: body.name ?? membership.user.name,
+      email: membership.user.email,
+      role: roleUpdate ?? membership.role,
+    },
+  });
 }
 
 // DELETE — remove user from organization
@@ -71,18 +82,12 @@ export async function DELETE(
   const ctx = await requirePermission(req, "user", "delete");
   if (isRbacError(ctx)) return ctx;
 
-  // Remove membership (user record stays for other orgs)
-  await db
+  const [deleted] = await db
     .delete(userOrganizations)
     .where(and(
       eq(userOrganizations.userId, id),
       eq(userOrganizations.organizationId, ctx.orgId)
-    ));
-
-  // Also clean up legacy field
-  const [deleted] = await db
-    .delete(users)
-    .where(and(eq(users.id, id), eq(users.organizationId, ctx.orgId)))
+    ))
     .returning();
 
   if (!deleted) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { validateServiceToken } from "@/lib/service-token";
 import { db } from "@/db";
-import { users, organizations, teamMembers, teamEntityTypes, teams, eventEditions } from "@/db/schema";
+import { users, organizations, userOrganizations, teamMembers, teamEntityTypes, teams, eventEditions } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { getActiveIds } from "@/lib/queries";
 
@@ -102,20 +102,30 @@ export async function requirePermission(
     const ids = await getActiveIds(orgId);
     const editionId = ids?.editionId || "";
 
-    // Look up full user record
+    // Look up user + org membership
     const user = await db.query.users.findFirst({
       where: eq(users.id, userId),
-      columns: { id: true, name: true, email: true, role: true, linkedEntityType: true, linkedEntityId: true },
+      columns: { id: true, name: true, email: true },
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
+    const membership = await db.query.userOrganizations.findFirst({
+      where: and(
+        eq(userOrganizations.userId, userId),
+        eq(userOrganizations.organizationId, orgId)
+      ),
+    });
+
+    const effectiveRole = membership?.role || role;
+
     const ctx: RbacContext = {
       user: {
-        id: user.id, role: user.role, name: user.name, email: user.email,
-        linkedEntityType: user.linkedEntityType, linkedEntityId: user.linkedEntityId,
+        id: user.id, role: effectiveRole, name: user.name, email: user.email,
+        linkedEntityType: membership?.linkedEntityType ?? null,
+        linkedEntityId: membership?.linkedEntityId ?? null,
       },
       orgId,
       editionId,

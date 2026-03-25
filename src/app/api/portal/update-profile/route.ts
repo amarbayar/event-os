@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { users, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { users, userOrganizations, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners } from "@/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 // PATCH — stakeholder updates their own entity profile fields
 export async function PATCH(req: NextRequest) {
@@ -13,12 +13,17 @@ export async function PATCH(req: NextRequest) {
 
   const sessionUser = session.user as Record<string, unknown>;
   const userId = sessionUser.id as string;
+  const orgId = sessionUser.organizationId as string;
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
+  const membership = await db.query.userOrganizations.findFirst({
+    where: and(
+      eq(userOrganizations.userId, userId),
+      eq(userOrganizations.organizationId, orgId),
+      eq(userOrganizations.role, "stakeholder"),
+    ),
   });
 
-  if (!user || user.role !== "stakeholder" || !user.linkedEntityType || !user.linkedEntityId) {
+  if (!membership || !membership.linkedEntityType || !membership.linkedEntityId) {
     return NextResponse.json({ error: "Not a stakeholder account" }, { status: 403 });
   }
 
@@ -34,7 +39,7 @@ export async function PATCH(req: NextRequest) {
     media: ["contactName", "contactEmail", "logoUrl"],
   };
 
-  const allowed = allowedFieldsByType[user.linkedEntityType] || [];
+  const allowed = allowedFieldsByType[membership.linkedEntityType] || [];
   const updates: Record<string, unknown> = {};
 
   for (const field of allowed) {
@@ -48,20 +53,20 @@ export async function PATCH(req: NextRequest) {
   }
 
   // Update the entity
-  const entityId = user.linkedEntityId;
+  const entityId = membership.linkedEntityId;
   let updated: unknown;
 
-  if (user.linkedEntityType === "speaker") {
+  if (membership.linkedEntityType === "speaker") {
     [updated] = await db.update(speakerApplications).set({ ...updates, updatedAt: new Date(), version: sql`${speakerApplications.version} + 1` }).where(eq(speakerApplications.id, entityId)).returning();
-  } else if (user.linkedEntityType === "sponsor") {
+  } else if (membership.linkedEntityType === "sponsor") {
     [updated] = await db.update(sponsorApplications).set({ ...updates, updatedAt: new Date(), version: sql`${sponsorApplications.version} + 1` }).where(eq(sponsorApplications.id, entityId)).returning();
-  } else if (user.linkedEntityType === "venue") {
+  } else if (membership.linkedEntityType === "venue") {
     [updated] = await db.update(venues).set({ ...updates, updatedAt: new Date() }).where(eq(venues.id, entityId)).returning();
-  } else if (user.linkedEntityType === "booth") {
+  } else if (membership.linkedEntityType === "booth") {
     [updated] = await db.update(booths).set({ ...updates, updatedAt: new Date() }).where(eq(booths.id, entityId)).returning();
-  } else if (user.linkedEntityType === "volunteer") {
+  } else if (membership.linkedEntityType === "volunteer") {
     [updated] = await db.update(volunteerApplications).set({ ...updates, updatedAt: new Date(), version: sql`${volunteerApplications.version} + 1` }).where(eq(volunteerApplications.id, entityId)).returning();
-  } else if (user.linkedEntityType === "media") {
+  } else if (membership.linkedEntityType === "media") {
     [updated] = await db.update(mediaPartners).set({ ...updates, updatedAt: new Date() }).where(eq(mediaPartners.id, entityId)).returning();
   }
 

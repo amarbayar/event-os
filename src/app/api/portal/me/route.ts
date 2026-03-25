@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { users, checklistItems, checklistTemplates, eventEditions } from "@/db/schema";
+import { users, userOrganizations, checklistItems, checklistTemplates, eventEditions } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 
 // GET — stakeholder portal data (their entity + checklist + event info)
@@ -13,15 +13,25 @@ export async function GET() {
 
   const sessionUser = session.user as Record<string, unknown>;
   const userId = sessionUser.id as string;
+  const orgId = sessionUser.organizationId as string;
 
-  // Look up user with linked entity info
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
+  // Look up stakeholder membership for this org
+  const membership = await db.query.userOrganizations.findFirst({
+    where: and(
+      eq(userOrganizations.userId, userId),
+      eq(userOrganizations.organizationId, orgId),
+      eq(userOrganizations.role, "stakeholder"),
+    ),
   });
 
-  if (!user || user.role !== "stakeholder" || !user.linkedEntityType || !user.linkedEntityId) {
+  if (!membership || !membership.linkedEntityType || !membership.linkedEntityId) {
     return NextResponse.json({ error: "Not a stakeholder account" }, { status: 403 });
   }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { name: true, email: true },
+  });
 
   // Look up the linked entity
   const entityQueryMap: Record<string, string> = {
@@ -33,14 +43,13 @@ export async function GET() {
     media: "mediaPartners",
   };
 
-  const queryName = entityQueryMap[user.linkedEntityType];
+  const queryName = entityQueryMap[membership.linkedEntityType];
   if (!queryName) {
     return NextResponse.json({ error: "Unknown entity type" }, { status: 400 });
   }
 
-  // Dynamic query based on entity type
   const entity = await (db.query as Record<string, any>)[queryName].findFirst({
-    where: (t: any, { eq: eqFn }: any) => eqFn(t.id, user.linkedEntityId),
+    where: (t: any, { eq: eqFn }: any) => eqFn(t.id, membership.linkedEntityId),
   });
 
   if (!entity) {
@@ -69,8 +78,8 @@ export async function GET() {
     .innerJoin(checklistTemplates, eq(checklistItems.templateId, checklistTemplates.id))
     .where(
       and(
-        eq(checklistItems.entityType, user.linkedEntityType),
-        eq(checklistItems.entityId, user.linkedEntityId!)
+        eq(checklistItems.entityType, membership.linkedEntityType),
+        eq(checklistItems.entityId, membership.linkedEntityId)
       )
     )
     .orderBy(asc(checklistTemplates.sortOrder));
@@ -78,11 +87,11 @@ export async function GET() {
   return NextResponse.json({
     data: {
       user: {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        linkedEntityType: user.linkedEntityType,
-        linkedEntityId: user.linkedEntityId,
+        name: user?.name,
+        email: user?.email,
+        role: membership.role,
+        linkedEntityType: membership.linkedEntityType,
+        linkedEntityId: membership.linkedEntityId,
       },
       entity,
       edition: edition ? {

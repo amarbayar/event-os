@@ -819,11 +819,6 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified"),
   image: text("image"),
   passwordHash: text("password_hash"),
-  // DEPRECATED: use user_organizations for org membership + role
-  organizationId: uuid("organization_id").references(() => organizations.id),
-  role: varchar("role", { length: 50 }).default("organizer").notNull(),
-  linkedEntityType: varchar("linked_entity_type", { length: 50 }),
-  linkedEntityId: uuid("linked_entity_id"),
   contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -882,7 +877,6 @@ export const accounts = pgTable("accounts", {
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   series: many(eventSeries),
   editions: many(eventEditions),
-  users: many(users),
   userOrganizations: many(userOrganizations),
 }));
 
@@ -946,10 +940,6 @@ export const speakerApplicationsRelations = relations(
 );
 
 export const usersRelations = relations(users, ({ one, many }) => ({
-  organization: one(organizations, {
-    fields: [users.organizationId],
-    references: [organizations.id],
-  }),
   contact: one(contacts, {
     fields: [users.contactId],
     references: [contacts.id],

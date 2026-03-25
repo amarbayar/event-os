@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, userOrganizations } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
@@ -17,19 +17,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "entityType and entityId required" }, { status: 400 });
   }
 
-  const stakeholder = await db.query.users.findFirst({
+  const membership = await db.query.userOrganizations.findFirst({
     where: and(
-      eq(users.role, "stakeholder"),
-      eq(users.linkedEntityType, entityType),
-      eq(users.linkedEntityId, entityId),
+      eq(userOrganizations.organizationId, ctx.orgId),
+      eq(userOrganizations.role, "stakeholder"),
+      eq(userOrganizations.linkedEntityType, entityType),
+      eq(userOrganizations.linkedEntityId, entityId),
     ),
-    columns: { id: true, email: true, name: true },
+    with: { user: true },
   });
 
   return NextResponse.json({
     data: {
-      invited: !!stakeholder,
-      user: stakeholder || null,
+      invited: !!membership,
+      user: membership ? { id: membership.user.id, email: membership.user.email, name: membership.user.name } : null,
     },
   });
 }

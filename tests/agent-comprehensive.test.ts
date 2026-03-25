@@ -59,13 +59,16 @@ beforeAll(async () => {
   const teamScoped = await db
     .select({
       userId: schema.teamMembers.userId,
-      role: schema.users.role,
+      role: schema.userOrganizations.role,
       entityType: schema.teamEntityTypes.entityType,
     })
     .from(schema.teamMembers)
     .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
     .innerJoin(schema.teamEntityTypes, eq(schema.teams.id, schema.teamEntityTypes.teamId))
-    .innerJoin(schema.users, eq(schema.teamMembers.userId, schema.users.id))
+    .innerJoin(schema.userOrganizations, and(
+      eq(schema.teamMembers.userId, schema.userOrganizations.userId),
+      eq(schema.userOrganizations.organizationId, orgId)
+    ))
     .where(and(eq(schema.teams.organizationId, orgId), isNull(schema.teams.editionId)))
     .limit(20);
 

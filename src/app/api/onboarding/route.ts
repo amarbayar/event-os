@@ -83,8 +83,6 @@ export async function POST(req: NextRequest) {
       name: userName || userEmail.split("@")[0],
       email: userEmail,
       passwordHash,
-      organizationId: org.id,
-      role: "owner",
     })
     .returning();
 

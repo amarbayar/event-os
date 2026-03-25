@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, userOrganizations, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { hash } from "@/lib/password";
 
@@ -19,9 +19,6 @@ export async function POST(req: NextRequest) {
   }
 
   // Look up the entity to get name + email
-  let entityName = "";
-  let entityEmail = "";
-
   const entityTables: Record<string, { table: any; nameField: string; emailField: string }> = {
     speaker: { table: speakerApplications, nameField: "name", emailField: "email" },
     sponsor: { table: sponsorApplications, nameField: "contactName", emailField: "contactEmail" },
@@ -56,27 +53,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Entity not found" }, { status: 404 });
   }
 
-  entityName = (entity[config.nameField] as string) || "";
-  entityEmail = (entity[config.emailField] as string) || "";
+  const entityName = (entity[config.nameField] as string) || "";
+  const entityEmail = (entity[config.emailField] as string) || "";
 
   if (!entityEmail) {
     return NextResponse.json({ error: "Entity has no email address — cannot create portal account" }, { status: 400 });
   }
 
-  // Check if a stakeholder user already exists for this email
+  // Check if user already exists
   const existing = await db.query.users.findFirst({
     where: eq(users.email, entityEmail),
   });
 
   if (existing) {
-    // If already a stakeholder for this entity, return success
-    if (existing.role === "stakeholder" && existing.linkedEntityId === entityId) {
+    // Check if already a stakeholder for this entity in this org
+    const existingMembership = await db.query.userOrganizations.findFirst({
+      where: and(
+        eq(userOrganizations.userId, existing.id),
+        eq(userOrganizations.organizationId, ctx.orgId),
+        eq(userOrganizations.role, "stakeholder"),
+        eq(userOrganizations.linkedEntityId, entityId),
+      ),
+    });
+
+    if (existingMembership) {
       return NextResponse.json({ data: { id: existing.id, email: existing.email, alreadyInvited: true } });
     }
-    return NextResponse.json({ error: `User with email ${entityEmail} already exists` }, { status: 409 });
+
+    // Add stakeholder membership to this org
+    await db.insert(userOrganizations).values({
+      userId: existing.id,
+      organizationId: ctx.orgId,
+      role: "stakeholder",
+      linkedEntityType: entityType,
+      linkedEntityId: entityId,
+    });
+
+    return NextResponse.json({
+      data: { id: existing.id, name: existing.name, email: existing.email, role: "stakeholder", portalUrl: `/portal` },
+    }, { status: 201 });
   }
 
-  // Create stakeholder user with random temp password
+  // Create new user + stakeholder membership
   const { randomBytes } = await import("crypto");
   const rawPassword = randomBytes(8).toString("base64url");
   const tempPassword = await hash(rawPassword);
@@ -87,22 +105,22 @@ export async function POST(req: NextRequest) {
       name: entityName,
       email: entityEmail,
       passwordHash: tempPassword,
-      organizationId: ctx.orgId,
-      role: "stakeholder",
-      linkedEntityType: entityType,
-      linkedEntityId: entityId,
     })
-    .returning({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-    });
+    .returning({ id: users.id, name: users.name, email: users.email });
+
+  await db.insert(userOrganizations).values({
+    userId: user.id,
+    organizationId: ctx.orgId,
+    role: "stakeholder",
+    linkedEntityType: entityType,
+    linkedEntityId: entityId,
+  });
 
   return NextResponse.json({
     data: {
       ...user,
-      tempPassword: rawPassword, // Show once to organizer so they can share it
+      role: "stakeholder",
+      tempPassword: rawPassword,
       portalUrl: `/portal`,
     },
   }, { status: 201 });

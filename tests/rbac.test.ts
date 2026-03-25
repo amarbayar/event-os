@@ -19,14 +19,15 @@ beforeAll(async () => {
   if (!org) throw new Error("No organization found — run seed first");
   orgId = org.id;
 
-  // Load all users
-  const allUsers = await testDb.query.users.findMany({
-    where: eq(schema.users.organizationId, orgId),
+  // Load all users via user_organizations
+  const memberships = await testDb.query.userOrganizations.findMany({
+    where: eq(schema.userOrganizations.organizationId, orgId),
+    with: { user: true },
   });
 
   users = {};
-  for (const u of allUsers) {
-    users[u.name || u.email] = { id: u.id, role: u.role };
+  for (const m of memberships) {
+    users[m.user.name || m.user.email] = { id: m.user.id, role: m.role };
   }
 
   // Load org-wide teams
@@ -208,33 +209,32 @@ describe("Permission scope checks", () => {
   });
 });
 
-// ─── Users API (direct DB checks) ──────────────────
+// ─── Users via user_organizations ──────────────────
 
-describe("Users API data", () => {
-  it("all users belong to the same org", async () => {
-    const allUsers = await testDb.query.users.findMany({
-      where: eq(schema.users.organizationId, orgId),
+describe("User organization memberships", () => {
+  it("all 5 users have memberships in the org", async () => {
+    const memberships = await testDb.query.userOrganizations.findMany({
+      where: eq(schema.userOrganizations.organizationId, orgId),
     });
-    expect(allUsers.length).toBeGreaterThan(0);
-    for (const u of allUsers) {
-      expect(u.organizationId).toBe(orgId);
-    }
+    expect(memberships.length).toBeGreaterThan(0);
   });
 
   it("emails are unique across the org", async () => {
-    const allUsers = await testDb.query.users.findMany({
-      where: eq(schema.users.organizationId, orgId),
+    const memberships = await testDb.query.userOrganizations.findMany({
+      where: eq(schema.userOrganizations.organizationId, orgId),
+      with: { user: true },
     });
-    const emails = allUsers.map((u) => u.email);
+    const emails = memberships.map((m) => m.user.email);
     expect(new Set(emails).size).toBe(emails.length);
   });
 
   it("all users have password hashes (can log in)", async () => {
-    const allUsers = await testDb.query.users.findMany({
-      where: eq(schema.users.organizationId, orgId),
+    const memberships = await testDb.query.userOrganizations.findMany({
+      where: eq(schema.userOrganizations.organizationId, orgId),
+      with: { user: true },
     });
-    for (const u of allUsers) {
-      expect(u.passwordHash).toBeTruthy();
+    for (const m of memberships) {
+      expect(m.user.passwordHash).toBeTruthy();
     }
   });
 });
@@ -277,7 +277,6 @@ describe("AssigneeId FK on entity tables", () => {
   it("speakerApplications has assigneeId column", async () => {
     const speakers = await testDb.query.speakerApplications.findMany({ limit: 1 });
     if (speakers.length > 0) {
-      // The column exists (either null or has value)
       expect("assigneeId" in speakers[0]).toBe(true);
     }
   });

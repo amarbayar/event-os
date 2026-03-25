@@ -74,12 +74,13 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 ### Stakeholder Portal
 - Confirmed entities can be "invited to portal" → creates a user with role="stakeholder"
 - Stakeholder sees only their own checklist + profile at `/portal`
-- `users.linkedEntityType` + `users.linkedEntityId` connects user to their entity
+- `user_organizations.linkedEntityType` + `user_organizations.linkedEntityId` connects user to their entity
 
 ### Multi-Org Support
-- `user_organizations` join table for multi-org membership
-- `users.organizationId` is legacy — prefer `user_organizations` for role/org lookups
-- Auth resolves org from `user_organizations` first, falls back to legacy field
+- `user_organizations` join table is the single source of truth for org membership, role, and stakeholder linking
+- Users can belong to multiple orgs with per-org roles
+- Auth resolves org + role from `user_organizations` on login (most recent membership)
+- Legacy `users.organizationId` / `users.role` columns have been removed
 
 ## Type Safety
 - Never use `as any` — use proper type declarations instead

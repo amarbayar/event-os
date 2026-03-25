@@ -84,16 +84,11 @@ export async function POST(req: NextRequest) {
       name: name || email.split("@")[0],
       email,
       passwordHash: tempPassword,
-      organizationId: ctx.orgId,
-      role: userRole,
-      linkedEntityType: body.linkedEntityType || null,
-      linkedEntityId: body.linkedEntityId || null,
     })
     .returning({
       id: users.id,
       name: users.name,
       email: users.email,
-      role: users.role,
       createdAt: users.createdAt,
     });
 
@@ -105,5 +100,5 @@ export async function POST(req: NextRequest) {
     linkedEntityId: body.linkedEntityId || null,
   });
 
-  return NextResponse.json({ data: user }, { status: 201 });
+  return NextResponse.json({ data: { ...user, role: userRole } }, { status: 201 });
 }

@@ -214,12 +214,10 @@ async function seed() {
       name: u.name,
       email: u.email,
       passwordHash,
-      organizationId: org.id,
-      role: u.role,
     });
   }
   const userRecords = await db.query.users.findMany({
-    where: (u, { eq }) => eq(u.organizationId, org.id),
+    where: (u, { inArray }) => inArray(u.email, teamUsers.map(tu => tu.email)),
   });
   const userMap = Object.fromEntries(userRecords.map((u) => [u.name, u.id]));
 

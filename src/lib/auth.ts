@@ -28,21 +28,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         );
         if (!valid) return null;
 
-        // Resolve org + role: prefer user_organizations, pick most recent membership
+        // Resolve org + role from user_organizations (most recent membership)
         const membership = await db.query.userOrganizations.findFirst({
           where: eq(userOrganizations.userId, user.id),
           orderBy: (uo, { desc }) => [desc(uo.createdAt)],
         });
 
-        const organizationId = membership?.organizationId ?? user.organizationId;
-        const role = membership?.role ?? user.role;
+        if (!membership) return null; // User must be invited to an org
 
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          role,
-          organizationId,
+          role: membership.role,
+          organizationId: membership.organizationId,
         };
       },
     }),
