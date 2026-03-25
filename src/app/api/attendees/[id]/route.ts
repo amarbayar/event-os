@@ -12,15 +12,6 @@ export async function PATCH(
   const ctx = await requirePermission(req, "attendee", "update");
   if (isRbacError(ctx)) return ctx;
 
-  // Verify attendee belongs to user's org
-  const attendee = await db.query.attendees.findFirst({
-    where: and(eq(attendees.id, id), eq(attendees.organizationId, ctx.orgId)),
-  });
-
-  if (!attendee) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
   const body = await req.json();
   const allowedFields = [
     "name", "email", "ticketType", "checkedIn", "checkedInAt",

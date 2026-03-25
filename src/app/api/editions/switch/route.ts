@@ -3,18 +3,13 @@ import { cookies } from "next/headers";
 import { db } from "@/db";
 import { eventEditions } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 
 const COOKIE_NAME = "event-os-edition";
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const userOrgId = (session.user as any).organizationId;
+  const ctx = await requirePermission(req, "edition", "update");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const { editionId } = body;
@@ -28,7 +23,7 @@ export async function POST(req: NextRequest) {
     where: eq(eventEditions.id, editionId),
   });
 
-  if (!edition || edition.organizationId !== userOrgId) {
+  if (!edition || edition.organizationId !== ctx.orgId) {
     return NextResponse.json({ error: "Edition not found" }, { status: 404 });
   }
 

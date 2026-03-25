@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { eventEditions } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { getActiveIds } from "@/lib/queries";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
@@ -14,10 +13,6 @@ export async function GET(req: NextRequest) {
     orderBy: desc(eventEditions.createdAt),
     with: { series: true, organization: true },
   });
-
-  // Determine which edition is currently active
-  const ids = await getActiveIds();
-  const activeEditionId = ids?.editionId || null;
 
   return NextResponse.json({
     data: editions.map((e) => ({
@@ -31,6 +26,6 @@ export async function GET(req: NextRequest) {
       organizationName: e.organization?.name,
       seriesName: e.series?.name,
     })),
-    activeEditionId,
+    activeEditionId: ctx.editionId || null,
   });
 }

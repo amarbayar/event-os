@@ -2,16 +2,17 @@ import { db } from "@/db";
 import { eq, and, desc, asc, count, sql } from "drizzle-orm";
 import * as schema from "@/db/schema";
 
-export async function getActiveIds() {
-  // 1. Get the user's org from session (authoritative source)
-  let userOrgId: string | undefined;
-  try {
-    const { auth } = await import("@/lib/auth");
-    const session = await auth();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    userOrgId = (session?.user as any)?.organizationId;
-  } catch {
-    // Session may not be available in all contexts
+export async function getActiveIds(userOrgId?: string) {
+  // 1. Resolve user's org — use passed value (from requirePermission) or fetch from session
+  if (!userOrgId) {
+    try {
+      const { auth } = await import("@/lib/auth");
+      const session = await auth();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      userOrgId = (session?.user as any)?.organizationId;
+    } catch {
+      // Session may not be available in all contexts
+    }
   }
 
   // 2. Try cookie — but only if edition belongs to user's org

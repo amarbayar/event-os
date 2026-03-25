@@ -98,8 +98,8 @@ export async function requirePermission(
       return NextResponse.json({ error: "No organization associated" }, { status: 403 });
     }
 
-    // Get active edition
-    const ids = await getActiveIds();
+    // Get active edition — pass orgId to avoid redundant auth() call
+    const ids = await getActiveIds(orgId);
     const editionId = ids?.editionId || "";
 
     // Look up full user record

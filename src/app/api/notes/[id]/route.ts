@@ -33,7 +33,7 @@ export async function PATCH(
   const [updated] = await db
     .update(entityNotes)
     .set({ content: body.content, updatedAt: new Date() })
-    .where(eq(entityNotes.id, id))
+    .where(and(eq(entityNotes.id, id), eq(entityNotes.organizationId, ctx.orgId)))
     .returning();
 
   return NextResponse.json({ data: updated });
@@ -63,7 +63,7 @@ export async function DELETE(
     return NextResponse.json({ error: "You can only delete your own notes" }, { status: 403 });
   }
 
-  await db.delete(entityNotes).where(eq(entityNotes.id, id));
+  await db.delete(entityNotes).where(and(eq(entityNotes.id, id), eq(entityNotes.organizationId, ctx.orgId)));
 
   return NextResponse.json({ data: { id } });
 }
