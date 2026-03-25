@@ -56,3 +56,8 @@ openclaw/*.json
 openclaw/*.json5
 openclaw/*.yaml
 openclaw/*.yml
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm

@@ -1,11 +1,12 @@
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
-import { randomUUID, createHash } from "crypto";
-import * as schema from "./schema";
+import { createHash } from "crypto";
+import { createConnection } from "./connection";
+import { getDialect } from "./dialect";
+import * as pgSchema from "./schema.pg";
+import * as sqliteSchema from "./schema.sqlite";
 
-const connectionString = process.env.DATABASE_URL || "postgresql://admin@localhost:5432/event_os";
-const client = postgres(connectionString, { prepare: false });
-const db = drizzle(client, { schema });
+const pgUrl = process.env.DATABASE_URL || "postgresql://admin@localhost:5432/event_os";
+const { db, close: cleanup } = await createConnection(getDialect() === "sqlite" ? undefined : pgUrl);
+const schema = getDialect() === "sqlite" ? sqliteSchema : pgSchema;
 
 function qrHash(input: string): string {
   return createHash("sha256").update(input).digest("hex").slice(0, 16);
@@ -325,7 +326,7 @@ async function seed() {
   console.log(`  Org: ${org.id}`);
   console.log(`  Edition: ${edition.id}`);
 
-  await client.end();
+  await cleanup();
 }
 
 seed().catch((e) => {
