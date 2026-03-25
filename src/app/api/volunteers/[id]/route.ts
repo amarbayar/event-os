@@ -44,7 +44,7 @@ export async function PATCH(
       ...updates,
       version: sql`${volunteerApplications.version} + 1`,
     })
-    .where(and(eq(volunteerApplications.id, id), eq(volunteerApplications.organizationId, ctx.orgId)))
+    .where(eq(volunteerApplications.id, id))
     .returning();
 
   if (!updated) {

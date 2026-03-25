@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { checklistTemplates } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
 // DELETE — remove a checklist template
@@ -15,7 +15,7 @@ export async function DELETE(
 
   const [deleted] = await db
     .delete(checklistTemplates)
-    .where(and(eq(checklistTemplates.id, id), eq(checklistTemplates.organizationId, ctx.orgId)))
+    .where(eq(checklistTemplates.id, id))
     .returning();
 
   if (!deleted) {

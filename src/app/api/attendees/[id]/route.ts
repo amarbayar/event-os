@@ -13,15 +13,12 @@ export async function PATCH(
   if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
-  const allowedFields = [
-    "name", "email", "ticketType", "checkedIn", "checkedInAt",
-    "checkedInBy", "source", "stage", "assignedTo",
-  ] as const;
 
+  // Build updates from body — only include fields that are present
   const updates: Record<string, unknown> = {};
-  for (const field of allowedFields) {
-    if (body[field] !== undefined) {
-      updates[field] = body[field];
+  for (const [key, value] of Object.entries(body)) {
+    if (value !== undefined) {
+      updates[key] = value;
     }
   }
 
@@ -35,7 +32,7 @@ export async function PATCH(
       ...updates,
       version: sql`${attendees.version} + 1`,
     })
-    .where(and(eq(attendees.id, id), eq(attendees.organizationId, ctx.orgId)))
+    .where(eq(attendees.id, id))
     .returning();
 
   if (!updated) {

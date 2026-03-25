@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { checklistItems } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
 // PATCH — update checklist item (submit value, approve, reject, etc.)
@@ -11,18 +11,17 @@ export async function PATCH(
 ) {
   const { id } = await params;
 
-  // Auth first with generic entity type, then verify org ownership
-  const ctx = await requirePermission(req, "checklist", "update");
-  if (isRbacError(ctx)) return ctx;
-
-  // Look up item — scoped to user's org
+  // Look up item to get entity type for RBAC
   const item = await db.query.checklistItems.findFirst({
-    where: and(eq(checklistItems.id, id), eq(checklistItems.organizationId, ctx.orgId)),
+    where: eq(checklistItems.id, id),
   });
 
   if (!item) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  const ctx = await requirePermission(req, item.entityType, "update");
+  if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
   const updates: Record<string, unknown> = {};
@@ -69,7 +68,7 @@ export async function PATCH(
       version: sql`${checklistItems.version} + 1`,
       updatedAt: new Date(),
     })
-    .where(and(eq(checklistItems.id, id), eq(checklistItems.organizationId, ctx.orgId)))
+    .where(eq(checklistItems.id, id))
     .returning();
 
   return NextResponse.json({ data: updated });

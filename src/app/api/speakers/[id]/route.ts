@@ -135,7 +135,7 @@ export async function DELETE(
 
   const [deleted] = await db
     .delete(speakerApplications)
-    .where(and(eq(speakerApplications.id, id), eq(speakerApplications.organizationId, ctx.orgId)))
+    .where(eq(speakerApplications.id, id))
     .returning();
 
   if (!deleted) {
