@@ -6,202 +6,55 @@ We run Dev Summit in Mongolia. Every year it's the same story: 47 spreadsheets, 
 
 Cvent wants $20K/year + $10K implementation. Bizzabo won't even show you pricing without a sales call. Sessionize handles CFPs but not payments. Eventbrite handles tickets but not schedules. So you end up with 6 tools duct-taped together and a spreadsheet that is technically load-bearing.
 
-Event OS replaces all of that. One app. Speakers, schedule, sponsors, booths, volunteers, media partners, marketing, check-in. Multi-event support so next year you don't start from zero.
+Event OS replaces all of that. One app. Speakers, schedule, sponsors, booths, volunteers, media partners, marketing, check-in — plus post-confirmation checklists, a stakeholder portal, and an in-app notification system. Multi-event support so next year you don't start from zero.
 
-Built by a 3-person team for 3-person teams. If you're running a tech conference with spreadsheets and prayers, this is for you. If you're a founder who can vibe-code, fork it and make it yours in an afternoon.
+Built by a small team for small teams. If you're running a tech conference with spreadsheets and prayers, this is for you.
 
 ## The agent-first difference
 
 Most event tools give you 14 forms and say "type everything in manually." Event OS gives you a chat panel. Paste a Viber conversation, drop a spreadsheet, type "just talked to Golomt Bank, they want Gold sponsorship" — the agent figures out what type of entity it is (speaker? sponsor? venue? volunteer?), extracts structured data, asks about anything missing, and creates the records. You confirm with one click.
 
-**Cmd+K** opens the agent from anywhere. The 14 entity pages still exist — but they're views you glance at, not forms you type into.
+**Cmd+K** opens the agent from anywhere.
 
-Supports multiple LLM providers: **Gemini** (free tier, default), **Ollama/Qwen** (local, free), or add your own by implementing one interface.
+Supports multiple LLM providers: **Gemini 2.5 Flash** (free tier, default), **xAI**, **z.ai** (ZhipuAI/GLM), **Ollama** (local, free), or add your own by implementing one interface.
 
 ## What's in the box
 
-| Module | What it does | What you'd otherwise use |
-|--------|-------------|------------------------|
-| **Agent Chat Panel** | Paste anything — CSV, chat logs, phone notes. Agent classifies, extracts, creates records. Cmd+K from anywhere. | Your brain + copy-paste + 14 different forms |
-| **Agenda Builder** | Multi-track schedule editor, conflict detection (speaker double-booked? room collision? 5-minute gap between talks?), draft/publish toggle | Google Sheets + hope |
-| **Speaker Pipeline** | CFP form, review scores, accept/reject/waitlist, application status tracking | Google Forms + another spreadsheet |
-| **Sponsor Pipeline** | Proposal to payment tracking | Email threads + memory |
-| **Venue Pipeline** | Venue candidates, negotiations, pricing, pros/cons, team assignment, finalization | "I think we decided on Chinggis Khaan?" |
-| **Booth Management** | Inventory grid, reservations, equipment lists, sponsor linking | A floor plan PDF and sticky notes |
-| **Volunteer Management** | Applications, shift assignments, t-shirt sizes | A WhatsApp group |
-| **Outreach CRM** | Proactive sourcing for speakers, sponsors, booths, volunteers, media. Pipeline funnel. Follow-up tracking. | A spreadsheet someone forgot to update |
-| **Media Partners** | TV/press/podcast pipeline with deliverables tracking | "I think Bayaraa said they'd cover it?" |
-| **Marketing Planner** | Campaign calendar, speaker announcements, schedule/publish per platform | Posting manually and forgetting LinkedIn |
-| **Invitations** | Special guests, speaker +1s, organizer +1s, student passes. Configurable allocations. QR codes for all. | An email chain and a prayer |
-| **Task Management** | Teams (Program, Logistics, Sponsors...), kanban board + list view, due dates, priority, linked entities | Trello that nobody checks |
-| **QR Check-in** | Scanner mode + dashboard mode, offline support, works when the venue WiFi inevitably dies | Paper lists and highlighters |
-| **Public Agenda** | Attendee-facing schedule with day/track filters | A PDF that's outdated by the time you export it |
-| **CFP Form** | Public speaker application with validation | Google Forms (again) |
-
-## Architecture
-
-The system is two halves: a web app for visual work (building schedules, managing pipelines) and a Telegram agent for quick decisions (approve this speaker? chase that invoice?). Both read/write the same database.
-
-```mermaid
-graph TB
-    subgraph "Organizers"
-        WEB["Web App<br/>(Next.js on Vercel)"]
-        TG["Telegram Agent<br/>(OpenClaw on Railway)"]
-    end
-
-    subgraph "External Users"
-        PUB["Public Agenda"]
-        CFP["CFP Form"]
-        SP["Speaker Portal"]
-        SCAN["QR Check-in"]
-    end
-
-    subgraph "Data Layer"
-        DB[(Supabase PostgreSQL)]
-        QUEUE["Event Queue<br/>(DB table)"]
-        STORE["File Storage<br/>(Supabase Storage)"]
-    end
-
-    subgraph "Integrations"
-        QPAY["QPay<br/>(Mongolia)"]
-        EMAIL["Email<br/>(Resend)"]
-    end
-
-    WEB -->|Drizzle ORM| DB
-    WEB -->|writes events| QUEUE
-    TG -->|polls queue| QUEUE
-    TG -->|REST API calls| WEB
-    PUB -->|reads published| DB
-    CFP -->|POST /api/speakers| WEB
-    SP -->|magic link auth| WEB
-    SCAN -->|POST /api/check-in| WEB
-    WEB -->|payment adapter| QPAY
-    TG -->|notifications| EMAIL
-```
-
-### Data Model
-
-```mermaid
-erDiagram
-    Organization ||--o{ EventSeries : has
-    EventSeries ||--o{ EventEdition : has
-    EventEdition ||--o{ Session : contains
-    EventEdition ||--o{ Track : has
-    EventEdition ||--o{ SpeakerApplication : receives
-    EventEdition ||--o{ SponsorApplication : receives
-    EventEdition ||--o{ VolunteerApplication : receives
-    EventEdition ||--o{ MediaPartner : has
-    EventEdition ||--o{ Booth : has
-    EventEdition ||--o{ Campaign : plans
-    EventEdition ||--o{ Attendee : registers
-    Session }o--|| Track : "belongs to"
-    Session }o--|| SpeakerApplication : "presented by"
-    Booth }o--|| SponsorApplication : "reserved by"
-    Campaign }o--|| SpeakerApplication : "announces"
-
-    Organization {
-        uuid id PK
-        string name
-        string slug
-    }
-    EventEdition {
-        uuid id PK
-        string name
-        date start_date
-        date end_date
-        enum status "draft|published|archived"
-        enum agenda_status "draft|published"
-    }
-    Session {
-        uuid id PK
-        string title
-        enum type "talk|workshop|keynote|break|panel"
-        timestamp start_time
-        timestamp end_time
-        int day
-        int version "optimistic locking"
-    }
-    SpeakerApplication {
-        uuid id PK
-        string name
-        string email
-        string talk_title
-        enum status "pending|accepted|rejected|waitlisted"
-        int review_score
-    }
-    Attendee {
-        uuid id PK
-        string name
-        string email
-        string qr_hash
-        boolean checked_in
-        string checked_in_by "station ID"
-    }
-```
-
-### Request Flow
-
-```mermaid
-sequenceDiagram
-    participant S as Speaker
-    participant W as Web App
-    participant DB as PostgreSQL
-    participant Q as Event Queue
-    participant A as Telegram Agent
-    participant O as Organizer
-
-    S->>W: Submit CFP application
-    W->>DB: INSERT speaker_application
-    W->>Q: INSERT event (speaker_submitted)
-    W->>S: "Application received!"
-
-    A->>Q: Poll for new events
-    Q->>A: speaker_submitted event
-    A->>W: GET /api/speakers/{id}
-    W->>A: Speaker details
-    A->>O: "New application: Sarah K. — Open Source in Central Asia" [Accept] [Reject]
-
-    O->>A: Taps [Accept]
-    A->>W: PATCH /api/speakers/{id} {status: accepted}
-    W->>DB: UPDATE speaker SET status=accepted, version=version+1
-    A->>O: "Done. Sarah gets acceptance email + onboarding checklist."
-```
-
-### Check-in Flow (with offline support)
-
-```mermaid
-stateDiagram-v2
-    [*] --> Online: App loads
-    Online --> Scanning: Point camera at QR
-    Scanning --> Success: Valid QR, not checked in
-    Scanning --> AlreadyIn: Valid QR, already checked in
-    Scanning --> NotFound: Invalid QR
-    Success --> Scanning: Auto-reset 3s
-    AlreadyIn --> Scanning: Auto-reset 3s
-    NotFound --> SearchFallback: Search by name
-    SearchFallback --> Scanning: Found and checked in
-
-    Online --> Offline: Network lost
-    Offline --> OfflineScanning: Continue scanning
-    OfflineScanning --> Queued: Validate against local cache
-    Queued --> OfflineScanning: Queue check-in event
-    Offline --> Syncing: Network restored
-    Syncing --> Online: First-check-in-wins merge
-```
+| Module | What it does |
+|--------|-------------|
+| **Agent Chat Panel** | Paste anything — CSV, chat logs, phone notes. Agent classifies, extracts, creates records. Cmd+K from anywhere. |
+| **Speaker Pipeline** | CFP form → review → accept/reject. Pipeline table with inline stage/source/assignee editing. |
+| **Sponsor Pipeline** | Outreach to confirmation. Same unified pipeline model as speakers. |
+| **Venue Pipeline** | Multiple venue candidates, negotiations, pricing, finalization. |
+| **Booth Management** | Inventory, reservations, company contacts, sponsor linking. |
+| **Volunteer Management** | Applications, assignments, pipeline tracking. |
+| **Media Partners** | TV/press/podcast pipeline with contact management. |
+| **Outreach CRM** | Proactive sourcing for all entity types. Follow-up tracking. |
+| **Agenda Builder** | Multi-track schedule, conflict detection (speaker double-booked? room collision?), draft/publish toggle. |
+| **Marketing Calendar** | Month-view content calendar. Click a day to add an item. Assign to team members. Platform tags (Twitter, Facebook, Instagram, LinkedIn, Telegram). |
+| **Task Board** | Kanban drag-and-drop (To Do → In Progress → Blocked → Done). Click cards for detail drawer with inline comments. Create/rename/delete teams. |
+| **Invitations** | Speaker +1s, organizer +1s, student passes. Configurable allocations. QR codes. |
+| **QR Check-in** | Scanner mode + dashboard mode with live stats. |
+| **Post-Confirmation Checklists** | When an entity is confirmed, auto-generate checklist items from templates (upload photo, submit slides, confirm travel). Track progress per entity. Admins configure templates in Settings. |
+| **Stakeholder Portal** | Confirmed speakers/sponsors get a login to self-service their checklist items — upload photos, submit bios, confirm travel. Organizers see submissions and approve/reject. |
+| **RBAC & Team Management** | 6 roles (owner → admin → organizer → coordinator → viewer → stakeholder). Role-based access control on all API routes. Team management in Settings (invite, role assignment). Team-scoped entity permissions in the backend — UI for configuring which teams own which entity types is planned. |
+| **Notifications** | In-app notifications for assignments, stage changes, checklist submissions, comments. Bell icon with unread badge. Mark read, bulk delete. |
+| **Settings** | Tabbed: Event details, Team management (invite/roles), Checklist templates (per entity type), Telegram connection (placeholder). |
+| **Public Agenda** | Attendee-facing schedule with day/track filters. |
+| **CFP Form** | Public speaker application form. |
 
 ## Tech Stack
-
-Not trying to be clever here. Boring tech that works.
 
 | Layer | Choice | Why |
 |-------|--------|-----|
 | Framework | Next.js 16 (App Router) | Server components, API routes, one deploy target |
 | Language | TypeScript | Catch bugs before your users do |
-| Styling | Tailwind + shadcn/ui | Fast, accessible components out of the box |
-| Database | PostgreSQL via Supabase | Free tier is generous, comes with storage |
+| Styling | Tailwind CSS + shadcn/ui | Fast, accessible components out of the box |
+| Database | PostgreSQL | Works with local Postgres, Supabase, Neon, or any PG provider |
 | ORM | Drizzle | Type-safe, no magic, SQL when you need it |
-| Auth | NextAuth.js | Credentials + service token for the agent |
-| Agent LLM | Gemini (default), Ollama/Qwen (local) | Abstracted — add providers with one interface |
+| Auth | NextAuth.js (v5) | Credentials + JWT + service token for API |
+| Passwords | bcrypt (12 rounds) | Proper key stretching. Legacy SHA-256 auto-detected for migration. |
+| Agent LLM | Gemini 2.5 Flash (default), xAI, z.ai, Ollama | Abstracted — add providers with one interface |
 | Icons | Lucide React | Consistent, tree-shakeable |
 
 ## Getting Started
@@ -214,32 +67,48 @@ cd event-os
 npm install
 ```
 
-### 2. Set up Supabase
+### 2. Set up PostgreSQL
 
-1. Create a free project at [supabase.com](https://supabase.com)
-2. Go to **Settings → Database** and copy the connection string (URI format)
+**Option A: Local PostgreSQL** (simplest for development)
+
+```bash
+# macOS
+brew install postgresql@16
+brew services start postgresql@16
+createdb event_os
+```
+
+**Option B: Supabase** (cloud, free tier)
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to **Settings → Database** and copy the connection string
 
 ### 3. Configure environment
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-Edit `.env` and fill in your values — at minimum `DATABASE_URL` and `AUTH_SECRET`:
+Edit `.env.local`:
 
 ```bash
-DATABASE_URL="postgresql://postgres.[your-project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres"
+# Required
+DATABASE_URL="postgresql://youruser@localhost:5432/event_os"  # or your Supabase URL
 AUTH_SECRET="$(openssl rand -base64 32)"
+
+# Optional — for the agent chat panel
+LLM_PROVIDER="gemini"          # gemini | xai | zai | ollama
+GEMINI_API_KEY="your-key"      # free at ai.google.dev
 ```
 
 ### 4. Push schema and seed
 
 ```bash
-# Create all tables in your Supabase database
+# Create all tables
 npx drizzle-kit push
 
-# Populate with sample data (Dev Summit 2026 — org, speakers, sessions, sponsors, attendees, etc.)
-node -r dotenv/config node_modules/.bin/tsx src/db/seed.ts
+# Populate with sample data (Dev Summit 2026)
+npx tsx src/db/seed.ts
 ```
 
 ### 5. Run
@@ -248,118 +117,196 @@ node -r dotenv/config node_modules/.bin/tsx src/db/seed.ts
 npm run dev
 ```
 
-Open `localhost:3000`. Log in with `admin@devsummit.mn` / `admin123` (or any of the 5 seeded users).
+Open `localhost:3000`. Log in with `admin@devsummit.mn` / `admin123`.
+
+**All seeded users** (password: `admin123`):
+
+| Name | Email | Role |
+|------|-------|------|
+| Amarbayar | admin@devsummit.mn | Owner |
+| Tuvshin | tuvshin@devsummit.mn | Organizer |
+| Oyungerel | oyungerel@devsummit.mn | Organizer |
+| Bat-Erdene | baterdene@devsummit.mn | Coordinator |
+| Sarnai | sarnai@devsummit.mn | Coordinator |
 
 ### Database commands
 
 | Task | Command |
 |------|---------|
-| Push schema changes to DB | `npx drizzle-kit push` |
-| Seed with fixture data | `node -r dotenv/config node_modules/.bin/tsx src/db/seed.ts` |
+| Push schema changes | `npx drizzle-kit push` |
+| Seed sample data | `npx tsx src/db/seed.ts` |
 | Browse DB in browser | `npx drizzle-kit studio` |
-
-> **Note:** `drizzle-kit push` syncs your schema to the database without migration files — it compares `src/db/schema.ts` against the live DB and applies the diff. Good for development; for production, consider using `drizzle-kit generate` + `drizzle-kit migrate` for versioned migrations.
+| Reset DB (local only) | `psql -d event_os -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"` then push + seed |
 
 ### Environment Variables
 
 | Variable | Required | What it is |
 |----------|----------|-----------|
-| `DATABASE_URL` | Yes | Supabase PostgreSQL connection string |
-| `AUTH_SECRET` | Yes | Any random string — `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | Yes | `http://localhost:3000` for dev, your domain for prod |
-| `SERVICE_TOKEN` | No | Random token for Telegram agent API auth |
-| `LLM_PROVIDER` | No | `gemini` (default), `xai`, or `ollama` |
-| `GEMINI_API_KEY` | No | Free at [ai.google.dev](https://ai.google.dev) — needed if using the agent chat panel |
-| `OLLAMA_URL` | No | Ollama URL if using local model (default: `localhost:11434`) |
-
-### Deploy
-
-```bash
-# Vercel (web app)
-vercel --prod
-
-# The agent runs on Railway or Fly.io as a long-running Node service
-```
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `AUTH_SECRET` | Yes | Random string — `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | No | `http://localhost:3000` for dev (auto-detected) |
+| `SERVICE_TOKEN` | No | Random token for API service auth |
+| `LLM_PROVIDER` | No | `gemini` (default), `xai`, `zai`, or `ollama` |
+| `GEMINI_API_KEY` | No | Free at [ai.google.dev](https://ai.google.dev) |
+| `XAI_API_KEY` | No | xAI API key |
+| `ZAI_API_KEY` | No | z.ai (ZhipuAI) API key |
+| `OLLAMA_URL` | No | Ollama URL (default: `localhost:11434`) |
 
 ## Project Structure
 
 ```
 src/
   app/
-    (dashboard)/        # Authenticated organizer pages
-      agenda/           # Schedule builder
-      speakers/         # CFP pipeline
-      sponsors/         # Sponsor pipeline
-      booths/           # Booth inventory
-      volunteers/       # Volunteer management
-      venue/            # Venue pipeline
-      outreach/         # Proactive sourcing CRM
-      media/            # Media partnerships
-      marketing/        # Campaign planner
-      tasks/            # Task management with teams
-      attendees/        # Registration list
-      invitations/      # Guest allocations
-      check-in/         # QR scanner + dashboard
-      settings/         # Event configuration
-    (public)/           # No-auth pages
-      agenda/[slug]/    # Public schedule
-      apply/[slug]/     # CFP submission form
+    (dashboard)/          # Authenticated organizer pages
+      speakers/           # Speaker pipeline + checklist + portal invite
+      sponsors/           # Sponsor pipeline + checklist
+      volunteers/         # Volunteer pipeline + checklist
+      venue/              # Venue pipeline + checklist
+      booths/             # Booth management + checklist
+      media/              # Media partner pipeline + checklist
+      outreach/           # Proactive sourcing CRM
+      agenda/             # Multi-track schedule builder
+      marketing/          # Content calendar (month view)
+      tasks/              # Kanban task board with teams
+      attendees/          # Registration + CSV import
+      invitations/        # Guest allocations
+      check-in/           # QR scanner + dashboard
+      settings/           # Event | Team | Checklists | Telegram tabs
+      notifications/      # Notification list + mark read/delete
+    portal/               # Stakeholder self-service (speakers/sponsors login here)
+    login/                # Authentication
+    onboarding/           # Create org + event + admin account
     api/
-      agent/process/    # Agent chat LLM endpoint
-      speakers/         # Speaker CRUD
-      sessions/         # Session CRUD + conflicts
-      check-in/         # QR check-in + stats
+      speakers/           # CRUD + RBAC + checklist triggers + notifications
+      sponsors/           # CRUD + RBAC + checklist triggers
+      ... (all entity types follow same pattern)
+      checklist-items/    # Checklist item CRUD + auto-sync templates
+      checklist-templates/# Template CRUD (admin)
+      notifications/      # List, mark read, bulk operations
+      portal/             # Stakeholder invite, status check, profile update, me
+      teams/              # Team CRUD
+      users/              # User list, invite, role management
+      me/                 # Current user info
+      upload/             # File upload (authenticated)
+      agent/process/      # LLM chat endpoint
   db/
-    schema.ts           # Drizzle schema (22 tables)
-    index.ts            # Database connection
+    schema.ts             # Drizzle schema (30+ tables)
+    seed.ts               # Dev Summit sample data
+    index.ts              # Database connection
   lib/
-    auth.ts             # NextAuth configuration
-    conflicts.ts        # Schedule conflict detection engine
-    api-utils.ts        # Auth context, versioning, pagination
-    service-token.ts    # Agent API authentication
-    agent/              # LLM provider abstraction
-      index.ts          # Provider factory (getProvider())
-      types.ts          # LLMProvider interface, entity types
-      prompt.ts         # System prompt + user prompt builder
+    auth.ts               # NextAuth config (credentials + JWT)
+    rbac.ts               # requirePermission() — role + team scope checks
+    checklist.ts          # generateChecklistItems() + archiveChecklistItems()
+    notify.ts             # notify() — create notifications for users
+    password.ts           # bcrypt hash + compare (legacy SHA-256 compat)
+    contacts.ts           # Cross-org person identity
+    conflicts.ts          # Schedule conflict detection
+    api-utils.ts          # Version checking, pagination
+    queries.ts            # Server-side data fetching + getActiveIds()
+    agent/                # LLM provider abstraction
       providers/
-        gemini.ts       # Google Gemini (default, free tier)
-        ollama.ts       # Local Qwen/Llama via Ollama
+        gemini.ts         # Google Gemini 2.5 Flash
+        xai.ts            # xAI
+        zai.ts            # z.ai (ZhipuAI/GLM)
+        ollama.ts         # Local Ollama
   components/
-    sidebar.tsx         # Grouped nav (People/Event/Operations)
-    chat-panel.tsx      # Agent chat panel (Cmd+K)
-    ui/                 # shadcn/ui components
+    sidebar.tsx           # Grouped nav + edition picker + notification bell
+    pipeline-table.tsx    # Reusable table with inline editing + checklist counts
+    entity-drawer.tsx     # Resizable drawer with tabs
+    checklist-panel.tsx   # Checklist items + progress bars
+    assigned-to-select.tsx# User dropdown for assignee fields
+    chat-panel.tsx        # Agent chat (Cmd+K)
+    notes-panel.tsx       # Discussion threads on entities
+    confirm-dialog.tsx    # Themed confirmation dialog (never use system alerts)
+    ui/                   # shadcn/ui components
 ```
-
-## Key Design Decisions
-
-**Why a PostgreSQL event queue instead of webhooks?** If the agent is down when a speaker applies, a webhook is lost forever. A queue table means events wait until the agent picks them up. Boring? Yes. Loses data? No.
-
-**Why version counters instead of timestamps for optimistic locking?** Two writes in the same millisecond both succeed with timestamp-based locking. A monotonic integer doesn't have that problem.
-
-**Why first-check-in-wins for offline sync?** Check-in is monotonic — once someone is checked in, they're checked in. Last-write-wins could accidentally un-check-in someone. First-check-in-wins can't.
-
-**Why not just build a Telegram bot without the web app?** You can't build a drag-and-drop schedule editor in a chat message. Some workflows need visual UI. Some need quick chat decisions. The hybrid lets organizers pick.
-
-## For Vibe Coders
-
-This entire codebase was built in one session with AI. Every page follows the same pattern:
-
-1. Stat cards at the top (2-col mobile, 4-col desktop)
-2. Filter buttons below
-3. Entity cards with status badges and actions
-4. Empty states with helpful CTAs
-
-Want to add a new entity type (e.g., "Hackathon Teams")? Copy `src/app/(dashboard)/volunteers/page.tsx`, change the fields, add a table to `src/db/schema.ts`, done. The pattern is the product.
 
 ## Security
 
-This is a **public repository**. A pre-commit hook scans every commit for API keys, tokens, and credentials. See `.githooks/pre-commit`.
+- **RBAC:** 6 roles (owner → admin → organizer → coordinator → viewer → stakeholder). Team-scoped permissions via `team_entity_types` junction table.
+- **Org isolation:** Every mutation WHERE clause includes `organizationId`. Cookie values validated against session. Cross-org access blocked.
+- **Password hashing:** bcrypt with 12 rounds. Legacy SHA-256 hashes auto-detected for migration.
+- **Auth middleware:** `requirePermission(req, entityType, action)` on all API routes. Service token validated against org existence.
+- **Pre-commit hook:** Scans every commit for API keys, tokens, credentials. See `.githooks/pre-commit`.
+- **No system alerts:** All confirmations use themed dialog components, never `window.confirm()` or `window.alert()`.
+- **Security regression tests:** Every CSO audit finding has a test that proves it stays fixed. Run `npx vitest run tests/security.test.ts` to verify.
 
 Never commit `.env.local`. The `.env.example` file has safe placeholders only.
+
+## Feature Status
+
+### Shipped
+
+- [x] Multi-org, multi-event support with edition switching
+- [x] Agent chat panel (Gemini, xAI, z.ai, Ollama)
+- [x] Unified pipeline model (source/stage) across all 7 entity types
+- [x] Pipeline tables with inline editing (stage, source, assignee dropdown)
+- [x] Entity drawers with tabs (profile, talk/details, pipeline, checklist)
+- [x] RBAC — 5 internal roles + stakeholder role, team-scoped permissions
+- [x] AssignedTo user dropdown (replaces free text)
+- [x] Settings: Team management, checklist templates, event details
+- [x] Post-confirmation checklists (auto-generate on confirm, archive on decline, restore on re-confirm)
+- [x] Stakeholder portal (self-service checklist + profile editing)
+- [x] Marketing content calendar (month view, drag to schedule)
+- [x] Task board (Kanban drag-drop, inline comments, team creation)
+- [x] Notifications (assignment, stage change, checklist submission, comments)
+- [x] QR check-in (scanner + dashboard)
+- [x] Public agenda + CFP form
+- [x] Notes/discussion threads on all entities
+- [x] File uploads (photos, logos, slides)
+- [x] Automated test suite — RBAC permissions, checklist lifecycle, security regression (run `npx vitest run` to see current count)
+
+### Planned / In Progress
+
+**Messaging & Agent Intelligence**
+- [ ] OpenClaw integration — agent framework for structured entity management
+- [ ] Telegram/Discord/WhatsApp bot — agent in group chat, `/link` account verification, RBAC-enforced
+- [ ] Smart agent routing — classify user intents and route to entity handlers (create/edit/delete speakers, sponsors, booths, etc.) with permission checks and clear error messages for unauthorized access
+- [ ] Agent query answering — "Do we have any speaker from Mobicom?", "How many booths are confirmed?" — agent checks permissions, queries data, responds naturally
+
+**Payments**
+- [ ] Pluggable payment providers — Stripe (global), QPay (Mongolia). Configure provider + credentials in Settings, works out of the box. Abstract adapter pattern so contributors can add their local payment provider.
+
+**Communications**
+- [ ] Email communications (scheduled broadcasts via Resend, auto-reminders for checklist items)
+- [ ] Meeting management (date + link + attendees on entities)
+
+**Infrastructure**
+- [ ] Cloud deployment (Fly.io, Vercel, or Railway)
+- [ ] Offline check-in support with sync
+- [ ] Team → entity type configuration UI in Settings (backend exists, UI needed)
+- [ ] Checklist template editing (reorder, inline edit — currently create/delete only)
+
+**Product**
+- [ ] Agenda drag-and-drop editor
+- [ ] Dashboard analytics (charts, trends, progress over time)
+- [ ] Multi-language support (English + Mongolian)
+- [ ] Public event website generator
+
+## Key Design Decisions
+
+**Why PostgreSQL directly, not just Supabase?** Supabase is great for cloud, but we don't want to lock contributors into a specific provider. Local Postgres for dev, Supabase/Neon/RDS for prod — your choice.
+
+**Why a unified pipeline model?** Every entity type (speaker, sponsor, venue, booth, volunteer, media) uses the same `source` (intake/outreach/sponsored) + `stage` (lead/engaged/confirmed/declined) columns. One reusable `PipelineTable` component, one `requirePermission` middleware, one mental model.
+
+**Why bcrypt, not Argon2?** bcrypt is well-tested, has zero native dependencies (bcryptjs is pure JS), and is sufficient for our threat model. Argon2 would require native compilation which breaks some deployment targets.
+
+**Why role-based access control?** 6 roles give clear permission boundaries without per-entity complexity. The backend supports team-scoped permissions (teams own entity types) — the UI for configuring team → entity type mappings is planned. For now, roles (owner/admin/organizer/coordinator/viewer/stakeholder) handle the 90% case.
+
+**Why checklist auto-generation on confirm?** The moment an entity is confirmed, the work begins — collect their photo, get their slides, confirm travel. Auto-generating checklist items from templates means organizers never forget a step.
+
+**Why no system alerts?** `window.confirm()` and `window.alert()` break the visual theme, feel cheap, and can't be styled. Every confirmation uses the themed `ConfirmDialog` component.
 
 ## Contributing
 
 PRs welcome. Read `CLAUDE.md` for project conventions and the secret safety checklist.
+
+**When building features:**
+- Every DB mutation WHERE clause must include `organizationId`
+- Every new API route must use `requirePermission()`
+- Never use `window.confirm()`, `window.alert()`, or `window.prompt()` — use `useConfirm()` hook
+- If you build create, also build edit, delete, and error handling
+- Run `npx vitest run` before pushing — all tests must pass
 
 ## License
 
