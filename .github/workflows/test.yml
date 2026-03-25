@@ -1,0 +1,62 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-and-integration:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Push SQLite schema
+        run: DB_DIALECT=sqlite npx drizzle-kit push --config=drizzle.config.sqlite.ts
+
+      - name: Seed SQLite
+        run: DB_DIALECT=sqlite npx tsx src/db/seed.ts
+
+      - name: Run unit & integration tests
+        run: DB_DIALECT=sqlite npx vitest run tests/unit tests/integration
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Push SQLite schema
+        run: DB_DIALECT=sqlite npx drizzle-kit push --config=drizzle.config.sqlite.ts
+
+      - name: Seed SQLite
+        run: DB_DIALECT=sqlite npx tsx src/db/seed.ts
+
+      - name: Build
+        run: DB_DIALECT=sqlite AUTH_SECRET=ci-test-secret npm run build
+
+      - name: Start server and run e2e tests
+        run: |
+          DB_DIALECT=sqlite AUTH_SECRET=ci-test-secret SERVICE_TOKEN=ci-test-token npm run start &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://localhost:3000 && break; sleep 1; done
+          DB_DIALECT=sqlite SERVICE_TOKEN=ci-test-token npx vitest run tests/e2e
+        env:
+          PORT: 3000
