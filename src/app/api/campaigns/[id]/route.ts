@@ -18,7 +18,12 @@ export async function PATCH(
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
     if (value !== undefined) {
-      updates[key] = value;
+      // Convert date strings to Date objects for timestamp columns
+      if (key === "scheduledDate" || key === "publishedDate" || key === "dueDate") {
+        updates[key] = value ? new Date(value as string) : null;
+      } else {
+        updates[key] = value;
+      }
     }
   }
 
@@ -26,20 +31,25 @@ export async function PATCH(
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
-  const [updated] = await db
-    .update(campaigns)
-    .set({
-      ...updates,
-      version: sql`${campaigns.version} + 1`,
-    })
-    .where(eq(campaigns.id, id))
-    .returning();
+  try {
+    const [updated] = await db
+      .update(campaigns)
+      .set({
+        ...updates,
+        version: sql`${campaigns.version} + 1`,
+      })
+      .where(eq(campaigns.id, id))
+      .returning();
 
-  if (!updated) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!updated) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ data: updated });
+  } catch (error) {
+    console.error("Campaign PATCH error:", error);
+    return NextResponse.json({ error: "Failed to update campaign", details: String(error) }, { status: 500 });
   }
-
-  return NextResponse.json({ data: updated });
 }
 
 export async function DELETE(

@@ -353,9 +353,11 @@ function DetailDrawer({ campaign, onClose, onSaved, onDeleted }: {
         assignedTo: form.assignedTo || null,
       }),
     });
-    if (res.ok) {
-      const d = await res.json();
+    const d = await res.json();
+    if (res.ok && d.data) {
       onSaved(d.data);
+    } else {
+      console.error("Save failed:", res.status, d);
     }
   };
 
