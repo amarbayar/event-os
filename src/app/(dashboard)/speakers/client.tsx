@@ -19,7 +19,7 @@ import { EntityDrawer } from "@/components/entity-drawer";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel, ChecklistProgress } from "@/components/checklist-panel";
-import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock } from "lucide-react";
+import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock, UserPlus } from "lucide-react";
 
 type Speaker = {
   id: string;
@@ -393,6 +393,33 @@ export function SpeakersClient({
                 <Label>Review Notes</Label>
                 <Textarea rows={4} placeholder="Internal notes..." value={(drawerForm.reviewNotes as string) || ""} onChange={(e) => updateField("reviewNotes", e.target.value)} />
               </div>
+              {selectedSpeaker?.stage === "confirmed" && selectedSpeaker?.email && (
+                <div className="pt-3 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={async () => {
+                      const res = await fetch("/api/portal/invite", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ entityType: "speaker", entityId: selectedSpeaker.id }),
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        const msg = data.data.alreadyInvited
+                          ? `Already invited. Login: ${selectedSpeaker.email}`
+                          : `Portal invite created!\nEmail: ${selectedSpeaker.email}\nTemp password: ${data.data.tempPassword}\nURL: /portal`;
+                        alert(msg);
+                      } else {
+                        alert(data.error || "Failed to invite");
+                      }
+                    }}
+                  >
+                    <UserPlus className="mr-2 h-3 w-3" /> Invite to Portal
+                  </Button>
+                </div>
+              )}
             </div>
           ),
         },

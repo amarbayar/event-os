@@ -43,6 +43,126 @@ const statusConfig: Record<string, { icon: React.ElementType; color: string; bg:
   needs_revision: { icon: AlertCircle, color: "text-orange-600", bg: "bg-orange-50" },
 };
 
+// ─── Profile Section (editable entity fields) ──────────
+
+function ProfileSection({
+  entity,
+  entityType,
+  onUpdate,
+}: {
+  entity: Record<string, unknown>;
+  entityType: string;
+  onUpdate: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  // Fields shown per entity type
+  const fieldsByType: Record<string, { key: string; label: string; type: "text" | "textarea" | "url" }[]> = {
+    speaker: [
+      { key: "name", label: "Full Name", type: "text" },
+      { key: "bio", label: "Bio", type: "textarea" },
+      { key: "talkTitle", label: "Talk Title", type: "text" },
+      { key: "talkAbstract", label: "Talk Abstract", type: "textarea" },
+      { key: "phone", label: "Phone", type: "text" },
+      { key: "linkedin", label: "LinkedIn", type: "url" },
+      { key: "website", label: "Website", type: "url" },
+    ],
+    sponsor: [
+      { key: "contactName", label: "Contact Name", type: "text" },
+      { key: "contactEmail", label: "Contact Email", type: "text" },
+      { key: "message", label: "Company Description", type: "textarea" },
+    ],
+    volunteer: [
+      { key: "name", label: "Full Name", type: "text" },
+      { key: "phone", label: "Phone", type: "text" },
+    ],
+    media: [
+      { key: "contactName", label: "Contact Name", type: "text" },
+      { key: "contactEmail", label: "Contact Email", type: "text" },
+    ],
+  };
+
+  const fields = fieldsByType[entityType] || [];
+  if (fields.length === 0) return null;
+
+  const startEditing = () => {
+    const initial: Record<string, string> = {};
+    for (const f of fields) {
+      initial[f.key] = (entity[f.key] as string) || "";
+    }
+    setForm(initial);
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await fetch("/api/portal/update-profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    setSaving(false);
+    setEditing(false);
+    onUpdate();
+  };
+
+  return (
+    <div className="rounded-lg border bg-white p-6 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-sm uppercase tracking-wider text-stone-500">Your Profile</h3>
+        {!editing && (
+          <Button variant="outline" size="sm" onClick={startEditing}>Edit</Button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-3">
+          {fields.map((f) => (
+            <div key={f.key} className="space-y-1">
+              <label className="text-xs font-medium text-stone-600">{f.label}</label>
+              {f.type === "textarea" ? (
+                <Textarea
+                  value={form[f.key] || ""}
+                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                  rows={3}
+                />
+              ) : (
+                <Input
+                  value={form[f.key] || ""}
+                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                  placeholder={f.label}
+                />
+              )}
+            </div>
+          ))}
+          <div className="flex gap-2 pt-2">
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {fields.map((f) => {
+            const val = entity[f.key] as string;
+            return val ? (
+              <div key={f.key} className="flex gap-2 text-sm">
+                <span className="text-stone-400 w-28 shrink-0">{f.label}</span>
+                <span className="text-stone-700 truncate">{val}</span>
+              </div>
+            ) : null;
+          })}
+          {fields.every((f) => !(entity[f.key])) && (
+            <p className="text-sm text-stone-400 italic">No profile info yet. Click Edit to add your details.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PortalPage() {
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -235,6 +355,13 @@ export default function PortalPage() {
             );
           })}
         </div>
+
+        {/* Your Profile — editable fields */}
+        <ProfileSection entity={entity} entityType={user.linkedEntityType} onUpdate={async () => {
+          const r = await fetch("/api/portal/me");
+          const d = await r.json();
+          setData(d.data);
+        }} />
 
         {/* Event Info */}
         <div className="rounded-lg border bg-white p-6 space-y-3">

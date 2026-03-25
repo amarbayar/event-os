@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat-panel";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -11,8 +12,32 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [chatOpen, setChatOpen] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const router = useRouter();
 
   const toggleChat = useCallback(() => setChatOpen((prev) => !prev), []);
+
+  // Stakeholder guard: redirect stakeholders to /portal
+  useEffect(() => {
+    fetch("/api/portal/me")
+      .then((r) => {
+        if (r.ok) {
+          // User is a stakeholder — redirect to portal
+          router.replace("/portal");
+        } else {
+          setChecked(true);
+        }
+      })
+      .catch(() => setChecked(true));
+  }, [router]);
+
+  if (!checked) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
+      </div>
+    );
+  }
 
   // Cmd+K listener lives here — always mounted, regardless of panel state
   useEffect(() => {
