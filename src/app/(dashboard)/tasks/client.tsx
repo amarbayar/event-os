@@ -771,7 +771,7 @@ function TaskDetailDrawer({
                   }
 
                   return (
-                    <div key={note.id} className="rounded-md bg-stone-50 px-3 py-3 group">
+                    <div key={note.id} className="rounded-md bg-stone-50 hover:bg-stone-100 px-3 py-3 group transition-colors">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium">{note.authorName}</span>
                         <div className="flex items-center gap-2">
