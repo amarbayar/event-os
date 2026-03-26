@@ -1,6 +1,8 @@
 import { getMailConfig } from "./config";
 import type { MailAddress, MailDriver, Mailable, SendResult } from "./types";
 import { LogDriver } from "./drivers/log";
+import { MailgunDriver } from "./drivers/mailgun";
+import { PostmarkDriver } from "./drivers/postmark";
 import { db } from "@/db";
 import { emailLog } from "@/db/schema";
 import { and, eq, gte } from "drizzle-orm";
@@ -11,15 +13,10 @@ function getDriver(): MailDriver {
   switch (config.driver) {
     case "log":
       return new LogDriver();
-    case "mailgun": {
-      // Lazy import to avoid loading driver code when not needed
-      const { MailgunDriver } = require("./drivers/mailgun");
+    case "mailgun":
       return new MailgunDriver(config.mailgun!);
-    }
-    case "postmark": {
-      const { PostmarkDriver } = require("./drivers/postmark");
+    case "postmark":
       return new PostmarkDriver(config.postmark!);
-    }
   }
 }
 
