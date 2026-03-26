@@ -391,40 +391,52 @@ export async function handleDelete(
     return { message: `Which ${label} do you want to delete? Give me a name.`, success: false };
   }
 
-  // Confirmation required
-  if (intent.confirmation) {
-    const conditions: any[] = [];
-    if ("editionId" in table) conditions.push(eq(table.editionId, ctx.editionId));
-    if ("organizationId" in table) conditions.push(eq(table.organizationId, ctx.orgId));
-    conditions.push(ilike((table as any)[nameField], `%${searchValue}%`));
+  // Find the entity
+  const conditions: any[] = [];
+  if ("editionId" in table) conditions.push(eq(table.editionId, ctx.editionId));
+  if ("organizationId" in table) conditions.push(eq(table.organizationId, ctx.orgId));
+  conditions.push(ilike((table as any)[nameField], `%${searchValue}%`));
 
-    const matches = await db.select().from(table).where(and(...conditions)).limit(1);
-    if (matches.length === 0) {
-      return { message: `No ${label} found matching "${searchValue}".`, success: false };
-    }
+  const matches = await db.select().from(table).where(and(...conditions)).limit(5);
+  if (matches.length === 0) {
+    return { message: `No ${label} found matching "${searchValue}".`, success: false };
+  }
 
-    const entity = matches[0] as any;
+  if (matches.length > 1) {
+    const list = matches.map((r: any, i: number) => `${i + 1}. **${r[nameField]}**`).join("\n");
+    return { message: `Multiple ${label}s match "${searchValue}":\n${list}\nWhich one did you mean?`, success: false };
+  }
 
-    // Stage protection: confirmed/engaged entities can't be deleted by non-admins
-    // These entities have checklists, portal users, and downstream dependencies.
-    if (entity.stage === "confirmed") {
-      if (ctx.userRole !== "owner" && ctx.userRole !== "admin") {
-        return {
-          message: `**${entity[nameField]}** is confirmed and has active checklists. Only admins can delete confirmed records. Ask an admin if this is really needed.`,
-          success: false,
-        };
-      }
-    }
+  const entity = matches[0] as any;
 
+  // Stage protection: confirmed entities can't be deleted by non-admins
+  if (entity.stage === "confirmed" && ctx.userRole !== "owner" && ctx.userRole !== "admin") {
     return {
-      message: `Are you sure you want to delete **${entity[nameField]}**? This cannot be undone. Reply "yes" to confirm.`,
-      success: true,
-      requiresConfirmation: true,
-      pendingAction: { ...intent, searchValue: entity.id },
+      message: `**${entity[nameField]}** is confirmed and has active checklists. Only admins can delete confirmed records.`,
+      success: false,
     };
   }
 
-  return { message: `Delete requires confirmation. Please confirm to proceed.`, success: false };
+  // When confirmation flag is set, execute directly.
+  // The two-step prompt doesn't work via API/Telegram (OpenClaw LLM can't relay confirmations).
+  if (intent.confirmation) {
+    const [deleted] = await db.delete(table).where(
+      and(eq(table.id, entity.id), eq(table.organizationId, ctx.orgId))
+    ).returning();
+
+    if (!deleted) {
+      return { message: `${label} not found or already deleted.`, success: false };
+    }
+    return { message: `Deleted **${(deleted as any)[nameField]}**.`, success: true };
+  }
+
+  // No confirmation flag — ask user to confirm
+  return {
+    message: `Are you sure you want to delete **${entity[nameField]}**? Say "delete ${entity[nameField]}" to confirm.`,
+    success: true,
+    requiresConfirmation: true,
+    pendingAction: { ...intent, searchValue: entity.id },
+  };
 }
 
 // Execute a confirmed delete (called by dispatcher after user confirms)

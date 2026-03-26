@@ -371,8 +371,7 @@ describe("Agent UPDATE operations", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("Agent DELETE operations", () => {
-  it("requires confirmation for delete", async () => {
-    // Create entity to delete
+  it("executes delete when confirmation flag is set", async () => {
     await db.insert(schema.volunteerApplications).values({
       editionId, organizationId: orgId, name: "AgentTest DeleteVol", email: "del@test.com", source: "intake", stage: "lead",
     });
@@ -386,10 +385,12 @@ describe("Agent DELETE operations", () => {
       ctx()
     );
     expect(result.success).toBe(true);
-    expect(result.requiresConfirmation).toBe(true);
-    expect(result.message).toContain("Are you sure");
+    expect(result.message).toContain("Deleted");
 
-    await cleanup(schema.volunteerApplications, "name", "AgentTest DeleteVol");
+    // Verify actually deleted from DB
+    const remaining = await db.select().from(schema.volunteerApplications)
+      .where(ilike(schema.volunteerApplications.name, "%AgentTest DeleteVol%"));
+    expect(remaining.length).toBe(0);
   });
 
   it("rejects delete with no search value", async () => {
@@ -1235,7 +1236,7 @@ describe("Destructive action prevention", () => {
       expect(result.message.toLowerCase()).toMatch(/confirmed|permission/);
     });
 
-    it("admin CAN delete confirmed entity (gets confirmation prompt)", async () => {
+    it("admin CAN delete confirmed entity (executes directly)", async () => {
       const result = await dispatch(
         intent({
           intent: "manage", action: "delete", entityType: "speaker",
@@ -1245,7 +1246,14 @@ describe("Destructive action prevention", () => {
         "Delete speaker AgentTest ConfirmedSpk"
       );
       expect(result.success).toBe(true);
-      expect(result.requiresConfirmation).toBe(true);
+      expect(result.message).toContain("Deleted");
+      // Re-create for afterAll cleanup
+      const [s] = await db.insert(schema.speakerApplications).values({
+        editionId, organizationId: orgId,
+        name: "AgentTest ConfirmedSpk", email: "c@t.com", talkTitle: "Talk",
+        source: "intake", stage: "confirmed",
+      }).returning();
+      confirmedSpeakerId = s.id;
     });
   });
 

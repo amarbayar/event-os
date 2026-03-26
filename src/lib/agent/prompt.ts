@@ -106,7 +106,13 @@ RULES:
 - For chitchat: greetings, thank you, unclear intent → set a helpful message and suggest what you can do
 - Handle Mongolian names (Cyrillic and Latin transliteration)
 - If ambiguous between query and manage, prefer query (read-only is safer)
-- NEVER hallucinate entity data — only include fields explicitly mentioned by the user`;
+- NEVER hallucinate entity data — only include fields explicitly mentioned by the user
+
+ENTITY TYPE DISAMBIGUATION:
+- "marketing calendar", "IG story", "social post", "FB post", "tweet", "LinkedIn post", "content calendar" → entityType: "campaign" (NOT task)
+- "campaign" is for marketing/social media content scheduled on a calendar
+- "task" is for internal to-dos, action items, assignments (e.g., "email venue", "book hotel", "call sponsor")
+- If the user mentions a social media platform (IG, Instagram, Facebook, Twitter, LinkedIn, Telegram) → likely a campaign`;
 
 // ─── Prompt builders ─────────────────────────────────
 
