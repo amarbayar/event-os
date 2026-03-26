@@ -1,3 +1,4 @@
+import type { RawNotifyParams } from "@/lib/notify";
 import type { MailAddress, Mailable } from "@/lib/mail/types";
 import type { JobDefinition } from "./types";
 
@@ -6,19 +7,7 @@ import type { JobDefinition } from "./types";
 // Wraps the notification DB insert. Receives pre-resolved
 // title/message (i18n resolved before dispatch in notify()).
 
-interface ResolvedNotifyPayload {
-  userId: string;
-  orgId: string;
-  type: string;
-  title: string;
-  message?: string | null;
-  link?: string;
-  entityType?: string;
-  entityId?: string;
-  actorName?: string;
-}
-
-export const sendNotificationJob: JobDefinition<ResolvedNotifyPayload> = {
+export const sendNotificationJob: JobDefinition<RawNotifyParams> = {
   name: "send-notification",
   queue: "default",
   maxAttempts: 3,
