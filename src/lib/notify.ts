@@ -40,17 +40,24 @@ async function resolveContent(params: NotifyParams): Promise<{ title: string; me
     return { title: params.title, message: params.message || null };
   }
 
-  const t = await getTranslations({
-    locale: params.locale,
-    namespace: "Notifications",
-  });
+  try {
+    const t = await getTranslations({
+      locale: params.locale,
+      namespace: "Notifications",
+    });
 
-  const title = t(params.titleKey as never, params.titleParams as never);
-  const message = params.messageKey
-    ? t(params.messageKey as never, params.messageParams as never)
-    : null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const title = t(params.titleKey as any, params.titleParams as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const message = params.messageKey
+      ? t(params.messageKey as any, params.messageParams as any)
+      : null;
 
-  return { title, message };
+    return { title, message };
+  } catch {
+    // Fallback if translation resolution fails (missing key, bad locale, etc.)
+    return { title: params.titleKey, message: params.messageKey || null };
+  }
 }
 
 /**

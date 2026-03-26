@@ -1,21 +1,34 @@
 import { describe, it, expect } from "vitest";
 
+// Mirror the validation logic from src/app/api/me/locale/route.ts
 const SUPPORTED_LOCALES = ["en", "mn"];
 
-describe("Locale API validation logic", () => {
-  it("accepts valid locale 'en'", () => {
-    expect(SUPPORTED_LOCALES.includes("en")).toBe(true);
+function isValidLocale(locale: unknown): boolean {
+  return typeof locale === "string" && SUPPORTED_LOCALES.includes(locale);
+}
+
+describe("Locale validation", () => {
+  it("accepts 'en'", () => {
+    expect(isValidLocale("en")).toBe(true);
   });
 
-  it("accepts valid locale 'mn'", () => {
-    expect(SUPPORTED_LOCALES.includes("mn")).toBe(true);
+  it("accepts 'mn'", () => {
+    expect(isValidLocale("mn")).toBe(true);
   });
 
   it("rejects unsupported locale 'fr'", () => {
-    expect(SUPPORTED_LOCALES.includes("fr")).toBe(false);
+    expect(isValidLocale("fr")).toBe(false);
   });
 
   it("rejects empty string", () => {
-    expect(SUPPORTED_LOCALES.includes("")).toBe(false);
+    expect(isValidLocale("")).toBe(false);
+  });
+
+  it("rejects null", () => {
+    expect(isValidLocale(null)).toBe(false);
+  });
+
+  it("rejects undefined", () => {
+    expect(isValidLocale(undefined)).toBe(false);
   });
 });
