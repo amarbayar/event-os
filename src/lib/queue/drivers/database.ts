@@ -221,16 +221,17 @@ export class DatabaseDriver implements QueueDriver {
    */
   async bury(jobId: string, error: string): Promise<void> {
     if (this.dialect === "sqlite") {
-      // SQLite: better-sqlite3 transactions are synchronous.
-      // SELECT + INSERT + DELETE all inside the sync transaction.
+      // SQLite: read job outside transaction to avoid SQLITE_BUSY_SNAPSHOT
+      // when other connections hold read snapshots (e.g. CI test parallelism).
+      // No race risk — SQLite serializes all writes synchronously.
+      const [job] = this.db
+        .select()
+        .from(jobs)
+        .where(eq(jobs.id, jobId))
+        .limit(1)
+        .all();
+      if (!job) return;
       this.db.transaction((tx: AnyDb) => {
-        const [job] = tx
-          .select()
-          .from(jobs)
-          .where(eq(jobs.id, jobId))
-          .limit(1)
-          .all();
-        if (!job) return;
         tx.insert(failedJobs)
           .values({
             jobName: job.name,
