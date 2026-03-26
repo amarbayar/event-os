@@ -131,6 +131,35 @@ function fixStageStatusConfusion(values: Record<string, unknown>, entityType: st
   }
 }
 
+// ─── Date coercion ────────────────────────────────────
+//
+// The LLM returns dates as strings ("04/01", "2026-04-01", "April 1st").
+// Drizzle timestamp columns need Date objects.
+
+const DATE_FIELDS = new Set(["dueDate", "scheduledDate", "publishedDate"]);
+
+function coerceDateFields(values: Record<string, unknown>): void {
+  for (const field of DATE_FIELDS) {
+    if (field in values && typeof values[field] === "string") {
+      const raw = values[field] as string;
+      let parsed = new Date(raw);
+
+      // Handle partial dates like "04/01" (no year) → assume current year
+      if (isNaN(parsed.getTime()) || raw.match(/^\d{1,2}\/\d{1,2}$/)) {
+        const year = new Date().getFullYear();
+        parsed = new Date(`${year}-${raw.replace("/", "-")}`);
+      }
+
+      if (!isNaN(parsed.getTime())) {
+        values[field] = parsed;
+      } else {
+        // Can't parse — remove rather than crash
+        delete values[field];
+      }
+    }
+  }
+}
+
 // Field aliases — maps LLM terms to actual DB column names
 const FIELD_ALIASES: Record<string, string> = {
   company: "companyName", "company_name": "companyName",
@@ -221,6 +250,9 @@ async function handleCreate(
 
   // Fix stage/status confusion (e.g. status="confirmed" → stage="confirmed")
   fixStageStatusConfusion(values, intent.entityType!);
+
+  // Coerce date-like strings to Date objects for timestamp columns
+  coerceDateFields(values);
 
   // Truncate string values to avoid DB varchar overflow (text fields exempt)
   const TEXT_FIELDS = new Set(["bio", "content", "description", "talkAbstract", "notes", "message", "experience", "availability", "requirements", "requirementsNotes"]);
@@ -321,6 +353,7 @@ async function applyUpdate(
 
   // Fix stage/status confusion before checking if empty
   fixStageStatusConfusion(updates, intent.entityType!);
+  coerceDateFields(updates);
 
   if (Object.keys(updates).length === 0) {
     return { message: `What do you want to change about **${entity[nameField]}**?`, success: false };
