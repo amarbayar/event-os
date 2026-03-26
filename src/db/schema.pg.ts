@@ -55,6 +55,11 @@ export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
+  botLanguage: varchar("bot_language", { length: 50 }).default("auto"), // auto | en | mn | ...
+  botMood: varchar("bot_mood", { length: 50 }).default("professional"), // professional | friendly | sarcastic | nerdy | funny
+  llmProvider: varchar("llm_provider", { length: 50 }), // gemini | zai | xai | ollama — null = use env var
+  llmModel: varchar("llm_model", { length: 100 }), // e.g. glm-5, gemini-2.5-flash
+  llmApiKey: varchar("llm_api_key", { length: 500 }), // encrypted in future, never returned in full
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

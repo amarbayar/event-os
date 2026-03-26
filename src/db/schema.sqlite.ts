@@ -26,6 +26,11 @@ export const organizations = sqliteTable("organizations", {
   id: uuidPk(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  botLanguage: text("bot_language").default("auto"),
+  botMood: text("bot_mood").default("professional"),
+  llmProvider: text("llm_provider"),
+  llmModel: text("llm_model"),
+  llmApiKey: text("llm_api_key"),
   createdAt: tsNow("created_at"),
   updatedAt: tsNow("updated_at"),
 });

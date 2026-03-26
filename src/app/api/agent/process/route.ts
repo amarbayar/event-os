@@ -144,7 +144,7 @@ async function handleRequest(
   const resolvedOrgId = ids?.orgId || orgId;
 
   try {
-    const provider = getProvider();
+    const provider = await getProvider(resolvedOrgId);
 
     // Decide: classify (smart routing) or extract (bulk import)
     const useClassify = mode !== "extract" && (inputType === "text" || !inputType);

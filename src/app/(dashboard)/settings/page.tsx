@@ -10,7 +10,7 @@ import { UserPlus, Trash2, Loader2, Plus, GripVertical } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirm } from "@/components/confirm-dialog";
 
-type Tab = "event" | "team" | "checklists" | "telegram";
+type Tab = "event" | "team" | "checklists" | "ai" | "telegram";
 type User = {
   id: string;
   name: string | null;
@@ -342,6 +342,7 @@ export default function SettingsPage() {
     { key: "event", label: "Event" },
     { key: "team", label: "Team" },
     { key: "checklists", label: "Checklists" },
+    { key: "ai", label: "AI Model" },
     { key: "telegram", label: "Messaging" },
   ];
 
@@ -573,6 +574,16 @@ export default function SettingsPage() {
         <ChecklistTemplatesTab />
       )}
 
+      {/* AI Model tab */}
+      {tab === "ai" && (
+        <div className="max-w-lg space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Choose the LLM that powers the agent — both the web chat and messaging bots (Telegram, Discord).
+          </p>
+          <LlmSettings />
+        </div>
+      )}
+
       {/* Messaging tab */}
       {tab === "telegram" && <MessagingTab />}
     </div>
@@ -646,6 +657,9 @@ function MessagingTab() {
         when @mentioned — query data, create records, manage your event through conversation.
       </p>
 
+      {/* Bot personality */}
+      <BotPersonality />
+
       {/* Platform selector cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <button
@@ -710,6 +724,254 @@ function MessagingTab() {
           setupComponent={<DiscordSetup onConnected={(cfg) => setDcConfig(cfg)} />}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Bot Personality ──────────────────────────────────
+
+const LANGUAGES = [
+  { value: "auto", label: "Auto (match user's language)" },
+  { value: "en", label: "English" },
+  { value: "mn", label: "Mongolian" },
+  { value: "ko", label: "Korean" },
+  { value: "ja", label: "Japanese" },
+  { value: "zh", label: "Chinese" },
+  { value: "ru", label: "Russian" },
+];
+
+const MOODS = [
+  { value: "professional", label: "Professional", desc: "Straight to the point" },
+  { value: "friendly", label: "Friendly", desc: "Warm and encouraging" },
+  { value: "sarcastic", label: "Sarcastic", desc: "Witty and dry humor" },
+  { value: "nerdy", label: "Nerdy", desc: "Enthusiastic tech nerd" },
+  { value: "funny", label: "Funny", desc: "Light-hearted and humorous" },
+];
+
+const LLM_PROVIDERS = [
+  { value: "gemini", label: "Google Gemini", desc: "Google's Gemini models" },
+  { value: "zai", label: "z.ai (Zhipu)", desc: "GLM models from z.ai" },
+  { value: "xai", label: "xAI (Grok)", desc: "Grok models from xAI" },
+  { value: "ollama", label: "Ollama (Local)", desc: "Self-hosted open-source models" },
+];
+
+function LlmSettings() {
+  const [provider, setProvider] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [apiKeyMasked, setApiKeyMasked] = useState<string | null>(null);
+  const [apiKeySet, setApiKeySet] = useState(false);
+  const [providerModels, setProviderModels] = useState<Record<string, { id: string; label: string; note?: string }[]>>({});
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editingKey, setEditingKey] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/messaging/llm-settings").then(async (res) => {
+      const json = await res.json();
+      if (json.data) {
+        setProvider(json.data.provider);
+        setModel(json.data.model);
+        setApiKeySet(json.data.apiKeySet);
+        setApiKeyMasked(json.data.apiKeyMasked);
+        if (json.data.providerModels) setProviderModels(json.data.providerModels);
+      }
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, []);
+
+  const save = async (updates: Record<string, unknown>) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/messaging/llm-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      const json = await res.json();
+      if (json.data) {
+        if (json.data.apiKeySet !== undefined) {
+          setApiKeySet(json.data.apiKeySet);
+          setEditingKey(false);
+          setApiKey("");
+          // Refetch to get masked key
+          const r = await fetch("/api/messaging/llm-settings");
+          const j = await r.json();
+          if (j.data) setApiKeyMasked(j.data.apiKeyMasked);
+        }
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!loaded) return null;
+
+  const models = provider ? (providerModels[provider] || []) : [];
+  const needsApiKey = provider && provider !== "ollama";
+
+  return (
+    <div className="rounded-lg border p-4 space-y-4">
+      <h3 className="text-sm font-medium">AI Model</h3>
+      <p className="text-xs text-muted-foreground">
+        Choose the LLM that powers the agent — both the web chat and messaging bots.
+        {!provider && " Using server default (env vars)."}
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Provider */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Provider</Label>
+          <select
+            className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
+            value={provider || ""}
+            onChange={(e) => {
+              const v = e.target.value || null;
+              setProvider(v);
+              setModel(null);
+              setApiKeySet(false);
+              setApiKeyMasked(null);
+              setEditingKey(false);
+              if (v) save({ provider: v, model: null, apiKey: null });
+              else save({ provider: null, model: null, apiKey: null });
+            }}
+          >
+            <option value="">Server default (env vars)</option>
+            {LLM_PROVIDERS.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Model */}
+        {provider && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Model</Label>
+            <select
+              className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
+              value={model || ""}
+              onChange={(e) => {
+                const v = e.target.value || null;
+                setModel(v);
+                save({ model: v });
+              }}
+            >
+              <option value="">Default</option>
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}{m.note ? ` — ${m.note}` : ""}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* API Key */}
+      {needsApiKey && (
+        <div className="space-y-1.5">
+          <Label className="text-xs">API Key</Label>
+          {apiKeySet && !editingKey ? (
+            <div className="flex items-center gap-2">
+              <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{apiKeyMasked}</code>
+              <button
+                onClick={() => setEditingKey(true)}
+                className="text-xs text-primary hover:underline"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                placeholder={`Enter your ${LLM_PROVIDERS.find((p) => p.value === provider)?.label} API key`}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="text-sm font-mono"
+              />
+              <Button
+                size="sm"
+                disabled={!apiKey.trim() || saving}
+                onClick={() => save({ apiKey: apiKey.trim() })}
+              >
+                {saving ? "Saving..." : "Save"}
+              </Button>
+              {editingKey && (
+                <Button size="sm" variant="ghost" onClick={() => { setEditingKey(false); setApiKey(""); }}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {saving && <p className="text-xs text-muted-foreground">Saving & syncing with messaging bots...</p>}
+    </div>
+  );
+}
+
+function BotPersonality() {
+  const [language, setLanguage] = useState("auto");
+  const [mood, setMood] = useState("professional");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/messaging/bot-settings").then(async (res) => {
+      const json = await res.json();
+      if (json.data) {
+        setLanguage(json.data.language || "auto");
+        setMood(json.data.mood || "professional");
+      }
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, []);
+
+  const save = async (newLang?: string, newMood?: string) => {
+    setSaving(true);
+    await fetch("/api/messaging/bot-settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language: newLang || language, mood: newMood || mood }),
+    });
+    setSaving(false);
+  };
+
+  if (!loaded) return null;
+
+  return (
+    <div className="rounded-lg border p-4 space-y-4">
+      <h3 className="text-sm font-medium">Bot Personality</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Response Language</Label>
+          <select
+            className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
+            value={language}
+            onChange={(e) => { setLanguage(e.target.value); save(e.target.value, undefined); }}
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.value} value={l.value}>{l.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Mood</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {MOODS.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => { setMood(m.value); save(undefined, m.value); }}
+                className={`px-2.5 py-1 rounded-full text-xs transition-colors ${mood === m.value ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"}`}
+                title={m.desc}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {saving && <p className="text-xs text-muted-foreground">Saving...</p>}
     </div>
   );
 }
