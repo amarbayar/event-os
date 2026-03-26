@@ -18,7 +18,9 @@ The agent understands English, Mongolian (Cyrillic), and transliterated Mongolia
 
 **Cmd+K** opens the agent from anywhere.
 
-Supports **Gemini 2.5 Flash** (free tier, default), **xAI**, **z.ai**, **Ollama** (local), or add your own by implementing one interface.
+Supports **Google Gemini**, **z.ai (GLM)**, **xAI (Grok)**, **Ollama** (local), or add your own by implementing one interface. Admins pick their provider and enter their API key from the Settings UI — no `.env` editing required.
+
+The agent also runs on **Telegram and Discord** via [OpenClaw](https://openclaw.ai). @mention the bot in your team's group chat and it responds with the same intelligence and RBAC as the web agent.
 
 ## What's in the box
 
@@ -41,7 +43,10 @@ Supports **Gemini 2.5 Flash** (free tier, default), **xAI**, **z.ai**, **Ollama*
 | **Stakeholder Portal** | Confirmed speakers/sponsors get a login to self-service their checklist items — upload photos, submit bios, confirm travel. Organizers see submissions and approve/reject. |
 | **RBAC & Team Management** | 6 roles (owner → admin → organizer → coordinator → viewer → stakeholder). Team-scoped permissions — teams own entity types. Confirmed entities protected from non-admin deletion. Same rules enforced in web UI and agent. |
 | **Notifications** | In-app notifications for assignments, stage changes, checklist submissions, comments. Bell icon with unread badge. Mark read, bulk delete. |
-| **Settings** | Tabbed: Event details, Team management (invite/roles), Checklist templates (per entity type), Telegram connection (placeholder). |
+| **Telegram & Discord Bot** | Connect your team's chat via OpenClaw. @mention the bot to query data, create records, manage your event. Thread-based replies, configurable bot personality (language + mood). |
+| **AI Model Settings** | Pick your LLM provider (Gemini, z.ai, xAI, Ollama) and enter API key from the UI. Changes apply to both web chat and messaging bots. API keys encrypted at rest. |
+| **Localization** | English and Mongolian UI via next-intl. Locale switcher in sidebar. Agent responds in user's language. |
+| **Settings** | Tabbed: Event details, Team management (invite/roles), Checklist templates, AI Model, Messaging (Telegram/Discord connection + bot personality). |
 | **Public Agenda** | Attendee-facing schedule with day/track filters. |
 | **CFP Form** | Public speaker application form. |
 
@@ -56,7 +61,9 @@ Supports **Gemini 2.5 Flash** (free tier, default), **xAI**, **z.ai**, **Ollama*
 | ORM | Drizzle | Type-safe, no magic, SQL when you need it |
 | Auth | NextAuth.js (v5) | Credentials + JWT + service token for API |
 | Passwords | bcrypt (12 rounds) | Proper key stretching. Legacy SHA-256 auto-detected for migration. |
-| Agent LLM | Gemini 2.5 Flash (default), xAI, z.ai, Ollama | Abstracted — add providers with one interface |
+| Agent LLM | Gemini, z.ai (GLM), xAI (Grok), Ollama | Configurable from Settings UI. Abstracted — add providers with one interface |
+| Messaging | OpenClaw | Telegram + Discord bot integration with thread-based replies |
+| i18n | next-intl | English + Mongolian, cookie-based locale switching |
 | Icons | Lucide React | Consistent, tree-shakeable |
 
 ## Getting Started
@@ -117,7 +124,7 @@ GEMINI_API_KEY="your-key"      # free at ai.google.dev
 
 ```bash
 # SQLite
-DB_DIALECT=sqlite npx drizzle-kit push --config=drizzle.config.sqlite.ts
+DB_DIALECT=sqlite npx drizzle-kit push
 DB_DIALECT=sqlite npx tsx src/db/seed.ts
 
 # PostgreSQL
@@ -147,9 +154,9 @@ Open `localhost:3000`. Log in with `admin@devsummit.mn` / `admin123`.
 
 | Task | PostgreSQL | SQLite |
 |------|-----------|--------|
-| Push schema | `npx drizzle-kit push` | `DB_DIALECT=sqlite npx drizzle-kit push --config=drizzle.config.sqlite.ts` |
+| Push schema | `npx drizzle-kit push` | `DB_DIALECT=sqlite npx drizzle-kit push` |
 | Seed data | `npx tsx src/db/seed.ts` | `DB_DIALECT=sqlite npx tsx src/db/seed.ts` |
-| Browse DB | `npx drizzle-kit studio` | `DB_DIALECT=sqlite npx drizzle-kit studio --config=drizzle.config.sqlite.ts` |
+| Browse DB | `npx drizzle-kit studio` | `DB_DIALECT=sqlite npx drizzle-kit studio` |
 | Reset DB | `psql -d event_os -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"` then push + seed | Delete `local.db` then push + seed |
 
 ### Environment Variables
@@ -167,6 +174,7 @@ Open `localhost:3000`. Log in with `admin@devsummit.mn` / `admin123`.
 | `XAI_API_KEY` | No | xAI API key |
 | `ZAI_API_KEY` | No | z.ai (ZhipuAI) API key |
 | `OLLAMA_URL` | No | Ollama URL (default: `localhost:11434`) |
+| `ENCRYPTION_KEY` | No | 64 hex chars for API key encryption — `openssl rand -hex 32`. Falls back to AUTH_SECRET |
 | `QUEUE_ENABLED` | No | `true` to route emails/notifications through the job queue |
 | `MAIL_DRIVER` | No | `log` (default), `mailgun`, or `postmark` |
 | `MAIL_FROM_ADDRESS` | No | Sender email (default: `noreply@example.com`) |
@@ -300,7 +308,7 @@ src/
       attendees/          # Registration + CSV import
       invitations/        # Guest allocations
       check-in/           # QR scanner + dashboard
-      settings/           # Event | Team | Checklists | Telegram tabs
+      settings/           # Event | Team | Checklists | AI Model | Messaging tabs
       notifications/      # Notification list + mark read/delete
     portal/               # Stakeholder self-service (speakers/sponsors login here)
     login/                # Authentication
@@ -318,8 +326,12 @@ src/
       me/                 # Current user info
       upload/             # File upload (authenticated)
       agent/process/      # LLM chat endpoint
+      agent/identify/     # Platform user → Event OS user resolution
+      messaging/          # Telegram, Discord, links, bot-settings, llm-settings
+      me/locale/          # User locale preference
   db/
-    schema.ts             # Drizzle PG schema (30+ tables) — canonical type source
+    schema.ts             # Dialect-aware barrel (exports PG or SQLite schema)
+    schema.pg.ts          # Drizzle PG schema (30+ tables)
     schema.sqlite.ts      # Drizzle SQLite schema (mirrors PG)
     dialect.ts            # DB_DIALECT env detection
     seed.ts               # Dev Summit sample data (works with both dialects)
@@ -341,6 +353,8 @@ src/
       drivers/database.ts # PG (FOR UPDATE SKIP LOCKED) + SQLite driver
       worker.ts           # Poll loop, retry, timeout, graceful shutdown
       jobs.ts             # send-email, send-notification
+    openclaw.ts           # OpenClaw config bridge (Telegram/Discord setup, LLM config sync)
+    crypto.ts             # AES-256-GCM encryption for API keys at rest
     password.ts           # bcrypt hash + compare (legacy SHA-256 compat)
     contacts.ts           # Cross-org person identity
     conflicts.ts          # Schedule conflict detection
@@ -351,6 +365,7 @@ src/
       manage-handler.ts   # Create/update/delete with dynamic schema
       query-handler.ts    # Count/list/search with checklist status
       input-guard.ts      # Prompt injection defense + @mention gating
+      sql-query.ts        # LLM-generated SQL for complex queries (validated + sandboxed)
       prompt.ts           # LLM system prompts (classify + extract)
       providers/          # Gemini, xAI, z.ai, Ollama
   components/
@@ -361,8 +376,15 @@ src/
     assigned-to-select.tsx# User dropdown for assignee fields
     chat-panel.tsx        # Agent chat (Cmd+K)
     notes-panel.tsx       # Discussion threads on entities
+    portal-invite-section.tsx # Shared portal invite component (deduped from 6 pages)
+    locale-switcher.tsx   # Language picker (en/mn)
     confirm-dialog.tsx    # Themed confirmation dialog (never use system alerts)
     ui/                   # shadcn/ui components
+  i18n/
+    request.ts            # next-intl locale resolution from cookie
+  messages/
+    en.json               # English translations
+    mn.json               # Mongolian translations
 ```
 
 ## Testing
@@ -373,7 +395,7 @@ Tests run against SQLite by default — no PostgreSQL or external services neede
 
 ```bash
 # Set up SQLite test database
-DB_DIALECT=sqlite npx drizzle-kit push --config=drizzle.config.sqlite.ts
+DB_DIALECT=sqlite npx drizzle-kit push
 DB_DIALECT=sqlite npx tsx src/db/seed.ts
 
 # Run unit + integration tests (no server needed)
@@ -435,12 +457,17 @@ Without the secret, LLM tests are skipped — all other tests still run and pass
 
 ## Security
 
-- **RBAC:** 6 roles with team-scoped permissions. Same rules enforced on web UI and agent.
-- **Org isolation:** Every mutation WHERE clause includes `organizationId`. Cross-org access blocked.
+- **RBAC:** 6 roles with team-scoped permissions. Same rules enforced on web UI, agent, and messaging bots.
+- **Org isolation:** Every mutation WHERE clause includes `organizationId`. Cross-org access blocked. Field allowlists prevent mass assignment.
 - **Stage protection:** Confirmed entities can't be deleted by non-admins (web UI + agent).
-- **Agent hardening:** Prompt injection defense (multilingual), bulk operation blocking, sensitive field stripping, @mention gating for group chats.
+- **Agent hardening:** Prompt injection defense (multilingual), bulk operation blocking, sensitive field stripping, @mention gating for group chats. LLM-generated SQL validated with keyword blocking, PG function blocklist, and mandatory org scoping.
+- **API key encryption:** LLM API keys stored with AES-256-GCM encryption at rest.
+- **Timing-safe auth:** Service token comparison uses `crypto.timingSafeEqual` to prevent timing attacks.
+- **Shell injection prevention:** All values interpolated into `execSync` commands are sanitized against shell metacharacters.
+- **Upload safety:** Path traversal prevention — uploaded file paths validated to stay within the upload directory.
+- **Onboarding gate:** `/api/onboarding` requires authentication after the first organization is created.
 - **Password hashing:** bcrypt (12 rounds). Pre-commit hook scans for leaked credentials.
-- **205 automated tests** covering RBAC, agent CRUD, prompt injection, checklist lifecycle, security regressions.
+- **Automated tests** covering RBAC, agent CRUD, prompt injection, checklist lifecycle, security regressions.
 
 Never commit `.env.local`. The `.env.example` file has safe placeholders only.
 
@@ -451,20 +478,27 @@ Never commit `.env.local`. The `.env.example` file has safe placeholders only.
 - [x] Multi-org, multi-event support with edition switching
 - [x] Agent intelligence — natural language CRUD, query, bulk import across all entity types
 - [x] Agent security — RBAC enforcement, prompt injection defense, bulk operation blocking, stage protection
+- [x] LLM-generated SQL — complex join/aggregation queries validated and sandboxed
+- [x] OpenClaw integration — Telegram + Discord bots with @mention gating, thread-based replies
+- [x] LLM settings UI — admins pick provider + model + API key from Settings (encrypted at rest)
+- [x] Bot personality — configurable language + mood from Settings
 - [x] Unified pipeline model (source/stage) across all entity types
 - [x] Pipeline tables with inline editing + entity drawers with tabs
-- [x] RBAC — 6 roles, team-scoped permissions, enforced on all API routes + agent
+- [x] RBAC — 6 roles, team-scoped permissions, enforced on all API routes + agent + bots
 - [x] Post-confirmation checklists (auto-generate, archive, restore)
 - [x] Stakeholder portal (self-service checklist + profile)
 - [x] Marketing content calendar + Kanban task board
 - [x] Notifications, QR check-in, public agenda, CFP form
+- [x] Localization — English + Mongolian UI (next-intl), locale switcher
+- [x] UI animations — slide-in drawers, fade dialogs, prefers-reduced-motion support
 - [x] Job queue — database-backed, retry with backoff, graceful shutdown, extensible driver interface
 - [x] Email system — Postmark/Mailgun/log drivers, async via queue, dedup protection, email logging
-- [x] 205 automated tests (RBAC, agent, security, checklist)
+- [x] Security hardened — 9 CSO audit findings resolved (command injection, mass assignment, timing attacks, path traversal, org isolation, API key encryption)
+- [x] Automated tests (RBAC, agent, security, checklist) — 0 TypeScript errors
 
 ### Planned
 
-- [ ] OpenClaw integration — Telegram/Discord/WhatsApp bot with @mention gating
+- [ ] WhatsApp bot integration (requires cloud deployment for webhook)
 - [ ] Payments — Stripe + QPay (Mongolia) via pluggable adapter
 - [ ] Email communications — scheduled broadcasts, checklist reminders, bulk campaigns
 - [ ] Cloud deployment (Vercel, Fly.io, or Railway)
