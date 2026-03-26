@@ -318,7 +318,6 @@ export const venues = pgTable(
     capacity: integer("capacity"),
     priceQuote: text("price_quote"), // free-text for negotiation notes
     status: varchar("status", { length: 50 }).default("identified").notNull(), // identified, contacted, negotiating, proposal_received, finalized, declined
-    isFinalized: boolean("is_finalized").default(false).notNull(),
     assignedTo: varchar("assigned_to", { length: 255 }), // organizer responsible
     assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
     pros: text("pros"),

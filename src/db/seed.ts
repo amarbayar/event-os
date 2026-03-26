@@ -152,9 +152,9 @@ async function seed() {
 
   // Venues
   const venueData = [
-    { name: "Chinggis Khaan Hotel", address: "Tokyo Street 17, Ulaanbaatar", contactName: "Boldbaatar M.", contactEmail: "events@ckhotel.mn", capacity: 500, priceQuote: "$3,500/day — includes AV", status: "finalized", isFinalized: true, assignedTo: "Amarbayar" },
-    { name: "Blue Sky Tower", address: "Peace Avenue, Ulaanbaatar", contactName: "Oyunaa S.", contactEmail: "events@bluesky.mn", capacity: 800, priceQuote: "$5,000/day", status: "proposal_received", isFinalized: false, assignedTo: "Tuvshin" },
-    { name: "NUM University Hall", address: "University Street 1", contactName: "Prof. Batbayar", contactEmail: "batbayar@num.edu.mn", capacity: 300, priceQuote: "Free (partnership)", status: "negotiating", isFinalized: false, assignedTo: "Tuvshin" },
+    { name: "Chinggis Khaan Hotel", address: "Tokyo Street 17, Ulaanbaatar", contactName: "Boldbaatar M.", contactEmail: "events@ckhotel.mn", capacity: 500, priceQuote: "$3,500/day — includes AV", status: "finalized", stage: "confirmed", assignedTo: "Amarbayar" },
+    { name: "Blue Sky Tower", address: "Peace Avenue, Ulaanbaatar", contactName: "Oyunaa S.", contactEmail: "events@bluesky.mn", capacity: 800, priceQuote: "$5,000/day", status: "proposal_received", assignedTo: "Tuvshin" },
+    { name: "NUM University Hall", address: "University Street 1", contactName: "Prof. Batbayar", contactEmail: "batbayar@num.edu.mn", capacity: 300, priceQuote: "Free (partnership)", status: "negotiating", assignedTo: "Tuvshin" },
   ];
 
   for (const v of venueData) {

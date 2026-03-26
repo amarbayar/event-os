@@ -33,7 +33,7 @@ export async function PATCH(
   const allowedFields = [
     "name", "address", "contactName", "contactEmail", "contactPhone",
     "capacity", "priceQuote", "status", "stage", "source", "substatus",
-    "notes", "assignedTo", "assigneeId", "isFinalized",
+    "notes", "assignedTo", "assigneeId",
   ];
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {

@@ -145,6 +145,134 @@ export async function getDashboardStats() {
   };
 }
 
+type StageCounts = { lead: number; engaged: number; confirmed: number; declined: number };
+
+function countStages(rows: { stage: string }[]): StageCounts {
+  const counts: StageCounts = { lead: 0, engaged: 0, confirmed: 0, declined: 0 };
+  for (const r of rows) {
+    if (r.stage in counts) counts[r.stage as keyof StageCounts]++;
+  }
+  return counts;
+}
+
+export async function getDashboardData() {
+  const ids = await getActiveIds();
+  if (!ids) return null;
+
+  const edId = ids.editionId;
+  const orgId = ids.orgId;
+
+  // All queries in parallel
+  const [
+    edition,
+    speakers,
+    sponsors,
+    venueRows,
+    booths,
+    attendeeStats,
+    sessions,
+    tracks,
+    tasks,
+    overdueTasks,
+    recentNotifications,
+    channelCount,
+    pendingChecklist,
+  ] = await Promise.all([
+    // Edition
+    db.query.eventEditions.findFirst({
+      where: eq(schema.eventEditions.id, edId),
+      with: { series: true },
+    }),
+    // Speakers with stage
+    db.select({ stage: schema.speakerApplications.stage })
+      .from(schema.speakerApplications)
+      .where(eq(schema.speakerApplications.editionId, edId)),
+    // Sponsors with stage
+    db.select({ stage: schema.sponsorApplications.stage })
+      .from(schema.sponsorApplications)
+      .where(eq(schema.sponsorApplications.editionId, edId)),
+    // Venues with stage
+    db.select({ stage: schema.venues.stage })
+      .from(schema.venues)
+      .where(eq(schema.venues.editionId, edId)),
+    // Booths with stage
+    db.select({ stage: schema.booths.stage })
+      .from(schema.booths)
+      .where(eq(schema.booths.editionId, edId)),
+    // Attendee check-in stats
+    db.select({
+      total: count(),
+      checkedIn: count(sql`CASE WHEN ${schema.attendees.checkedIn} = true THEN 1 END`),
+    }).from(schema.attendees).where(eq(schema.attendees.editionId, edId)),
+    // Sessions
+    db.select({ id: schema.sessions.id, type: schema.sessions.type })
+      .from(schema.sessions)
+      .where(eq(schema.sessions.editionId, edId)),
+    // Tracks
+    db.select({ id: schema.tracks.id, name: schema.tracks.name })
+      .from(schema.tracks)
+      .where(eq(schema.tracks.editionId, edId)),
+    // All tasks for status counts
+    db.select({ status: schema.tasks.status, priority: schema.tasks.priority })
+      .from(schema.tasks)
+      .where(eq(schema.tasks.editionId, edId)),
+    // Overdue tasks
+    db.select({ id: schema.tasks.id, title: schema.tasks.title, dueDate: schema.tasks.dueDate, assigneeName: schema.tasks.assigneeName })
+      .from(schema.tasks)
+      .where(and(
+        eq(schema.tasks.editionId, edId),
+        sql`${schema.tasks.dueDate} < NOW()`,
+        sql`${schema.tasks.status} != 'done'`,
+      ))
+      .orderBy(asc(schema.tasks.dueDate))
+      .limit(5),
+    // Recent notifications (activity feed)
+    db.query.notifications.findMany({
+      where: eq(schema.notifications.organizationId, orgId),
+      orderBy: desc(schema.notifications.createdAt),
+      limit: 8,
+    }),
+    // Messaging channels
+    db.select({ count: count() }).from(schema.messagingChannels)
+      .where(eq(schema.messagingChannels.organizationId, orgId)),
+    // Pending checklist items (stakeholder submissions needed)
+    db.select({ count: count() }).from(schema.checklistItems)
+      .where(and(
+        eq(schema.checklistItems.organizationId, orgId),
+        eq(schema.checklistItems.status, "pending"),
+      )),
+  ]);
+
+  const attendeeTotal = Number(attendeeStats[0]?.total || 0);
+  const attendeeCheckedIn = Number(attendeeStats[0]?.checkedIn || 0);
+
+  // Task status breakdown
+  const taskCounts = { todo: 0, in_progress: 0, blocked: 0, done: 0 };
+  for (const t of tasks) {
+    if (t.status && t.status in taskCounts) taskCounts[t.status as keyof typeof taskCounts]++;
+  }
+
+  // Days until event
+  const daysUntil = edition?.startDate
+    ? Math.ceil((new Date(edition.startDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  return {
+    edition,
+    daysUntil,
+    speakers: { total: speakers.length, stages: countStages(speakers) },
+    sponsors: { total: sponsors.length, stages: countStages(sponsors) },
+    venues: { total: venueRows.length, stages: countStages(venueRows) },
+    booths: { total: booths.length, stages: countStages(booths) },
+    attendees: { total: attendeeTotal, checkedIn: attendeeCheckedIn },
+    sessions: { total: sessions.length, tracks: tracks.length },
+    tasks: { total: tasks.length, ...taskCounts, overdue: overdueTasks },
+    pendingChecklist: Number(pendingChecklist[0]?.count || 0),
+    messagingConnected: Number(channelCount[0]?.count || 0),
+    recentActivity: recentNotifications,
+  };
+}
+
 export async function getSponsors() {
   const ids = await getActiveIds();
   if (!ids) return [];

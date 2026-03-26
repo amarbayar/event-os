@@ -276,7 +276,6 @@ export const venues = sqliteTable(
     capacity: integer("capacity"),
     priceQuote: text("price_quote"),
     status: text("status").default("identified").notNull(),
-    isFinalized: bool("is_finalized").default(false).notNull(),
     assignedTo: text("assigned_to"),
     assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
     pros: text("pros"),

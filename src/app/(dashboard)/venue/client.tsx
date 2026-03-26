@@ -36,7 +36,6 @@ type Venue = {
   capacity: number | null;
   priceQuote: string | null;
   status: string;
-  isFinalized: boolean;
   assignedTo: string | null;
   pros: string | null;
   cons: string | null;
@@ -57,8 +56,8 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [drawerForm, setDrawerForm] = useState<Record<string, string | null | string[]>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const finalized = venues.find((v) => v.isFinalized);
-  const filtered = filter(venues).filter((v) => !v.isFinalized);
+  const confirmed = venues.find((v) => v.stage === "confirmed");
+  const filtered = filter(venues);
 
   const columns = [
     {
@@ -423,8 +422,8 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
         </Card>
       )}
 
-      {/* Finalized venue banner */}
-      {finalized && (
+      {/* Confirmed venue banner */}
+      {confirmed && (
         <Card className="mb-4 border-emerald-200 bg-emerald-50">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
@@ -433,12 +432,20 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
               </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-emerald-900">{finalized.name}</p>
-                  <Badge className="bg-emerald-100 text-emerald-700">Finalized</Badge>
+                  <p className="font-semibold text-emerald-900">{confirmed.name}</p>
+                  <Badge className="bg-emerald-100 text-emerald-700">Confirmed</Badge>
                 </div>
-                <p className="text-sm text-emerald-700 mt-0.5">{finalized.address}</p>
-                <p className="text-sm text-emerald-700">Capacity: {finalized.capacity} &middot; {finalized.priceQuote}</p>
-                <p className="text-xs text-emerald-600 mt-1">Contact: {finalized.contactName} &middot; Managed by {finalized.assignedTo}</p>
+                {confirmed.address && <p className="text-sm text-emerald-700 mt-0.5">{confirmed.address}</p>}
+                {(confirmed.capacity || confirmed.priceQuote) && (
+                  <p className="text-sm text-emerald-700">
+                    {confirmed.capacity ? `Capacity: ${confirmed.capacity}` : ""}{confirmed.capacity && confirmed.priceQuote ? " · " : ""}{confirmed.priceQuote || ""}
+                  </p>
+                )}
+                {(confirmed.contactName || confirmed.assignedTo) && (
+                  <p className="text-xs text-emerald-600 mt-1">
+                    {confirmed.contactName ? `Contact: ${confirmed.contactName}` : ""}{confirmed.contactName && confirmed.assignedTo ? " · " : ""}{confirmed.assignedTo ? `Managed by ${confirmed.assignedTo}` : ""}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
