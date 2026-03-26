@@ -990,7 +990,7 @@ describe("Agent LLM integration (real Gemini)", () => {
   beforeAll(async () => {
     try {
       const { getProvider } = await import("@/lib/agent");
-      provider = getProvider();
+      provider = await getProvider();
     } catch {
       // No API key — skip LLM tests
       provider = null;

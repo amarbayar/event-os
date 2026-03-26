@@ -352,7 +352,7 @@ describe("LLM-level security (real Gemini)", () => {
   beforeAll(async () => {
     try {
       const { getProvider } = await import("@/lib/agent");
-      provider = getProvider();
+      provider = await getProvider();
     } catch { provider = null; }
   });
 
