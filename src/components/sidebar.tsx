@@ -24,6 +24,7 @@ import {
   ChevronDown,
   MessageSquare,
   Bell,
+  Mail,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -34,28 +35,35 @@ type NavGroup = {
 
 const navGroups: NavGroup[] = [
   {
-    label: "People",
+    label: "Program",
     items: [
+      { href: "/agenda", label: "Agenda", icon: Calendar },
       { href: "/speakers", label: "Speakers", icon: Mic2 },
-      { href: "/sponsors", label: "Sponsors", icon: Building2 },
-      { href: "/volunteers", label: "Volunteers", icon: HandHelping },
-      { href: "/media", label: "Media", icon: Tv },
     ],
   },
   {
-    label: "Event",
+    label: "Partnerships",
     items: [
-      { href: "/agenda", label: "Agenda", icon: Calendar },
+      { href: "/sponsors", label: "Sponsors", icon: Building2 },
+      { href: "/media", label: "Media", icon: Tv },
       { href: "/venue", label: "Venues", icon: MapPin },
       { href: "/booths", label: "Booths", icon: Store },
     ],
   },
   {
-    label: "Operations",
+    label: "Team & Tasks",
     items: [
       { href: "/tasks", label: "Tasks", icon: CheckSquare },
       { href: "/marketing", label: "Marketing", icon: Megaphone },
-      { href: "/attendees", label: "Attendees", icon: Users },
+      { href: "/volunteers", label: "Volunteers", icon: HandHelping },
+    ],
+  },
+  {
+    label: "Attendees",
+    items: [
+      { href: "/attendees", label: "Registration", icon: Users },
+      { href: "/invitations", label: "Invitations", icon: Mail },
+      { href: "/check-in", label: "Check-in", icon: ScanLine },
     ],
   },
 ];
@@ -64,9 +72,7 @@ const topItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
 ];
 
-const bottomItems = [
-  { href: "/check-in", label: "Check-in", icon: ScanLine },
-];
+const bottomItems: { href: string; label: string; icon: React.ElementType }[] = [];
 
 type Edition = {
   id: string;
@@ -77,7 +83,7 @@ export function Sidebar({ onToggleChat }: { onToggleChat?: () => void }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(["People", "Event", "Operations"])
+    new Set(["Program", "Partnerships", "Team & Tasks", "Attendees"])
   );
   const [editions, setEditions] = useState<Edition[]>([]);
   const [activeEdition, setActiveEdition] = useState<string>("");
