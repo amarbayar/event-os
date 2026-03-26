@@ -229,15 +229,12 @@ function openclawExec(cmd: string, timeout = 10000): string {
 export function restartGateway(): { ok: boolean; error?: string } {
   if (!OPENCLAW_BIN) return { ok: false, error: "OpenClaw not installed" };
   try {
-    openclawExec("gateway restart");
+    // Always force-reinstall to ensure the plist has the latest config/token.
+    // A simple "restart" fails when the LaunchAgent is stale.
+    openclawExec("gateway install --force", 15000);
     return { ok: true };
-  } catch {
-    try {
-      openclawExec("gateway install", 15000);
-      return { ok: true };
-    } catch (e2: any) {
-      return { ok: false, error: e2.message?.slice(0, 200) };
-    }
+  } catch (e: any) {
+    return { ok: false, error: e.message?.slice(0, 200) };
   }
 }
 
