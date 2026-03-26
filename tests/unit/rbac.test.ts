@@ -77,7 +77,7 @@ describe("RBAC schema", () => {
       .from(schema.teamEntityTypes)
       .where(eq(schema.teamEntityTypes.teamId, teams["Program"]));
 
-    const typeNames = types.map((t) => t.entityType).sort();
+    const typeNames = types.map((t: any) => t.entityType).sort();
     expect(typeNames).toEqual(["session", "speaker"]);
   });
 
@@ -87,7 +87,7 @@ describe("RBAC schema", () => {
       .from(schema.teamEntityTypes)
       .where(eq(schema.teamEntityTypes.teamId, teams["Logistics"]));
 
-    const typeNames = types.map((t) => t.entityType).sort();
+    const typeNames = types.map((t: any) => t.entityType).sort();
     expect(typeNames).toEqual(["booth", "venue"]);
   });
 
@@ -97,7 +97,7 @@ describe("RBAC schema", () => {
       .from(schema.teamEntityTypes)
       .where(eq(schema.teamEntityTypes.teamId, teams["Operations"]));
 
-    const typeNames = types.map((t) => t.entityType).sort();
+    const typeNames = types.map((t: any) => t.entityType).sort();
     expect(typeNames).toEqual(["attendee", "media", "volunteer"]);
   });
 });
@@ -111,7 +111,7 @@ describe("Team membership", () => {
       .from(schema.teamMembers)
       .where(eq(schema.teamMembers.userId, users["Tuvshin"].id));
 
-    const teamIds = memberships.map((m) => m.teamId);
+    const teamIds = memberships.map((m: any) => m.teamId);
     expect(teamIds).toContain(teams["Program"]);
     expect(teamIds).toContain(teams["Logistics"]);
   });
@@ -122,7 +122,7 @@ describe("Team membership", () => {
       .from(schema.teamMembers)
       .where(eq(schema.teamMembers.userId, users["Sarnai"].id));
 
-    const teamIds = memberships.map((m) => m.teamId);
+    const teamIds = memberships.map((m: any) => m.teamId);
     expect(teamIds).toContain(teams["Operations"]);
     expect(teamIds).toContain(teams["Marketing"]);
   });
@@ -133,7 +133,7 @@ describe("Team membership", () => {
       .from(schema.teamMembers)
       .where(eq(schema.teamMembers.userId, users["Oyungerel"].id));
 
-    const teamIds = memberships.map((m) => m.teamId);
+    const teamIds = memberships.map((m: any) => m.teamId);
     expect(teamIds).toContain(teams["Sponsor/Partnership"]);
     expect(teamIds).toContain(teams["Marketing"]);
   });
@@ -224,7 +224,7 @@ describe("User organization memberships", () => {
       where: eq(schema.userOrganizations.organizationId, orgId),
       with: { user: true },
     });
-    const emails = memberships.map((m) => m.user.email);
+    const emails = memberships.map((m: any) => m.user.email);
     expect(new Set(emails).size).toBe(emails.length);
   });
 

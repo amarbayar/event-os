@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       name: user.userName,
       email: user.userEmail,
       role: user.role,
-      teams: userTeams.map((t) => t.teamName),
+      teams: userTeams.map((t: typeof userTeams[number]) => t.teamName),
       linked: true,
     },
   });

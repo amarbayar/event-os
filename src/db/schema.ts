@@ -11,7 +11,7 @@ import { getDialect } from "./dialect";
 import * as pg from "./schema.pg";
 import * as sqlite from "./schema.sqlite";
 
-const s: typeof pg = getDialect() === "sqlite" ? (sqlite as typeof pg) : pg;
+const s: typeof pg = getDialect() === "sqlite" ? (sqlite as unknown as typeof pg) : pg;
 
 // ─── Enums (PG-only, but exported for type compatibility) ───
 export const speakerStatusEnum = pg.speakerStatusEnum;

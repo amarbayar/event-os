@@ -8,7 +8,7 @@ import { useState, useEffect, useRef } from "react";
 export function useAnimatedMount(isOpen: boolean, exitDuration = 150) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     if (isOpen) {

@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json({
-    data: editions.map((e) => ({
+    data: editions.map((e: typeof editions[number]) => ({
       id: e.id,
       name: e.name,
       slug: e.slug,

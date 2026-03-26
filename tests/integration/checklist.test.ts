@@ -153,7 +153,7 @@ describe("Checklist item generation", () => {
       ),
     });
     expect(items.length).toBe(templateCount.length);
-    expect(items.every((i) => i.status === "pending")).toBe(true);
+    expect(items.every((i: any) => i.status === "pending")).toBe(true);
   });
 
   it("skips generation if items already exist (no duplicates)", async () => {
@@ -205,7 +205,7 @@ describe("Checklist item archival", () => {
         eq(schema.checklistItems.entityId, speakerId)
       ),
     });
-    expect(items.every((i) => i.status === "archived")).toBe(true);
+    expect(items.every((i: any) => i.status === "archived")).toBe(true);
   });
 
   it("is idempotent — archiving already archived items is a no-op", async () => {
@@ -241,9 +241,9 @@ describe("Re-confirmation restore", () => {
         eq(schema.checklistItems.entityId, speakerId)
       ),
     });
-    const restored = items.filter((i) => i.status !== "archived");
+    const restored = items.filter((i: any) => i.status !== "archived");
     expect(restored.length).toBeGreaterThan(0);
-    expect(restored.every((i) => i.status === "pending")).toBe(true);
+    expect(restored.every((i: any) => i.status === "pending")).toBe(true);
   });
 
   it("restores submitted items with submitted status", async () => {
@@ -275,8 +275,8 @@ describe("Re-confirmation restore", () => {
       ),
     });
 
-    const active = restored.filter((i) => i.status !== "archived");
-    const withValue = active.find((i) => i.value === "https://example.com/photo.jpg");
+    const active = restored.filter((i: any) => i.status !== "archived");
+    const withValue = active.find((i: any) => i.value === "https://example.com/photo.jpg");
     expect(withValue).toBeDefined();
     expect(withValue!.status).toBe("submitted");
   });

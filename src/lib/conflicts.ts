@@ -21,7 +21,7 @@ export async function detectConflicts(
   const allSessions = await db.query.sessions.findMany({
     where: eq(sessions.editionId, editionId),
     with: { speaker: true, track: true },
-    orderBy: (s, { asc }) => [asc(s.day), asc(s.startTime)],
+    orderBy: (s: any, { asc }: any) => [asc(s.day), asc(s.startTime)],
   });
 
   const conflicts: Conflict[] = [];

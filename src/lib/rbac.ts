@@ -73,7 +73,7 @@ export async function requirePermission(
       // Get latest edition for this org
       const edition = await db.query.eventEditions.findFirst({
         where: eq(eventEditions.organizationId, orgId),
-        orderBy: (e, { desc }) => [desc(e.createdAt)],
+        orderBy: (e: any, { desc }: any) => [desc(e.createdAt)],
       });
       return {
         user: { id: "service", role: "admin", name: "Service", email: "service@system" },

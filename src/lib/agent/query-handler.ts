@@ -462,9 +462,9 @@ async function getChecklistStatus(
   if (items.length === 0) return null;
 
   const total = items.length;
-  const approved = items.filter((i) => i.status === "approved").length;
-  const submitted = items.filter((i) => i.status === "submitted").length;
-  const pending = items.filter((i) => i.status === "pending").length;
+  const approved = items.filter((i: typeof items[number]) => i.status === "approved").length;
+  const submitted = items.filter((i: typeof items[number]) => i.status === "submitted").length;
+  const pending = items.filter((i: typeof items[number]) => i.status === "pending").length;
 
   if (approved === total) return `Checklist: **all ${total} items complete**`;
   if (pending === total) return `Checklist: **${total} items pending** (none submitted)`;

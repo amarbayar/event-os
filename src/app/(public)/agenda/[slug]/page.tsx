@@ -30,7 +30,7 @@ export default async function PublicAgendaPage({
     orderBy: [asc(sessions.day), asc(sessions.startTime), asc(sessions.sortOrder)],
   });
 
-  const publicSessions = allSessions.map((s) => ({
+  const publicSessions = allSessions.map((s: typeof allSessions[number]) => ({
     id: s.id,
     title: s.title,
     description: s.description,

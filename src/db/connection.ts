@@ -19,7 +19,7 @@ export async function createConnection(pgUrlOverride?: string): Promise<{
     const sqlite = new Database(process.env.SQLITE_PATH || "local.db");
     sqlite.pragma("journal_mode = WAL");
     sqlite.pragma("foreign_keys = ON");
-    return { db: drizzle(sqlite, { schema: sqliteSchema }), close: async () => sqlite.close() };
+    return { db: drizzle(sqlite, { schema: sqliteSchema }), close: async () => { sqlite.close(); } };
   }
 
   const postgres = (await import("postgres")).default;

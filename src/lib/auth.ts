@@ -31,7 +31,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Resolve org + role from user_organizations (most recent membership)
         const membership = await db.query.userOrganizations.findFirst({
           where: eq(userOrganizations.userId, user.id),
-          orderBy: (uo, { desc }) => [desc(uo.createdAt)],
+          orderBy: (uo: any, { desc }: any) => [desc(uo.createdAt)],
         });
 
         if (!membership) return null; // User must be invited to an org

@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   // Find or create series for this org
   let series = await db.query.eventSeries.findFirst({
-    where: (s, { eq }) => eq(s.organizationId, ids.orgId),
+    where: (s: any, { eq }: any) => eq(s.organizationId, ids.orgId),
   });
 
   if (!series) {

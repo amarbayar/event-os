@@ -67,7 +67,7 @@ export async function generateChecklistItems(
         eq(checklistTemplates.editionId, editionId),
         eq(checklistTemplates.entityType, entityType)
       ),
-      orderBy: (t, { asc }) => asc(t.sortOrder),
+      orderBy: (t: any, { asc }: any) => asc(t.sortOrder),
     });
 
     if (templates.length === 0) {
@@ -107,7 +107,7 @@ export async function archiveChecklistItems(
       ),
     });
 
-    const activeItems = items.filter((i) => i.status !== "archived");
+    const activeItems = items.filter((i: typeof items[number]) => i.status !== "archived");
     if (activeItems.length === 0) return 0;
 
     for (const item of activeItems) {

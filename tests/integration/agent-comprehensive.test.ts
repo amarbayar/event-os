@@ -73,8 +73,8 @@ beforeAll(async () => {
     .where(and(eq(schema.teams.organizationId, orgId), isNull(schema.teams.editionId)))
     .limit(20);
 
-  const org = teamScoped.find((r) => r.role === "organizer");
-  const coord = teamScoped.find((r) => r.role === "coordinator");
+  const org = teamScoped.find((r: any) => r.role === "organizer");
+  const coord = teamScoped.find((r: any) => r.role === "coordinator");
   organizerUserId = org?.userId || "no-organizer";
   organizerEntityType = org?.entityType || "speaker";
   coordinatorUserId = coord?.userId || "no-coordinator";
@@ -696,7 +696,7 @@ describe("Agent RBAC enforcement", () => {
           eq(schema.teams.organizationId, orgId),
           isNull(schema.teams.editionId)
         ));
-      const scopedSet = new Set(scopedTypes.map((r) => r.entityType));
+      const scopedSet = new Set(scopedTypes.map((r: any) => r.entityType));
       const manageable = ["speaker", "sponsor", "venue", "booth", "volunteer", "media", "task", "campaign"];
       const outOfScope = manageable.find((t) => !scopedSet.has(t));
       if (!outOfScope) return; // organizer has scope for everything — skip test

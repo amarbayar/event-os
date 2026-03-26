@@ -218,9 +218,9 @@ async function seed() {
     });
   }
   const userRecords = await db.query.users.findMany({
-    where: (u, { inArray }) => inArray(u.email, teamUsers.map(tu => tu.email)),
+    where: (u: any, { inArray }: any) => inArray(u.email, teamUsers.map((tu: typeof teamUsers[number]) => tu.email)),
   });
-  const userMap = Object.fromEntries(userRecords.map((u) => [u.name, u.id]));
+  const userMap = Object.fromEntries(userRecords.map((u: typeof userRecords[number]) => [u.name, u.id]));
 
   // User ↔ Organization memberships (mirrors legacy users.organizationId + role)
   for (const u of teamUsers) {

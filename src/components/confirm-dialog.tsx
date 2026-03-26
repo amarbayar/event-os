@@ -30,7 +30,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     resolve: (value: boolean) => void;
   } | null>(null);
   const [visible, setVisible] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {

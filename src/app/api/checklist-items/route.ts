@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   // Only sync if entity already has at least one item (i.e., was confirmed)
   if (existingItems.length > 0) {
-    const existingTemplateIds = new Set(existingItems.map((i) => i.templateId));
+    const existingTemplateIds = new Set(existingItems.map((i: typeof existingItems[number]) => i.templateId));
     const templates = await db.query.checklistTemplates.findMany({
       where: and(
         eq(checklistTemplates.editionId, ctx.editionId),
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     );
 
   // Filter out archived
-  const activeItems = items.filter((i) => i.status !== "archived");
+  const activeItems = items.filter((i: typeof items[number]) => i.status !== "archived");
 
   // Group by template name for progress bars
   const templateProgress: Record<string, { total: number; done: number }> = {};
