@@ -1,4 +1,5 @@
 // Test setup — database connection for integration tests
+import "dotenv/config";
 import { createConnection } from "@/db/connection";
 
 const TEST_DB_URL =
