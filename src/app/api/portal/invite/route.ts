@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, userOrganizations, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners } from "@/db/schema";
+import { users, userOrganizations, organizations, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { hash } from "@/lib/password";
+import { mail } from "@/lib/mail";
+import { portalInvite } from "@/lib/mail/mailables/portal-invite";
+import { portalAdded } from "@/lib/mail/mailables/portal-added";
 
 // POST — invite a confirmed entity to the stakeholder portal
 // Creates a user with role="stakeholder" linked to the entity
@@ -60,6 +63,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Entity has no email address — cannot create portal account" }, { status: 400 });
   }
 
+  // Get org name for email templates
+  const org = await db.query.organizations.findFirst({
+    where: eq(organizations.id, ctx.orgId),
+    columns: { name: true },
+  });
+  const orgName = org?.name || "your organization";
+
   // Check if user already exists
   const existing = await db.query.users.findFirst({
     where: eq(users.email, entityEmail),
@@ -89,6 +99,13 @@ export async function POST(req: NextRequest) {
       linkedEntityId: entityId,
     });
 
+    // Notify existing user they've been added to a new org
+    await mail(
+      { email: existing.email, name: existing.name || undefined },
+      portalAdded({ name: existing.name || entityName, portalUrl: "/portal", organizationName: orgName }),
+      { orgId: ctx.orgId, entityType, entityId }
+    );
+
     return NextResponse.json({
       data: { id: existing.id, name: existing.name, email: existing.email, role: "stakeholder", portalUrl: `/portal` },
     }, { status: 201 });
@@ -115,6 +132,13 @@ export async function POST(req: NextRequest) {
     linkedEntityType: entityType,
     linkedEntityId: entityId,
   });
+
+  // Send portal invite email with temp password
+  await mail(
+    { email: entityEmail, name: entityName },
+    portalInvite({ name: entityName, tempPassword: rawPassword, portalUrl: "/portal", organizationName: orgName }),
+    { orgId: ctx.orgId, entityType, entityId }
+  );
 
   return NextResponse.json({
     data: {
