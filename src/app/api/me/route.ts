@@ -11,9 +11,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sessionUser = session.user as Record<string, unknown>;
-  const userId = sessionUser.id as string;
-  const orgId = sessionUser.organizationId as string;
+  const userId = session.user.id;
+  const orgId = session.user.organizationId as string;
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),

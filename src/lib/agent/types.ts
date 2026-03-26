@@ -1,3 +1,22 @@
+import type { Table, Column } from "drizzle-orm";
+
+/**
+ * A Drizzle table that also supports dynamic string-key column access.
+ * Uses intersection so it satisfies both Table (for getTableColumns, select, etc.)
+ * and Record<string, ...> (for dynamic column lookup).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type DrizzleTable = Table<any> & Record<string, any>;
+
+/** Safely access a Drizzle table column by dynamic string key. */
+export function col(table: DrizzleTable, name: string): Column {
+  const c = table[name];
+  if (!c || typeof c !== "object" || !("name" in c)) {
+    throw new Error(`Column "${name}" not found on table`);
+  }
+  return c as Column;
+}
+
 export type EntityType =
   | "speaker"
   | "sponsor"

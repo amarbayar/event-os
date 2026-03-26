@@ -1,8 +1,8 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { eq, and, sql, desc, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, inArray, SQL } from "drizzle-orm";
 import { ilikeFn as ilike } from "@/db/dialect";
-import { AgentIntent, DispatchResult } from "./types";
+import { AgentIntent, DispatchResult, DrizzleTable, col } from "./types";
 import { AgentContext } from "./dispatcher";
 
 // ─── Query Handler ───────────────────────────────────
@@ -61,7 +61,7 @@ function resolveField(key: string): string {
 }
 
 // Entity type → Drizzle table mapping
-const TABLE_MAP: Record<string, { table: any; nameField: string; label: string; pluralLabel: string }> = {
+const TABLE_MAP: Record<string, { table: DrizzleTable; nameField: string; label: string; pluralLabel: string }> = {
   speaker: { table: schema.speakerApplications, nameField: "name", label: "speaker", pluralLabel: "speakers" },
   sponsor: { table: schema.sponsorApplications, nameField: "companyName", label: "sponsor", pluralLabel: "sponsors" },
   venue: { table: schema.venues, nameField: "name", label: "venue", pluralLabel: "venues" },
@@ -80,7 +80,7 @@ export async function handleQuery(
   const entityType = intent.entityType;
 
   // "Tell me about this event" / event info queries
-  if (entityType === "event" as any || (!entityType && intent.action === "search")) {
+  if ((entityType as string) === "event" || (!entityType && intent.action === "search")) {
     return handleEventInfo(ctx);
   }
 
@@ -161,15 +161,15 @@ function resolveEnumFilter(field: string, value: string): { values: string[]; ne
 
 function buildFilterConditions(
   filters: Record<string, unknown>,
-  table: any,
-): any[] {
-  const conditions: any[] = [];
+  table: DrizzleTable,
+): SQL[] {
+  const conditions: SQL[] = [];
   const enumFields = new Set(["stage", "status", "priority", "talkType", "type", "platform", "source"]);
 
   for (const [key, value] of Object.entries(filters)) {
     if (!value) continue;
-    const col = resolveField(key);
-    const actualCol = col in table ? col : key in table ? key : null;
+    const resolved = resolveField(key);
+    const actualCol = resolved in table ? resolved : key in table ? key : null;
     if (!actualCol) continue;
 
     // Array value → validate each, then IN clause
@@ -178,12 +178,12 @@ function buildFilterConditions(
         const validSet = VALID_ENUM_VALUES[actualCol];
         const validValues = value.filter((v): v is string => typeof v === "string" && (validSet?.has(v.toLowerCase()) ?? true)).map((v) => v.toLowerCase());
         if (validValues.length > 0) {
-          conditions.push(inArray((table as any)[actualCol], validValues));
+          conditions.push(inArray(col(table, actualCol), validValues));
         }
       } else {
         const strings = value.filter((v): v is string => typeof v === "string");
         if (strings.length > 0) {
-          conditions.push(inArray((table as any)[actualCol], strings));
+          conditions.push(inArray(col(table, actualCol), strings));
         }
       }
       continue;
@@ -196,14 +196,14 @@ function buildFilterConditions(
       const resolved = resolveEnumFilter(actualCol, value);
       if (resolved) {
         if (resolved.values.length === 1) {
-          conditions.push(eq((table as any)[actualCol], resolved.values[0]));
+          conditions.push(eq(col(table, actualCol), resolved.values[0]));
         } else {
-          conditions.push(inArray((table as any)[actualCol], resolved.values));
+          conditions.push(inArray(col(table, actualCol), resolved.values));
         }
       }
       // If null — invalid value, skip silently instead of crashing
     } else {
-      conditions.push(ilike((table as any)[actualCol], `%${value}%`));
+      conditions.push(ilike(col(table, actualCol), `%${value}%`));
     }
   }
 
@@ -220,7 +220,7 @@ async function handleCount(
   const { table, pluralLabel } = config;
   const filters = (intent.params?.filters as Record<string, unknown>) || {};
 
-  const conditions: any[] = [];
+  const conditions: SQL[] = [];
   if ("editionId" in table) conditions.push(eq(table.editionId, ctx.editionId));
   if ("organizationId" in table) conditions.push(eq(table.organizationId, ctx.orgId));
   conditions.push(...buildFilterConditions(filters, table));
@@ -255,7 +255,7 @@ async function handleList(
   const filters = (intent.params?.filters as Record<string, unknown>) || {};
   const limit = (intent.params?.limit as number) || 10;
 
-  const conditions: any[] = [];
+  const conditions: SQL[] = [];
   if ("editionId" in table) conditions.push(eq(table.editionId, ctx.editionId));
   if ("organizationId" in table) conditions.push(eq(table.organizationId, ctx.orgId));
   conditions.push(...buildFilterConditions(filters, table));
@@ -277,7 +277,7 @@ async function handleList(
   }
 
   // Format as a readable list
-  const items = rows.map((row: any, i: number) => {
+  const items = rows.map((row: Record<string, unknown>, i: number) => {
     const name = row[nameField] || row.name || row.title || "Unnamed";
     const stage = row.stage ? ` (${row.stage})` : "";
     const status = row.status && row.status !== row.stage ? ` [${row.status}]` : "";
@@ -293,7 +293,7 @@ async function handleList(
   return {
     message: `${header}\n${items.join("\n")}`,
     success: true,
-    data: { items: rows.map((r: any) => stripSensitiveFields(r)) },
+    data: { items: rows.map((r: Record<string, unknown>) => stripSensitiveFields(r)) },
   };
 }
 
@@ -314,7 +314,7 @@ async function handleSearch(
     };
   }
 
-  const conditions: any[] = [];
+  const conditions: SQL[] = [];
 
   if ("editionId" in table) {
     conditions.push(eq(table.editionId, ctx.editionId));
@@ -331,7 +331,7 @@ async function handleSearch(
                         nameField;
 
   if (searchColumn in table) {
-    conditions.push(ilike((table as any)[searchColumn], `%${searchValue}%`));
+    conditions.push(ilike(col(table, searchColumn), `%${searchValue}%`));
   }
 
   const rows = await db
@@ -349,7 +349,7 @@ async function handleSearch(
   }
 
   if (rows.length === 1) {
-    const row = rows[0] as any;
+    const row = rows[0] as Record<string, unknown>;
     const name = row[nameField] || row.name || row.title || "Unnamed";
     const details: string[] = [];
     if (row.email || row.contactEmail) details.push(`Email: ${row.email || row.contactEmail}`);
@@ -360,7 +360,7 @@ async function handleSearch(
     if (row.talkType) details.push(`Type: ${row.talkType}`);
 
     // Include checklist completion status if entity has checklist items
-    const checklistInfo = await getChecklistStatus(row.id, intent.entityType!, ctx);
+    const checklistInfo = await getChecklistStatus(row.id as string, intent.entityType!, ctx);
     if (checklistInfo) details.push(checklistInfo);
 
     return {
@@ -371,7 +371,7 @@ async function handleSearch(
   }
 
   // Multiple matches
-  const items = rows.map((row: any, i: number) => {
+  const items = rows.map((row: Record<string, unknown>, i: number) => {
     const name = row[nameField] || row.name || row.title || "Unnamed";
     const extra = row.company || row.companyName || row.email || row.contactEmail || "";
     const stage = row.stage ? ` (${row.stage})` : "";
@@ -381,7 +381,7 @@ async function handleSearch(
   return {
     message: `Found ${rows.length} ${pluralLabel} matching "${searchValue}":\n${items.join("\n")}`,
     success: true,
-    data: { items: rows.map((r: any) => stripSensitiveFields(r)) },
+    data: { items: rows.map((r: Record<string, unknown>) => stripSensitiveFields(r)) },
   };
 }
 

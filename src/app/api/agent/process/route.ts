@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getProvider } from "@/lib/agent";
-import { InputType } from "@/lib/agent/types";
+import { InputType, AgentResponse } from "@/lib/agent/types";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
 import { getActiveIds } from "@/lib/queries";
 import { gateMention, sanitizeInput, isOffTopic } from "@/lib/agent/input-guard";
@@ -60,11 +60,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sessionUser = session.user as Record<string, unknown>;
-  userId = sessionUser.id as string;
-  orgId = sessionUser.organizationId as string;
-  role = (sessionUser.role as string) || "viewer";
-  userName = (sessionUser.name as string) || null;
+  userId = session.user.id;
+  orgId = session.user.organizationId as string;
+  role = session.user.role || "viewer";
+  userName = session.user.name || null;
 
   if (!checkRateLimit(userId)) {
     return NextResponse.json({ error: "Rate limited. Please wait a moment." }, { status: 429 });
@@ -204,7 +203,7 @@ async function handleRequest(
 
 // Existing extraction flow (backward compatible)
 async function handleExtract(
-  provider: { extract: (input: string, inputType: InputType, context?: string) => Promise<any>; name: string },
+  provider: { extract: (input: string, inputType: InputType, context?: string) => Promise<AgentResponse>; name: string },
   input: string,
   inputType: InputType,
   context: string | undefined,
@@ -213,7 +212,7 @@ async function handleExtract(
 ) {
   const result = await provider.extract(input, inputType, context);
 
-  const enrichedActions = (result.actions || []).map((action: any) => ({
+  const enrichedActions = (result.actions || []).map((action: AgentResponse["actions"][number]) => ({
     ...action,
     payload: {
       ...action.payload,

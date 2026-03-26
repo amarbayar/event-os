@@ -271,7 +271,7 @@ export default function PortalPage() {
   const total = activeItems.length;
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const entityName = (entity as Record<string, string>).name || (entity as Record<string, string>).companyName || (entity as Record<string, string>).contactName || "Your Profile";
+  const entityName = (entity.name as string) || (entity.companyName as string) || (entity.contactName as string) || "Your Profile";
 
   return (
     <div className="min-h-screen bg-stone-50">

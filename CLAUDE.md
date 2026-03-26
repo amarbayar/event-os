@@ -129,9 +129,37 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 - Never hardcode `"en-US"` in `toLocaleDateString()` / `toLocaleTimeString()` calls
 
 ## Type Safety
-- Never use `as any` — use proper type declarations instead
-- NextAuth types are extended via module augmentation in `src/types/next-auth.d.ts`
-- Prefer `as Record<string, unknown>` → proper interface extension over inline casts
+
+### No `as any` — zero tolerance
+- **Never** cast to `as any`. Every instance must use a proper type instead.
+- If a library API forces dynamic typing, isolate the cast in a single helper function (see Drizzle section below).
+
+### NextAuth session — already typed, don't re-cast
+- `Session.user` is extended via module augmentation in `src/types/next-auth.d.ts` with `id`, `role`, `organizationId`.
+- Access these directly: `session.user.id`, `session.user.role`, `session.user.organizationId`.
+- **Never** cast `session.user as Record<string, unknown>` — the types already cover all custom fields.
+- `organizationId` is `string | null | undefined` — use `as string` only after a null check guard.
+
+### Dynamic DB rows — use `Record<string, unknown>`
+- When a DB query returns a polymorphic/dynamic row (e.g., entity from a runtime-selected table), type it as `Record<string, unknown>`.
+- Access fields with `row.fieldName as string` (narrowing individual properties), not by casting the entire row to `any`.
+
+### Drizzle dynamic table access — use `col()` helper
+- Agent handlers access Drizzle table columns by dynamic string key. Use the typed `col(table, name)` helper from `src/lib/agent/types.ts` instead of `(table as any)[name]`.
+- Table configs use `DrizzleTable` type (intersection of `Table` + `Record<string, any>`) — not bare `any`.
+- Type filter condition arrays as `ReturnType<typeof eq>[]`, not `any[]`.
+- For `db.query` dynamic lookup by entity type string (e.g., `db.query[queryName]`), a single eslint-disable `as any` is acceptable at the lookup site with a `Record<string, unknown>` result type.
+
+### Array narrowing — use `Array.isArray()`, not double-casts
+- When a union type includes arrays (e.g., `string | string[]`), narrow with `Array.isArray(value)` at runtime.
+- **Never** use `as unknown as string[]` double-casts — they hide type mismatches.
+
+### `Promise.race` with timeouts
+- Type the timeout branch as `new Promise<never>((_, reject) => ...)` so the race result inherits the real promise's type.
+- Then narrow the result with a typed destructure, not `as any`.
+
+### next-intl dynamic keys — accepted exception
+- `t(dynamicKey)` requires `as any` because next-intl expects literal union types from translation files. This is the **one** accepted exception — mark with `// eslint-disable-next-line @typescript-eslint/no-explicit-any`.
 
 ## UI Rules
 

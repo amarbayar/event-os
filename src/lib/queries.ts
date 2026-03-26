@@ -8,8 +8,7 @@ export async function getActiveIds(userOrgId?: string) {
     try {
       const { auth } = await import("@/lib/auth");
       const session = await auth();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      userOrgId = (session?.user as any)?.organizationId;
+      userOrgId = session?.user?.organizationId ?? undefined;
     } catch {
       // Session may not be available in all contexts
     }
