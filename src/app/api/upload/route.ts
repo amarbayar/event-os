@@ -21,6 +21,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
+  // Path traversal protection
+  if (folder.includes("..")) {
+    return NextResponse.json({ error: "Invalid folder" }, { status: 400 });
+  }
+  const resolvedPath = path.resolve(UPLOAD_DIR, folder);
+  if (!resolvedPath.startsWith(path.resolve(UPLOAD_DIR))) {
+    return NextResponse.json({ error: "Invalid folder" }, { status: 400 });
+  }
+
   if (file.size > MAX_SIZE) {
     return NextResponse.json({ error: "File too large. Max 5MB." }, { status: 400 });
   }
@@ -35,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   const ext = file.name.split(".").pop() || "jpg";
   const fileName = `${randomUUID()}.${ext}`;
-  const folderPath = path.join(UPLOAD_DIR, folder);
+  const folderPath = resolvedPath;
 
   await mkdir(folderPath, { recursive: true });
 

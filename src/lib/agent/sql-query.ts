@@ -130,10 +130,27 @@ export function validateSql(query: string): { valid: boolean; error?: string } {
 
   // Block mutations hidden in subqueries or CTEs
   const upper = trimmed.toUpperCase();
-  const blocked = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "CREATE", "GRANT", "REVOKE", "EXEC"];
+  const blocked = [
+    // Mutation keywords
+    "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "CREATE", "GRANT", "REVOKE", "EXEC",
+    // Dangerous PostgreSQL functions
+    "PG_READ_FILE", "PG_READ_BINARY_FILE",
+    "PG_LS_DIR", "PG_STAT_FILE",
+    "PG_SLEEP",
+    "LO_IMPORT", "LO_EXPORT", "LO_GET", "LO_PUT",
+    "DBLINK", "DBLINK_CONNECT", "DBLINK_EXEC",
+    "COPY",
+    "EXECUTE",
+    "SET ROLE", "SET SESSION",
+    "PG_TERMINATE_BACKEND", "PG_CANCEL_BACKEND",
+    "CURRENT_SETTING",
+    "INET_SERVER_ADDR",
+  ];
   for (const keyword of blocked) {
-    // Check for keyword as a standalone word (not inside a string)
-    const regex = new RegExp(`\\b${keyword}\\b`, "i");
+    // Check for keyword as standalone word(s) (not inside a string)
+    // Escape any special regex chars, then match word boundaries
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`\\b${escaped}\\b`, "i");
     if (regex.test(upper)) {
       return { valid: false, error: `Blocked keyword: ${keyword}` };
     }
@@ -153,9 +170,9 @@ export function validateSql(query: string): { valid: boolean; error?: string } {
     }
   }
 
-  // Must contain org scoping
+  // Must contain org scoping — reject queries missing organization_id filter
   if (!trimmed.includes(ctx_placeholder_org)) {
-    // We'll inject it ourselves, so this is a warning not a block
+    return { valid: false, error: "Query must include organization_id filter for data isolation." };
   }
 
   return { valid: true };
@@ -173,24 +190,12 @@ export async function executeSqlQuery(
   try {
     // Step 1: Get LLM to generate SQL
     const { getProvider } = await import("@/lib/agent");
-    const provider = getProvider();
+    const provider = await getProvider(ctx.orgId);
 
     const prompt = buildSqlPrompt(question, ctx);
-    // Use the extract method with a custom prompt to get raw SQL
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0, maxOutputTokens: 500 },
-        }),
-      }
-    );
-
-    const data = await response.json();
-    let generatedSql = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    // Use the provider's extract method to get raw SQL from any LLM
+    const result = await provider.extract(prompt, "text");
+    let generatedSql = result.message?.trim() || "";
 
     // Clean up — remove markdown fences if present
     generatedSql = generatedSql.replace(/^```\w*\n?/m, "").replace(/\n?```$/m, "").trim();
@@ -243,12 +248,12 @@ export async function executeSqlQuery(
     const pagedSql = `${baseSql} LIMIT ${PAGE_SIZE} OFFSET ${offset}`;
 
     console.log("Executing LLM SQL (paged):", pagedSql);
-    const result = await Promise.race([
+    const queryResult = await Promise.race([
       db.execute(sql.raw(pagedSql)),
       new Promise((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 5000)),
     ]) as any;
 
-    const rows = result.rows || result || [];
+    const rows = queryResult.rows || queryResult || [];
 
     if (!Array.isArray(rows) || rows.length === 0) {
       return { message: "No results found.", success: true, data: { items: [] } };

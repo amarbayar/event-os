@@ -18,6 +18,28 @@ import path from "path";
 const OPENCLAW_DIR = path.join(homedir(), ".openclaw");
 const CONFIG_PATH = path.join(OPENCLAW_DIR, "openclaw.json");
 
+// ─── Shell injection prevention ──────────────────────
+//
+// User-supplied values (API keys, bot tokens, model names) are interpolated
+// into execSync shell commands. Reject any value containing shell
+// metacharacters to prevent command injection.
+
+function sanitizeShellValue(value: string, label = "Value"): string {
+  if (/[;"'`$|&()<>\\!{}[\]#~\n\r]/.test(value)) {
+    throw new Error(`${label} contains invalid characters`);
+  }
+  return value;
+}
+
+// For values written to .env files (not shell commands), we only need
+// to reject newlines/carriage returns which could corrupt the file format.
+function sanitizeEnvValue(value: string, label = "Value"): string {
+  if (/[\n\r]/.test(value)) {
+    throw new Error(`${label} contains invalid characters`);
+  }
+  return value;
+}
+
 // Find the openclaw binary — it may be installed under a different Node version via nvm
 function findOpenClawBin(): string | null {
   // Check common locations
@@ -81,12 +103,14 @@ export function getOpenClawStatus(): {
     return { installed: false, gatewayRunning: false, telegramConnected: false, botUsername: null };
   }
 
+  // Infer status from config + plist existence (instant, no shell call)
   let gatewayRunning = false;
   let telegramConnected = false;
   try {
-    const status = openclawExec("channels status", 5000);
-    gatewayRunning = status.includes("Gateway reachable");
-    telegramConnected = status.includes("running, mode:polling");
+    const plistPath = path.join(homedir(), "Library/LaunchAgents/ai.openclaw.gateway.plist");
+    gatewayRunning = existsSync(plistPath);
+    const config = readConfig();
+    telegramConnected = gatewayRunning && !!config?.channels?.telegram?.enabled;
   } catch {}
 
   const config = readConfig();
@@ -142,10 +166,11 @@ export function configureTelegram(opts: {
   // Ensure GEMINI_API_KEY is in the gateway's env
   if (opts.geminiApiKey) {
     try {
+      const safeKey = sanitizeShellValue(opts.geminiApiKey, "Gemini API key");
       const plistPath = path.join(homedir(), "Library/LaunchAgents/ai.openclaw.gateway.plist");
       if (existsSync(plistPath)) {
         // macOS: inject into LaunchAgent plist
-        execSync(`/usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:GEMINI_API_KEY ${opts.geminiApiKey}" "${plistPath}" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:GEMINI_API_KEY string ${opts.geminiApiKey}" "${plistPath}"`, { stdio: "pipe" });
+        execSync(`/usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:GEMINI_API_KEY ${safeKey}" "${plistPath}" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:GEMINI_API_KEY string ${safeKey}" "${plistPath}"`, { stdio: "pipe" });
       }
     } catch {}
   }
@@ -239,6 +264,7 @@ export function configureDiscord(opts: {
     enabled: true,
     token: opts.botToken,
     groupPolicy: "allowlist",
+    ackReactionScope: "off",
     guilds: {
       [opts.serverId]: { requireMention: true },
     },
@@ -264,12 +290,57 @@ export function configureDiscord(opts: {
   // Set DISCORD_BOT_TOKEN env for the gateway
   if (opts.botToken) {
     try {
+      const safeToken = sanitizeShellValue(opts.botToken, "Discord bot token");
       const plistPath = path.join(homedir(), "Library/LaunchAgents/ai.openclaw.gateway.plist");
       if (existsSync(plistPath)) {
-        execSync(`/usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:DISCORD_BOT_TOKEN ${opts.botToken}" "${plistPath}" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:DISCORD_BOT_TOKEN string ${opts.botToken}" "${plistPath}"`, { stdio: "pipe" });
+        execSync(`/usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:DISCORD_BOT_TOKEN ${safeToken}" "${plistPath}" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:DISCORD_BOT_TOKEN string ${safeToken}" "${plistPath}"`, { stdio: "pipe" });
       }
     } catch {}
   }
+}
+
+// ─── Update bot personality ───────────────────────────
+
+const MOOD_DESCRIPTIONS: Record<string, string> = {
+  professional: "Professional and concise. Straight to the point.",
+  friendly: "Warm and encouraging. Use casual language, be supportive.",
+  sarcastic: "Witty and sarcastic. Dry humor, but still helpful. Never mean.",
+  nerdy: "Enthusiastic tech nerd. Use analogies, get excited about data, occasional references.",
+  funny: "Light-hearted and humorous. Crack relevant jokes, keep it fun.",
+};
+
+const LANGUAGE_INSTRUCTIONS: Record<string, string> = {
+  auto: "Respond in the same language the user writes in.",
+  en: "Always respond in English.",
+  mn: "Always respond in Mongolian (Cyrillic script).",
+  ko: "Always respond in Korean.",
+  ja: "Always respond in Japanese.",
+  zh: "Always respond in Chinese (Simplified).",
+  ru: "Always respond in Russian.",
+};
+
+export function updateBotPersonality(language: string, mood: string) {
+  const workspace = path.join(OPENCLAW_DIR, "workspace");
+  if (!existsSync(workspace)) return;
+
+  const langInstruction = LANGUAGE_INSTRUCTIONS[language] || LANGUAGE_INSTRUCTIONS.auto;
+  const moodDescription = MOOD_DESCRIPTIONS[mood] || MOOD_DESCRIPTIONS.professional;
+
+  writeFileSync(path.join(workspace, "SOUL.md"), `You are Event OS Bot — an event management assistant.
+
+You help the organizing team manage speakers, sponsors, venues, booths, volunteers,
+media partners, tasks, and campaigns through natural conversation.
+
+PERSONALITY: ${moodDescription}
+
+LANGUAGE: ${langInstruction}
+
+You are NOT a general-purpose AI. If asked to do anything unrelated to event
+management, politely decline.
+
+You cannot process images or files. If a user sends media, tell them to upload
+via the Event OS web dashboard instead.
+`);
 }
 
 // ─── Shared: ensure skill + workspace files ───────────
@@ -304,6 +375,64 @@ export function restartGateway(): { ok: boolean; error?: string } {
   } catch (e: any) {
     return { ok: false, error: e.message?.slice(0, 200) };
   }
+}
+
+// ─── Update LLM config ───────────────────────────────
+
+const PROVIDER_MODEL_PREFIX: Record<string, string> = {
+  gemini: "google",
+  zai: "zai",
+  xai: "xai",
+  ollama: "ollama",
+};
+
+const PROVIDER_ENV_KEY: Record<string, string> = {
+  gemini: "GEMINI_API_KEY",
+  zai: "ZAI_API_KEY",
+  xai: "XAI_API_KEY",
+};
+
+export function updateLlmConfig(provider: string, model?: string, apiKey?: string) {
+  if (!OPENCLAW_BIN) return;
+
+  const prefix = PROVIDER_MODEL_PREFIX[provider];
+  if (!prefix) return;
+
+  const modelId = model ? `${prefix}/${model}` : `${prefix}/default`;
+  const safeModelId = sanitizeShellValue(modelId, "Model ID");
+
+  // Update model in openclaw.json
+  try {
+    openclawExec(`config set agents.defaults.model.primary "${safeModelId}"`, 5000);
+  } catch {}
+
+  // Write API key to ~/.openclaw/.env
+  if (apiKey) {
+    const envKey = PROVIDER_ENV_KEY[provider];
+    if (envKey) {
+      try {
+        const safeApiKey = sanitizeEnvValue(apiKey, "API key");
+        const envPath = path.join(OPENCLAW_DIR, ".env");
+        let envContent = "";
+        if (existsSync(envPath)) {
+          envContent = readFileSync(envPath, "utf-8");
+        }
+        // Replace or append the key
+        const regex = new RegExp(`^${envKey}=.*$`, "m");
+        if (regex.test(envContent)) {
+          envContent = envContent.replace(regex, `${envKey}=${safeApiKey}`);
+        } else {
+          envContent = envContent.trimEnd() + `\n${envKey}=${safeApiKey}\n`;
+        }
+        writeFileSync(envPath, envContent);
+      } catch {}
+    }
+  }
+
+  // Restart gateway to pick up changes
+  try {
+    openclawExec("gateway install --force", 15000);
+  } catch {}
 }
 
 export function stopGateway(): { ok: boolean } {

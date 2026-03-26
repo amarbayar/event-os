@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 
 const SERVICE_TOKEN = process.env.SERVICE_TOKEN;
 
@@ -12,8 +13,10 @@ const ALLOWED_ROUTES = [
 export function validateServiceToken(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) return false;
+  if (!SERVICE_TOKEN) return false;
   const token = authHeader.slice(7);
-  return token === SERVICE_TOKEN;
+  if (token.length !== SERVICE_TOKEN.length) return false;
+  return timingSafeEqual(Buffer.from(token), Buffer.from(SERVICE_TOKEN));
 }
 
 export function isServiceTokenRoute(pathname: string): boolean {

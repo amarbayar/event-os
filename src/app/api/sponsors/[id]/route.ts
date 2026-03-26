@@ -29,10 +29,24 @@ export async function PATCH(
 
   const body = await req.json();
 
-  // Build updates from body — only include fields that are present
+  const allowedFields = [
+    "companyName",
+    "contactName",
+    "contactEmail",
+    "contactId",
+    "logoUrl",
+    "packagePreference",
+    "message",
+    "status",
+    "source",
+    "stage",
+    "assignedTo",
+    "assigneeId",
+  ];
+
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
-    if (value !== undefined) {
+    if (allowedFields.includes(key) && value !== undefined) {
       updates[key] = value;
     }
   }
@@ -47,7 +61,12 @@ export async function PATCH(
       ...updates,
       version: sql`${sponsorApplications.version} + 1`,
     })
-    .where(eq(sponsorApplications.id, id))
+    .where(
+      and(
+        eq(sponsorApplications.id, id),
+        eq(sponsorApplications.organizationId, ctx.orgId)
+      )
+    )
     .returning();
 
   if (!updated) {

@@ -2,8 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { organizations, eventSeries, eventEditions, tracks, users, userOrganizations } from "@/db/schema";
 import { hash } from "@/lib/password";
+import { auth } from "@/lib/auth";
+import { count } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
+  // Security: only allow unauthenticated access for first-time setup (no orgs exist).
+  // After the first org is created, require authentication.
+  const [{ total }] = await db.select({ total: count() }).from(organizations);
+  if (total > 0) {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
   const body = await req.json();
   const {
     orgName,

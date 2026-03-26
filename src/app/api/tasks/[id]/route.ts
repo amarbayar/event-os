@@ -15,7 +15,7 @@ export async function PATCH(
   if (isRbacError(ctx)) return ctx;
 
   const existingTask = await db.query.tasks.findFirst({
-    where: eq(tasks.id, id),
+    where: and(eq(tasks.id, id), eq(tasks.organizationId, ctx.orgId)),
   });
 
   if (!existingTask) {
@@ -24,10 +24,25 @@ export async function PATCH(
 
   const body = await req.json();
 
-  // Build updates from body — only include fields that are present
+  const allowedFields = [
+    "title",
+    "description",
+    "status",
+    "priority",
+    "assigneeId",
+    "assigneeName",
+    "dueDate",
+    "linkedEntityType",
+    "linkedEntityId",
+    "sortOrder",
+    "source",
+    "assignedTo",
+    "teamId",
+  ];
+
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
-    if (value !== undefined) {
+    if (allowedFields.includes(key) && value !== undefined) {
       updates[key] = value;
     }
   }
@@ -42,7 +57,7 @@ export async function PATCH(
       ...updates,
       version: sql`${tasks.version} + 1`,
     })
-    .where(eq(tasks.id, id))
+    .where(and(eq(tasks.id, id), eq(tasks.organizationId, ctx.orgId)))
     .returning();
 
   if (!updated) {
