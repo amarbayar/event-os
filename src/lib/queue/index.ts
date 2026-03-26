@@ -5,7 +5,7 @@ import { DatabaseDriver } from "./drivers/database";
 export type { JobDefinition, JobContext, QueueDriver, WorkerOptions } from "./types";
 export { Worker } from "./worker";
 export { DatabaseDriver } from "./drivers/database";
-export { sendNotificationJob } from "./jobs";
+export { sendNotificationJob, sendEmailJob } from "./jobs";
 
 // ─── Job Registry ───────────────────────────────────────
 
@@ -33,8 +33,9 @@ export function getRegistry(): Map<string, JobDefinition> {
  */
 export async function initializeJobs(): Promise<void> {
   if (initialized) return;
-  const { sendNotificationJob } = await import("./jobs");
+  const { sendNotificationJob, sendEmailJob } = await import("./jobs");
   registerJob(sendNotificationJob);
+  registerJob(sendEmailJob);
   initialized = true;
 }
 

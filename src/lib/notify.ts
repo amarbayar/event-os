@@ -75,15 +75,26 @@ async function resolveContent(params: NotifyParams): Promise<{ title: string; me
  */
 export async function notify(params: NotifyParams): Promise<void> {
   try {
+    const { title, message } = await resolveContent(params);
+
     if (process.env.QUEUE_ENABLED === "true") {
       const { dispatch, sendNotificationJob } = await import("@/lib/queue");
-      await dispatch(sendNotificationJob, params, {
+      // Resolve i18n before dispatching — worker may not have next-intl
+      await dispatch(sendNotificationJob, {
+        userId: params.userId,
+        orgId: params.orgId,
+        type: params.type,
+        title,
+        message,
+        link: params.link,
+        entityType: params.entityType,
+        entityId: params.entityId,
+        actorName: params.actorName,
+      }, {
         organizationId: params.orgId,
       });
       return;
     }
-
-    const { title, message } = await resolveContent(params);
 
     await db.insert(notifications).values({
       userId: params.userId,

@@ -31,7 +31,13 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => ({ op: "eq", a, b })),
   gte: vi.fn((a: unknown, b: unknown) => ({ op: "gte", a, b })),
+  like: vi.fn((a: unknown, b: unknown) => ({ op: "like", a, b })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: "sql", strings, values })),
+}));
+
+// Mock dialect detection
+vi.mock("@/db/dialect", () => ({
+  getDialect: vi.fn(() => "postgresql"),
 }));
 
 import { mail } from "@/lib/mail";

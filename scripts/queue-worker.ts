@@ -39,7 +39,7 @@ async function main() {
   console.log(`[queue] Registered jobs: ${[...registry.keys()].join(", ")}`);
 
   const worker = new Worker(driver, registry, {
-    queues: args.queues,
+    ...(args.queues ? { queues: args.queues } : {}),
   });
 
   await worker.start();

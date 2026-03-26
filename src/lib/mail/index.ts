@@ -5,7 +5,8 @@ import { MailgunDriver } from "./drivers/mailgun";
 import { PostmarkDriver } from "./drivers/postmark";
 import { db } from "@/db";
 import { emailLog } from "@/db/schema";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, like, sql } from "drizzle-orm";
+import { getDialect } from "@/db/dialect";
 
 function getDriver(config: MailConfig): MailDriver {
   switch (config.driver) {
@@ -29,8 +30,14 @@ async function isDuplicate(
 ): Promise<boolean> {
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
+  // PG uses jsonb containment; SQLite stores JSON as text, so use LIKE
+  const emailMatch =
+    getDialect() === "sqlite"
+      ? like(emailLog.toEmails, `%${toEmail}%`)
+      : sql`${emailLog.toEmails}::jsonb @> ${JSON.stringify([toEmail])}::jsonb`;
+
   const conditions = [
-    sql`${emailLog.toEmails}::jsonb @> ${JSON.stringify([toEmail])}::jsonb`,
+    emailMatch,
     eq(emailLog.subject, subject),
     gte(emailLog.createdAt, fiveMinutesAgo),
   ];
@@ -71,16 +78,39 @@ function buildLogEntry(
 }
 
 /**
- * Send an email. Logs to email_log table. Never throws.
+ * Queue an email for sending. Returns immediately — the actual send
+ * happens in the background via the queue worker with retry/backoff.
  *
- * Usage:
- *   await mail(
- *     { email: "alice@example.com", name: "Alice" },
- *     portalInvite({ name: "Alice", tempPassword: "abc123", ... }),
- *     { orgId, entityType: "speaker", entityId }
- *   );
+ * Falls back to synchronous send when QUEUE_ENABLED is not set
+ * (e.g. local dev without a worker running).
  */
 export async function mail(
+  to: MailAddress | MailAddress[],
+  mailable: Mailable,
+  options?: { orgId?: string; entityType?: string; entityId?: string }
+): Promise<SendResult> {
+  try {
+    if (process.env.QUEUE_ENABLED === "true") {
+      const { dispatch, sendEmailJob } = await import("@/lib/queue");
+      await dispatch(sendEmailJob, { to, mailable, options }, {
+        organizationId: options?.orgId,
+      });
+      return { success: true };
+    }
+
+    return mailNow(to, mailable, options);
+  } catch (error) {
+    console.error("Mail dispatch failed:", error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Send an email synchronously. Dedup-checks, sends via driver, logs result.
+ * Called directly by the queue worker (sendEmailJob) or as fallback when
+ * queue is disabled. Never throws.
+ */
+export async function mailNow(
   to: MailAddress | MailAddress[],
   mailable: Mailable,
   options?: { orgId?: string; entityType?: string; entityId?: string }

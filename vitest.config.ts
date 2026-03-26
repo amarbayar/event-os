@@ -8,7 +8,7 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     testTimeout: 60000,
     pool: "forks",
-    exclude: ["tests/e2e-browser/**", "node_modules/**"],
+    exclude: ["tests/e2e-browser/**", "node_modules/**", ".claude/**"],
   },
   resolve: {
     alias: {
