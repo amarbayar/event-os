@@ -46,6 +46,7 @@ export const checklistTemplates = s.checklistTemplates as typeof pg.checklistTem
 export const checklistItems = s.checklistItems as typeof pg.checklistItems;
 export const notifications = s.notifications as typeof pg.notifications;
 export const auditLog = s.auditLog as typeof pg.auditLog;
+export const emailLog = s.emailLog as typeof pg.emailLog;
 export const contacts = s.contacts as typeof pg.contacts;
 export const users = s.users as typeof pg.users;
 export const userOrganizations = s.userOrganizations as typeof pg.userOrganizations;

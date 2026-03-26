@@ -787,6 +787,32 @@ export const auditLog = pgTable(
   ]
 );
 
+// ─── Email Log ──────────────────────────────────────────
+
+export const emailLog = pgTable(
+  "email_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+    driver: varchar("driver", { length: 50 }).notNull(), // mailgun, postmark, log
+    fromEmail: varchar("from_email", { length: 255 }).notNull(),
+    toEmails: jsonb("to_emails").notNull(), // JSON array of email strings
+    subject: varchar("subject", { length: 500 }).notNull(),
+    status: varchar("status", { length: 50 }).notNull(), // sent, failed, skipped
+    providerMessageId: varchar("provider_message_id", { length: 255 }),
+    error: text("error"),
+    entityType: varchar("entity_type", { length: 50 }),
+    entityId: uuid("entity_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("email_log_org_idx").on(table.organizationId),
+    index("email_log_entity_idx").on(table.entityType, table.entityId),
+    index("email_log_created_idx").on(table.createdAt),
+    index("email_log_dedup_idx").on(table.entityId, table.subject, table.createdAt),
+  ]
+);
+
 // ─── Contacts (cross-org person identity) ────────────────
 
 export const contacts = pgTable(

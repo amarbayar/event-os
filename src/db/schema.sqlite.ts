@@ -730,6 +730,32 @@ export const auditLog = sqliteTable(
   ]
 );
 
+// ─── Email Log ──────────────────────────────────────────
+
+export const emailLog = sqliteTable(
+  "email_log",
+  {
+    id: uuidPk(),
+    organizationId: uuidCol("organization_id").references(() => organizations.id),
+    driver: text("driver").notNull(), // mailgun, postmark, log
+    fromEmail: text("from_email").notNull(),
+    toEmails: json("to_emails").notNull(), // JSON array of email strings
+    subject: text("subject").notNull(),
+    status: text("status").notNull(), // sent, failed, skipped
+    providerMessageId: text("provider_message_id"),
+    error: text("error"),
+    entityType: text("entity_type"),
+    entityId: uuidCol("entity_id"),
+    createdAt: tsNow("created_at"),
+  },
+  (table) => [
+    index("email_log_org_idx").on(table.organizationId),
+    index("email_log_entity_idx").on(table.entityType, table.entityId),
+    index("email_log_created_idx").on(table.createdAt),
+    index("email_log_dedup_idx").on(table.entityId, table.subject, table.createdAt),
+  ]
+);
+
 // ─── Contacts (cross-org person identity) ────────────────
 
 export const contacts = sqliteTable(
