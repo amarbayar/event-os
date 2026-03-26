@@ -131,13 +131,16 @@ export async function PATCH(
       where: eq(users.name, assigneeName),
     });
     if (assignee && assignee.id !== ctx.user.id) {
+      const locale = assignee.preferredLocale ?? "en";
       // Assignment notification
       if (updates.assignedTo && updates.assignedTo !== speaker.assignedTo) {
         await notify({
           userId: assignee.id,
           orgId: ctx.orgId,
           type: "assignment",
-          title: `You were assigned to ${updated.name}`,
+          titleKey: "assigned",
+          titleParams: { entity: updated.name ?? "" },
+          locale,
           link: "/speakers",
           entityType: "speaker",
           entityId: id,
@@ -150,7 +153,9 @@ export async function PATCH(
           userId: assignee.id,
           orgId: ctx.orgId,
           type: "stage_change",
-          title: `${updated.name} moved to ${updates.stage}`,
+          titleKey: "stageChanged",
+          titleParams: { entity: updated.name ?? "", stage: updates.stage as string },
+          locale,
           link: "/speakers",
           entityType: "speaker",
           entityId: id,

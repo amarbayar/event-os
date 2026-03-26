@@ -1,17 +1,64 @@
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
+import { getTranslations } from "next-intl/server";
 
-export type NotifyParams = {
+type BaseNotifyParams = {
   userId: string;
   orgId: string;
   type: string;
-  title: string;
-  message?: string;
   link?: string;
   entityType?: string;
   entityId?: string;
   actorName?: string;
 };
+
+type RawNotifyParams = BaseNotifyParams & {
+  title: string;
+  message?: string;
+};
+
+type I18nNotifyParams = BaseNotifyParams & {
+  titleKey: string;
+  titleParams?: Record<string, string>;
+  messageKey?: string;
+  messageParams?: Record<string, string>;
+  locale: string;
+};
+
+export type NotifyParams = RawNotifyParams | I18nNotifyParams;
+
+function isI18n(params: NotifyParams): params is I18nNotifyParams {
+  return "titleKey" in params;
+}
+
+/**
+ * Resolve the title and message from a NotifyParams.
+ * For i18n params, uses next-intl's getTranslations with the recipient's locale.
+ */
+async function resolveContent(params: NotifyParams): Promise<{ title: string; message: string | null }> {
+  if (!isI18n(params)) {
+    return { title: params.title, message: params.message || null };
+  }
+
+  try {
+    const t = await getTranslations({
+      locale: params.locale,
+      namespace: "Notifications",
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const title = t(params.titleKey as any, params.titleParams as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const message = params.messageKey
+      ? t(params.messageKey as any, params.messageParams as any)
+      : null;
+
+    return { title, message };
+  } catch {
+    // Fallback if translation resolution fails (missing key, bad locale, etc.)
+    return { title: params.titleKey, message: params.messageKey || null };
+  }
+}
 
 /**
  * Create a notification for a user.
@@ -20,6 +67,11 @@ export type NotifyParams = {
  *
  * When QUEUE_ENABLED=true, dispatches to the job queue instead
  * of inserting directly. Same signature, same fire-and-forget semantics.
+ *
+ * Supports two calling patterns:
+ * - Raw: { title: "Hello" } — stores as-is
+ * - I18n: { titleKey: "assigned", titleParams: { entity: "John" }, locale: "mn" }
+ *         — resolves translation before storing
  */
 export async function notify(params: NotifyParams): Promise<void> {
   try {
@@ -31,12 +83,14 @@ export async function notify(params: NotifyParams): Promise<void> {
       return;
     }
 
+    const { title, message } = await resolveContent(params);
+
     await db.insert(notifications).values({
       userId: params.userId,
       organizationId: params.orgId,
       type: params.type,
-      title: params.title,
-      message: params.message || null,
+      title,
+      message,
       link: params.link || null,
       entityType: params.entityType || null,
       entityId: params.entityId || null,
@@ -73,7 +127,7 @@ export async function notifyMany(
     }
 
     for (const userId of userIds) {
-      await notify({ ...params, userId });
+      await notify({ ...params, userId } as NotifyParams);
     }
   } catch (error) {
     console.error("Failed to create notifications:", error);

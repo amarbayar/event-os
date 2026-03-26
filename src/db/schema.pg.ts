@@ -846,6 +846,7 @@ export const users = pgTable("users", {
   image: text("image"),
   passwordHash: text("password_hash"),
   contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  preferredLocale: varchar("preferred_locale", { length: 5 }).default("en"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

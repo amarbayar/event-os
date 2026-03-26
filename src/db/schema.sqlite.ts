@@ -789,6 +789,7 @@ export const users = sqliteTable("users", {
   image: text("image"),
   passwordHash: text("password_hash"),
   contactId: uuidCol("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  preferredLocale: text("preferred_locale").default("en"),
   createdAt: tsNow("created_at"),
 });
 

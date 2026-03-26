@@ -18,61 +18,57 @@ import {
   Tv,
   Megaphone,
   MapPin,
-  Send,
   CheckSquare,
-  Ticket,
   ChevronDown,
   MessageSquare,
   Bell,
   Mail,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
-type NavGroup = {
-  label: string;
-  items: { href: string; label: string; icon: React.ElementType }[];
-};
+type NavItem = { href: string; labelKey: string; icon: React.ElementType };
+type NavGroup = { key: string; labelKey: string; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
   {
-    label: "Program",
+    key: "program", labelKey: "program",
     items: [
-      { href: "/agenda", label: "Agenda", icon: Calendar },
-      { href: "/speakers", label: "Speakers", icon: Mic2 },
+      { href: "/agenda", labelKey: "agenda", icon: Calendar },
+      { href: "/speakers", labelKey: "speakers", icon: Mic2 },
     ],
   },
   {
-    label: "Partnerships",
+    key: "partnerships", labelKey: "partnerships",
     items: [
-      { href: "/sponsors", label: "Sponsors", icon: DollarSign },
-      { href: "/media", label: "Media", icon: Tv },
-      { href: "/venue", label: "Venues", icon: MapPin },
-      { href: "/booths", label: "Booths", icon: Store },
+      { href: "/sponsors", labelKey: "sponsors", icon: DollarSign },
+      { href: "/media", labelKey: "media", icon: Tv },
+      { href: "/venue", labelKey: "venues", icon: MapPin },
+      { href: "/booths", labelKey: "booths", icon: Store },
     ],
   },
   {
-    label: "Team & Tasks",
+    key: "teamAndTasks", labelKey: "teamAndTasks",
     items: [
-      { href: "/tasks", label: "Tasks", icon: CheckSquare },
-      { href: "/marketing", label: "Marketing", icon: Megaphone },
-      { href: "/volunteers", label: "Volunteers", icon: HandHelping },
+      { href: "/tasks", labelKey: "tasks", icon: CheckSquare },
+      { href: "/marketing", labelKey: "marketing", icon: Megaphone },
+      { href: "/volunteers", labelKey: "volunteers", icon: HandHelping },
     ],
   },
   {
-    label: "Attendees",
+    key: "attendees", labelKey: "attendees",
     items: [
-      { href: "/attendees", label: "Registration", icon: Users },
-      { href: "/invitations", label: "Invitations", icon: Mail },
-      { href: "/check-in", label: "Check-in", icon: ScanLine },
+      { href: "/attendees", labelKey: "registration", icon: Users },
+      { href: "/invitations", labelKey: "invitations", icon: Mail },
+      { href: "/check-in", labelKey: "checkIn", icon: ScanLine },
     ],
   },
 ];
 
-const topItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+const topItems: NavItem[] = [
+  { href: "/", labelKey: "dashboard", icon: LayoutDashboard },
 ];
-
-const bottomItems: { href: string; label: string; icon: React.ElementType }[] = [];
 
 type Edition = {
   id: string;
@@ -81,9 +77,11 @@ type Edition = {
 
 export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void; chatOpen?: boolean }) {
   const pathname = usePathname();
+  const t = useTranslations("Nav");
+  const tc = useTranslations("Common");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(["Program", "Partnerships", "Team & Tasks", "Attendees"])
+    new Set(["program", "partnerships", "teamAndTasks", "attendees"])
   );
   const [editions, setEditions] = useState<Edition[]>([]);
   const [activeEdition, setActiveEdition] = useState<string>("");
@@ -127,7 +125,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
   useEffect(() => {
     for (const group of navGroups) {
       if (group.items.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"))) {
-        setExpandedGroups((prev) => new Set([...prev, group.label]));
+        setExpandedGroups((prev) => new Set([...prev, group.key]));
       }
     }
   }, [pathname]);
@@ -144,7 +142,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
   const isActive = (href: string) =>
     pathname === href || (href !== "/" && pathname.startsWith(href));
 
-  const navLink = (item: { href: string; label: string; icon: React.ElementType }, indent = false) => (
+  const navLink = (item: NavItem, indent = false) => (
     <Link
       key={item.href}
       href={item.href}
@@ -157,7 +155,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
       )}
     >
       <item.icon className="h-4 w-4 shrink-0" />
-      <span>{item.label}</span>
+      <span>{t(item.labelKey as never)}</span>
     </Link>
   );
 
@@ -174,7 +172,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
               onClick={() => setShowEditionPicker(!showEditionPicker)}
               className="flex w-full items-center justify-between rounded-md text-sm font-medium text-white hover:text-yellow-400 transition-colors"
             >
-              <span className="truncate">{activeEdition || "Select event"}</span>
+              <span className="truncate">{activeEdition || tc("selectEvent")}</span>
               <ChevronDown className={cn("h-3 w-3 ml-1 shrink-0 transition-transform", showEditionPicker && "rotate-180")} />
             </button>
             {showEditionPicker && (
@@ -234,14 +232,14 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
                           }
                         }}
                       />
-                      <p className="text-[10px] text-stone-500">Enter to create, Esc to cancel</p>
+                      <p className="text-[10px] text-stone-500">{tc("enterToCreate")}</p>
                     </div>
                   ) : (
                     <button
                       onClick={() => setShowNewEvent(true)}
                       className="block w-full px-3 py-1.5 text-left text-xs text-yellow-400 hover:bg-stone-700 transition-colors"
                     >
-                      + New Event
+                      {tc("newEvent")}
                     </button>
                   )}
                 </div>
@@ -268,20 +266,20 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
             )}
           >
             <MessageSquare className="h-4 w-4 shrink-0" />
-            <span>Agent</span>
+            <span>{t("agent")}</span>
             <kbd className="ml-auto hidden lg:inline-flex text-[9px] text-stone-500 border border-stone-700 rounded px-1">⌘K</kbd>
           </button>
         )}
 
         {/* Grouped sections */}
         {navGroups.map((group) => {
-          const isExpanded = expandedGroups.has(group.label);
+          const isExpanded = expandedGroups.has(group.key);
           const hasActive = group.items.some((item) => isActive(item.href));
 
           return (
-            <div key={group.label} className="pt-2">
+            <div key={group.key} className="pt-2">
               <button
-                onClick={() => toggleGroup(group.label)}
+                onClick={() => toggleGroup(group.key)}
                 className={cn(
                   "flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors",
                   hasActive
@@ -289,7 +287,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
                     : "text-stone-500 hover:text-stone-300"
                 )}
               >
-                <span>{group.label}</span>
+                <span>{t(group.labelKey as never)}</span>
                 <ChevronDown
                   className={cn(
                     "h-3 w-3 transition-transform",
@@ -309,7 +307,6 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
 
       {/* Bottom */}
       <div className="border-t border-stone-800 px-2 py-3 space-y-1">
-        {bottomItems.map((item) => navLink(item))}
         <Link
           href="/notifications"
           className={cn(
@@ -320,7 +317,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
           )}
         >
           <Bell className="h-4 w-4 shrink-0" />
-          <span>Notifications</span>
+          <span>{t("notifications")}</span>
           {unreadCount > 0 && (
             <span className="absolute right-2 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
               {unreadCount > 9 ? "9+" : unreadCount}
@@ -337,8 +334,9 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
           )}
         >
           <Settings className="h-4 w-4 shrink-0" />
-          <span>Settings</span>
+          <span>{t("settings")}</span>
         </Link>
+        <LocaleSwitcher />
       </div>
     </>
   );
@@ -390,13 +388,13 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
 
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-stone-200 bg-white py-2 lg:hidden">
-        {[
-          { href: "/", label: "Home", icon: LayoutDashboard },
-          { href: "/speakers", label: "People", icon: Users },
-          { href: "/agenda", label: "Event", icon: Calendar },
-          { href: "/tasks", label: "Ops", icon: CheckSquare },
-          { href: "/check-in", label: "Check-in", icon: ScanLine },
-        ].map((item) => (
+        {([
+          { href: "/", labelKey: "home", icon: LayoutDashboard },
+          { href: "/speakers", labelKey: "people", icon: Users },
+          { href: "/agenda", labelKey: "event", icon: Calendar },
+          { href: "/tasks", labelKey: "ops", icon: CheckSquare },
+          { href: "/check-in", labelKey: "checkIn", icon: ScanLine },
+        ] as const).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -408,7 +406,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
             )}
           >
             <item.icon className="h-5 w-5" />
-            <span>{item.label}</span>
+            <span>{t(item.labelKey)}</span>
           </Link>
         ))}
       </nav>
