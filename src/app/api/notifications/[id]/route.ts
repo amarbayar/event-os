@@ -13,7 +13,7 @@ export async function PATCH(
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userId = (session.user as Record<string, unknown>).id as string;
+  const userId = session.user.id;
 
   const [updated] = await db
     .update(notifications)
@@ -34,7 +34,7 @@ export async function DELETE(
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userId = (session.user as Record<string, unknown>).id as string;
+  const userId = session.user.id;
 
   await db.delete(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
   return NextResponse.json({ data: { id } });

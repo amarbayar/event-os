@@ -1,8 +1,8 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { eq, and, sql, getTableColumns } from "drizzle-orm";
+import { eq, and, sql, getTableColumns, SQL } from "drizzle-orm";
 import { ilikeFn as ilike } from "@/db/dialect";
-import { AgentIntent, DispatchResult } from "./types";
+import { AgentIntent, DispatchResult, DrizzleTable, col } from "./types";
 import { AgentContext } from "./dispatcher";
 import { notify } from "@/lib/notify";
 
@@ -16,7 +16,7 @@ import { notify } from "@/lib/notify";
 
 // Table + config map — allowedFields derived from schema at init time
 const ENTITY_CONFIG: Record<string, {
-  table: any;
+  table: DrizzleTable;
   nameField: string;
   label: string;
 }> = {
@@ -50,9 +50,11 @@ type ColumnMeta = { name: string; notNull: boolean; hasDefault: boolean; dataTyp
 // Cache per table: { userFields: string[], requiredNoDefault: string[] }
 const _schemaCache = new Map<string, { userFields: string[]; requiredNoDefault: string[] }>();
 
-function getSchemaInfo(table: any): { userFields: string[]; requiredNoDefault: string[] } {
+function getSchemaInfo(table: DrizzleTable): { userFields: string[]; requiredNoDefault: string[] } {
   // Use the table's SQL name as cache key (unique per table)
-  const tableName = (table as any)[Symbol.for("drizzle:Name")] || (table as any)._.name || "";
+  // Access Drizzle's internal table name via symbol key (no typed API for this)
+  const drizzleName = (table as unknown as Record<symbol, string>)[Symbol.for("drizzle:Name")];
+  const tableName = drizzleName || (table._.name as string) || "";
   const key = tableName || JSON.stringify(Object.keys(getTableColumns(table)));
   if (_schemaCache.has(key)) return _schemaCache.get(key)!;
 
@@ -60,11 +62,11 @@ function getSchemaInfo(table: any): { userFields: string[]; requiredNoDefault: s
   const userFields: string[] = [];
   const requiredNoDefault: string[] = [];
 
-  for (const [name, col] of Object.entries(cols)) {
+  for (const [name, colDef] of Object.entries(cols)) {
     if (SYSTEM_FIELDS.has(name)) continue;
     userFields.push(name);
-    const c = col as any;
-    if (c.notNull && !c.hasDefault && c.default === undefined) {
+    const c = colDef as ColumnMeta;
+    if (c.notNull && !c.hasDefault && (c as Record<string, unknown>).default === undefined) {
       requiredNoDefault.push(name);
     }
   }
@@ -265,14 +267,14 @@ async function handleCreate(
 
   const [created] = await db.insert(table).values(values).returning();
 
-  const createdName = (created as any)[nameField] || "New record";
+  const createdName = (created as Record<string, unknown>)[nameField] || "New record";
   const details: string[] = [];
   for (const [k, v] of Object.entries(params)) {
     if (v && k !== nameField && k !== "name") details.push(`${k}: ${v}`);
   }
 
   return {
-    message: `Created ${label} **${createdName}**${details.length > 0 ? ` (${details.join(", ")})` : ""} — stage: ${(created as any).stage || (created as any).status || "created"}.`,
+    message: `Created ${label} **${createdName}**${details.length > 0 ? ` (${details.join(", ")})` : ""} — stage: ${(created as Record<string, unknown>).stage || (created as Record<string, unknown>).status || "created"}.`,
     success: true,
     data: created,
   };
@@ -287,17 +289,18 @@ async function handleUpdate(
 ): Promise<DispatchResult> {
   const { table, nameField, label } = config;
   const { userFields } = getSchemaInfo(table);
-  const searchValue = intent.searchValue || (intent.params as any)?.name || (intent.params as any)?.[nameField];
+  const rawSearch = intent.searchValue || (intent.params as Record<string, unknown>)?.name || (intent.params as Record<string, unknown>)?.[nameField];
+  const searchValue = typeof rawSearch === "string" ? rawSearch : null;
 
   if (!searchValue) {
     return { message: `Which ${label} do you want to update? Give me a name.`, success: false };
   }
 
   // Find entity by name (ILIKE, org-scoped)
-  const conditions: any[] = [];
+  const conditions: SQL[] = [];
   if ("editionId" in table) conditions.push(eq(table.editionId, ctx.editionId));
   if ("organizationId" in table) conditions.push(eq(table.organizationId, ctx.orgId));
-  conditions.push(ilike((table as any)[nameField], `%${searchValue}%`));
+  conditions.push(ilike(col(table, nameField), `%${searchValue}%`));
 
   const matches = await db.select().from(table).where(and(...conditions)).limit(5);
 
@@ -305,21 +308,21 @@ async function handleUpdate(
     // Retry with shorter search
     const shortSearch = searchValue.split(" ")[0];
     conditions.pop();
-    conditions.push(ilike((table as any)[nameField], `%${shortSearch}%`));
+    conditions.push(ilike(col(table, nameField), `%${shortSearch}%`));
     const retryMatches = await db.select().from(table).where(and(...conditions)).limit(5);
 
     if (retryMatches.length === 0) {
       return { message: `No ${label} found matching "${searchValue}". Check the name and try again.`, success: false };
     }
     if (retryMatches.length > 1) {
-      const list = retryMatches.map((r: any, i: number) => `${i + 1}. **${r[nameField]}**`).join("\n");
+      const list = retryMatches.map((r: Record<string, unknown>, i: number) => `${i + 1}. **${r[nameField]}**`).join("\n");
       return { message: `Multiple matches for "${searchValue}":\n${list}\nWhich one? Reply with the number or full name.`, success: false };
     }
     return applyUpdate(retryMatches[0], intent, ctx, config, userFields);
   }
 
   if (matches.length > 1) {
-    const list = matches.map((r: any, i: number) => {
+    const list = matches.map((r: Record<string, unknown>, i: number) => {
       const extra = r.company || r.companyName || r.email || r.contactEmail || "";
       return `${i + 1}. **${r[nameField]}**${extra ? ` — ${extra}` : ""}`;
     }).join("\n");
@@ -330,7 +333,7 @@ async function handleUpdate(
 }
 
 async function applyUpdate(
-  entity: any,
+  entity: Record<string, unknown>,
   intent: AgentIntent,
   ctx: AgentContext,
   config: typeof ENTITY_CONFIG[string],
@@ -386,17 +389,18 @@ export async function handleDelete(
   config: typeof ENTITY_CONFIG[string]
 ): Promise<DispatchResult> {
   const { table, nameField, label } = config;
-  const searchValue = intent.searchValue || (intent.params as any)?.name || (intent.params as any)?.[nameField];
+  const rawSearch = intent.searchValue || (intent.params as Record<string, unknown>)?.name || (intent.params as Record<string, unknown>)?.[nameField];
+  const searchValue = typeof rawSearch === "string" ? rawSearch : null;
 
   if (!searchValue) {
     return { message: `Which ${label} do you want to delete? Give me a name.`, success: false };
   }
 
   // Find the entity
-  const conditions: any[] = [];
+  const conditions: SQL[] = [];
   if ("editionId" in table) conditions.push(eq(table.editionId, ctx.editionId));
   if ("organizationId" in table) conditions.push(eq(table.organizationId, ctx.orgId));
-  conditions.push(ilike((table as any)[nameField], `%${searchValue}%`));
+  conditions.push(ilike(col(table, nameField), `%${searchValue}%`));
 
   const matches = await db.select().from(table).where(and(...conditions)).limit(5);
   if (matches.length === 0) {
@@ -404,11 +408,11 @@ export async function handleDelete(
   }
 
   if (matches.length > 1) {
-    const list = matches.map((r: any, i: number) => `${i + 1}. **${r[nameField]}**`).join("\n");
+    const list = matches.map((r: Record<string, unknown>, i: number) => `${i + 1}. **${r[nameField]}**`).join("\n");
     return { message: `Multiple ${label}s match "${searchValue}":\n${list}\nWhich one did you mean?`, success: false };
   }
 
-  const entity = matches[0] as any;
+  const entity = matches[0] as Record<string, unknown>;
 
   // Stage protection: confirmed entities can't be deleted by non-admins
   if (entity.stage === "confirmed" && ctx.userRole !== "owner" && ctx.userRole !== "admin") {
@@ -428,7 +432,7 @@ export async function handleDelete(
     if (!deleted) {
       return { message: `${label} not found or already deleted.`, success: false };
     }
-    return { message: `Deleted **${(deleted as any)[nameField]}**.`, success: true };
+    return { message: `Deleted **${(deleted as Record<string, unknown>)[nameField]}**.`, success: true };
   }
 
   // No confirmation flag — ask user to confirm
@@ -436,7 +440,7 @@ export async function handleDelete(
     message: `Are you sure you want to delete **${entity[nameField]}**? Say "delete ${entity[nameField]}" to confirm.`,
     success: true,
     requiresConfirmation: true,
-    pendingAction: { ...intent, searchValue: entity.id },
+    pendingAction: { ...intent, searchValue: entity.id as string },
   };
 }
 
@@ -459,5 +463,5 @@ export async function executeDelete(
     return { message: `${label} not found or already deleted.`, success: false };
   }
 
-  return { message: `Deleted **${(deleted as any)[nameField]}**.`, success: true };
+  return { message: `Deleted **${(deleted as Record<string, unknown>)[nameField]}**.`, success: true };
 }

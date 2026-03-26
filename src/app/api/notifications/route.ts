@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userId = (session.user as Record<string, unknown>).id as string;
+  const userId = session.user.id;
   const url = new URL(req.url);
   const unreadOnly = url.searchParams.get("unread") === "true";
   const countOnly = url.searchParams.get("count") === "true";
@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userId = (session.user as Record<string, unknown>).id as string;
+  const userId = session.user.id;
   const body = await req.json();
 
   if (body.action === "mark_all_read") {

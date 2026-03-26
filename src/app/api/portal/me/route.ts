@@ -11,9 +11,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sessionUser = session.user as Record<string, unknown>;
-  const userId = sessionUser.id as string;
-  const orgId = sessionUser.organizationId as string;
+  const userId = session.user.id;
+  const orgId = session.user.organizationId as string;
 
   // Look up stakeholder membership for this org
   const membership = await db.query.userOrganizations.findFirst({
@@ -48,9 +47,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unknown entity type" }, { status: 400 });
   }
 
-  const entity = await (db.query as Record<string, any>)[queryName].findFirst({
-    where: (t: any, { eq: eqFn }: any) => eqFn(t.id, membership.linkedEntityId),
-  });
+  // Dynamic query by entity type name — Drizzle's query API doesn't support string-based table lookup
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const queryFn = (db.query as Record<string, any>)[queryName];
+  const entity = await queryFn.findFirst({
+    where: (t: Record<string, unknown>, { eq: eqFn }: { eq: typeof eq }) => eqFn(t.id as Parameters<typeof eq>[0], membership.linkedEntityId!),
+  }) as Record<string, unknown> | undefined;
 
   if (!entity) {
     return NextResponse.json({ error: "Linked entity not found" }, { status: 404 });
@@ -58,7 +60,7 @@ export async function GET() {
 
   // Get edition info
   const edition = await db.query.eventEditions.findFirst({
-    where: eq(eventEditions.id, entity.editionId),
+    where: eq(eventEditions.id, entity.editionId as string),
   });
 
   // Get checklist items with template info

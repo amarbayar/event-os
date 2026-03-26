@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { validateServiceToken } from "@/lib/service-token";
 import { db } from "@/db";
 import { users, organizations, userOrganizations, teamMembers, teamEntityTypes, teams, eventEditions } from "@/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, desc } from "drizzle-orm";
 import { getActiveIds } from "@/lib/queries";
 
 // ─── Types ─────────────────────────────────────────────
@@ -73,7 +73,7 @@ export async function requirePermission(
       // Get latest edition for this org
       const edition = await db.query.eventEditions.findFirst({
         where: eq(eventEditions.organizationId, orgId),
-        orderBy: (e: any, { desc }: any) => [desc(e.createdAt)],
+        orderBy: desc(eventEditions.createdAt),
       });
       return {
         user: { id: "service", role: "admin", name: "Service", email: "service@system" },
@@ -89,10 +89,9 @@ export async function requirePermission(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const sessionUser = session.user as Record<string, unknown>;
-    const userId = sessionUser.id as string;
-    const orgId = sessionUser.organizationId as string;
-    const role = (sessionUser.role as string) || "viewer";
+    const userId = session.user.id;
+    const orgId = session.user.organizationId as string;
+    const role = session.user.role || "viewer";
 
     if (!orgId) {
       return NextResponse.json({ error: "No organization associated" }, { status: 403 });

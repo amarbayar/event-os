@@ -230,9 +230,10 @@ export async function executeSqlQuery(
     try {
       const countResult = await Promise.race([
         db.execute(sql.raw(countSql)),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Count timeout")), 5000)),
-      ]) as any;
-      const countRows = countResult.rows || countResult || [];
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Count timeout")), 5000)),
+      ]);
+      const countObj = countResult as { rows?: Record<string, unknown>[] };
+      const countRows = countObj.rows || (countResult as Record<string, unknown>[]) || [];
       totalCount = Number(countRows[0]?.total || 0);
     } catch {
       // If count fails, proceed with limited query
@@ -250,10 +251,10 @@ export async function executeSqlQuery(
     console.log("Executing LLM SQL (paged):", pagedSql);
     const queryResult = await Promise.race([
       db.execute(sql.raw(pagedSql)),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 5000)),
-    ]) as any;
-
-    const rows = queryResult.rows || queryResult || [];
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 5000)),
+    ]);
+    const queryObj = queryResult as { rows?: Record<string, unknown>[] };
+    const rows = queryObj.rows || (queryResult as Record<string, unknown>[]) || [];
 
     if (!Array.isArray(rows) || rows.length === 0) {
       return { message: "No results found.", success: true, data: { items: [] } };

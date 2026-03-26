@@ -29,8 +29,7 @@ export async function getApiContext(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = session.user as Record<string, unknown>;
-  if (!user.organizationId) {
+  if (!session.user.organizationId) {
     return NextResponse.json(
       { error: "No organization associated" },
       { status: 403 }
@@ -38,8 +37,8 @@ export async function getApiContext(
   }
 
   return {
-    organizationId: user.organizationId as string,
-    userId: user.id as string,
+    organizationId: session.user.organizationId,
+    userId: session.user.id,
     source: "web",
   };
 }

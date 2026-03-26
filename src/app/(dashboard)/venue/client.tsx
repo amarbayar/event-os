@@ -266,8 +266,8 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
               </div>
               <div className="space-y-1.5">
                 <ImageGalleryUpload
-                  images={(drawerForm.interiorPhotos as unknown as string[]) || []}
-                  onChange={(urls) => updateField("interiorPhotos", urls as unknown as string)}
+                  images={Array.isArray(drawerForm.interiorPhotos) ? drawerForm.interiorPhotos : []}
+                  onChange={(urls) => updateField("interiorPhotos", urls)}
                   folder="venues/interior"
                   label="Interior Photos"
                   maxImages={10}
@@ -275,8 +275,8 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
               </div>
               <div className="space-y-1.5">
                 <ImageGalleryUpload
-                  images={(drawerForm.exteriorPhotos as unknown as string[]) || []}
-                  onChange={(urls) => updateField("exteriorPhotos", urls as unknown as string)}
+                  images={Array.isArray(drawerForm.exteriorPhotos) ? drawerForm.exteriorPhotos : []}
+                  onChange={(urls) => updateField("exteriorPhotos", urls)}
                   folder="venues/exterior"
                   label="Exterior Photos"
                   maxImages={10}
