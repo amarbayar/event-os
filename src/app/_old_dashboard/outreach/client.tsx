@@ -18,26 +18,45 @@ import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Plus, ArrowRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
+import { useTranslations } from "next-intl";
 
 type OutreachStatus = "identified" | "contacted" | "interested" | "negotiating" | "confirmed" | "declined" | "converted";
 type TargetType = "speaker" | "sponsor" | "booth" | "volunteer" | "media";
 
-const statusConfig: Record<OutreachStatus, { label: string; color: string }> = {
-  identified: { label: "Identified", color: "bg-stone-100 text-stone-600" },
-  contacted: { label: "Contacted", color: "bg-sky-50 text-sky-700" },
-  interested: { label: "Interested", color: "bg-violet-50 text-violet-700" },
-  negotiating: { label: "Negotiating", color: "bg-yellow-50 text-yellow-700" },
-  confirmed: { label: "Confirmed", color: "bg-emerald-50 text-emerald-700" },
-  declined: { label: "Declined", color: "bg-red-50 text-red-600" },
-  converted: { label: "Converted", color: "bg-emerald-100 text-emerald-800" },
+const statusStyles: Record<OutreachStatus, { color: string }> = {
+  identified: { color: "bg-stone-100 text-stone-600" },
+  contacted: { color: "bg-sky-50 text-sky-700" },
+  interested: { color: "bg-violet-50 text-violet-700" },
+  negotiating: { color: "bg-yellow-50 text-yellow-700" },
+  confirmed: { color: "bg-emerald-50 text-emerald-700" },
+  declined: { color: "bg-red-50 text-red-600" },
+  converted: { color: "bg-emerald-100 text-emerald-800" },
 };
 
-const typeConfig: Record<TargetType, { label: string; color: string }> = {
-  speaker: { label: "Speaker", color: "bg-sky-100 text-sky-800" },
-  sponsor: { label: "Sponsor", color: "bg-yellow-100 text-yellow-800" },
-  booth: { label: "Booth", color: "bg-violet-100 text-violet-800" },
-  volunteer: { label: "Volunteer", color: "bg-emerald-100 text-emerald-800" },
-  media: { label: "Media", color: "bg-pink-100 text-pink-800" },
+const STATUS_LABEL_KEYS: Record<OutreachStatus, string> = {
+  identified: "statusIdentified",
+  contacted: "statusContacted",
+  interested: "statusInterested",
+  negotiating: "statusNegotiating",
+  confirmed: "statusConfirmed",
+  declined: "statusDeclined",
+  converted: "statusConverted",
+};
+
+const typeStyles: Record<TargetType, { color: string }> = {
+  speaker: { color: "bg-sky-100 text-sky-800" },
+  sponsor: { color: "bg-yellow-100 text-yellow-800" },
+  booth: { color: "bg-violet-100 text-violet-800" },
+  volunteer: { color: "bg-emerald-100 text-emerald-800" },
+  media: { color: "bg-pink-100 text-pink-800" },
+};
+
+const TYPE_LABEL_KEYS: Record<TargetType, string> = {
+  speaker: "targetSpeaker",
+  sponsor: "targetSponsor",
+  booth: "targetBooth",
+  volunteer: "targetVolunteer",
+  media: "targetMedia",
 };
 
 type OutreachRecord = {
@@ -54,6 +73,9 @@ type OutreachRecord = {
 };
 
 export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachRecord[] }) {
+  const t = useTranslations("Outreach");
+  const tC = useTranslations("Common");
+  const tP = useTranslations("Pipeline");
   const [typeFilter, setTypeFilter] = useState<TargetType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<OutreachStatus | "all">("all");
   const [showForm, setShowForm] = useState(false);
@@ -89,7 +111,7 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
     });
 
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to create lead"));
+      toast.error(await getApiError(res, tC("failedTo", { action: tC("create") })));
       return;
     }
 
@@ -101,11 +123,11 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
     <div>
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Outreach</h1>
-          <p className="text-sm text-muted-foreground">Proactive sourcing for speakers, sponsors, partners, and volunteers</p>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("description")}</p>
         </div>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
-          {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Add Lead</>}
+          {showForm ? <><X className="mr-2 h-3 w-3" /> {tC("cancel")}</> : <><Plus className="mr-2 h-3 w-3" /> {t("addLead")}</>}
         </Button>
       </div>
 
@@ -116,46 +138,46 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Name *</Label>
+                  <Label>{t("nameLabel")}</Label>
                   <Input name="name" placeholder="e.g., Jane Doe" aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
                   {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Target Type</Label>
+                  <Label>{t("targetType")}</Label>
                   <Select name="targetType" defaultValue="speaker">
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="speaker">Speaker</SelectItem>
-                      <SelectItem value="sponsor">Sponsor</SelectItem>
-                      <SelectItem value="booth">Booth</SelectItem>
-                      <SelectItem value="volunteer">Volunteer</SelectItem>
-                      <SelectItem value="media">Media</SelectItem>
+                      <SelectItem value="speaker">{t("targetSpeaker")}</SelectItem>
+                      <SelectItem value="sponsor">{t("targetSponsor")}</SelectItem>
+                      <SelectItem value="booth">{t("targetBooth")}</SelectItem>
+                      <SelectItem value="volunteer">{t("targetVolunteer")}</SelectItem>
+                      <SelectItem value="media">{t("targetMedia")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Email</Label>
+                  <Label>{t("emailLabel")}</Label>
                   <Input name="email" type="email" placeholder="jane@company.com" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const { email: _, ...rest } = prev; return rest; })} />
                   {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Company</Label>
+                  <Label>{t("companyLabel")}</Label>
                   <Input name="company" placeholder="e.g., Acme Corp" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
-                  <Input name="source" placeholder="e.g., LinkedIn, Referral" />
+                  <Label>{t("sourceLabel")}</Label>
+                  <Input name="source" placeholder={t("sourcePlaceholder")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Assigned To</Label>
+                  <Label>{tP("assignedTo")}</Label>
                   <AssignedToSelect name="assignedTo" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Notes</Label>
-                <Textarea name="notes" placeholder="Any notes about this lead..." rows={2} />
+                <Label>{tP("notes")}</Label>
+                <Textarea name="notes" placeholder={t("notesPlaceholder")} rows={2} />
               </div>
-              <Button type="submit" className="w-full sm:w-auto">Add Lead</Button>
+              <Button type="submit" className="w-full sm:w-auto">{t("addLead")}</Button>
             </form>
           </CardContent>
         </Card>
@@ -172,7 +194,7 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
               }`}
             >
               <p className="text-lg font-semibold tabular-nums">{pipelineCounts[status]}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{status}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{t(STATUS_LABEL_KEYS[status])}</p>
             </button>
             {i < 4 && <ArrowRight className="h-4 w-4 text-stone-300 shrink-0 mx-1" />}
           </div>
@@ -181,10 +203,10 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
 
       {/* Type filters */}
       <div className="flex flex-wrap gap-2 mb-4">
-        <Button variant={typeFilter === "all" ? "default" : "outline"} size="sm" onClick={() => setTypeFilter("all")}>All</Button>
-        {(Object.keys(typeConfig) as TargetType[]).map((type) => (
+        <Button variant={typeFilter === "all" ? "default" : "outline"} size="sm" onClick={() => setTypeFilter("all")}>{t("all")}</Button>
+        {(Object.keys(typeStyles) as TargetType[]).map((type) => (
           <Button key={type} variant={typeFilter === type ? "default" : "outline"} size="sm" onClick={() => setTypeFilter(type)} className="capitalize">
-            {typeConfig[type].label} ({initialOutreach.filter((o) => o.targetType === type).length})
+            {t(TYPE_LABEL_KEYS[type])} ({initialOutreach.filter((o) => o.targetType === type).length})
           </Button>
         ))}
       </div>
@@ -198,26 +220,26 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{lead.name}</p>
-                    <Badge className={typeConfig[lead.targetType as TargetType]?.color}>{typeConfig[lead.targetType as TargetType]?.label ?? lead.targetType}</Badge>
-                    <Badge className={statusConfig[lead.status as OutreachStatus]?.color}>{statusConfig[lead.status as OutreachStatus]?.label ?? lead.status}</Badge>
+                    <Badge className={typeStyles[lead.targetType as TargetType]?.color}>{t(TYPE_LABEL_KEYS[lead.targetType as TargetType]) ?? lead.targetType}</Badge>
+                    <Badge className={statusStyles[lead.status as OutreachStatus]?.color}>{t(STATUS_LABEL_KEYS[lead.status as OutreachStatus]) ?? lead.status}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-0.5">{lead.company} &middot; Source: {lead.source}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{lead.company} &middot; {t("sourceLabel")}: {lead.source}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{lead.notes}</p>
                   <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-                    <span>Assigned: <strong>{lead.assignedTo}</strong></span>
-                    {lead.lastContactDate && <span>Last contact: {new Date(lead.lastContactDate).toLocaleDateString()}</span>}
+                    <span>{t("assigned", { name: lead.assignedTo ?? "" })}</span>
+                    {lead.lastContactDate && <span>{t("lastContact", { date: new Date(lead.lastContactDate).toLocaleDateString() })}</span>}
                     {lead.nextFollowUp && (
-                      <span className="text-yellow-600 font-medium">Follow up: {new Date(lead.nextFollowUp).toLocaleDateString()}</span>
+                      <span className="text-yellow-600 font-medium">{t("followUp", { date: new Date(lead.nextFollowUp).toLocaleDateString() })}</span>
                     )}
                   </div>
                 </div>
               </div>
               {lead.status !== "confirmed" && lead.status !== "declined" && lead.status !== "converted" && (
                 <div className="flex gap-2 mt-3 sm:justify-end">
-                  <Button size="sm" variant="outline" className="flex-1 sm:flex-none">Log Contact</Button>
-                  <Button size="sm" variant="outline" className="flex-1 sm:flex-none">Update Status</Button>
+                  <Button size="sm" variant="outline" className="flex-1 sm:flex-none">{t("logContact")}</Button>
+                  <Button size="sm" variant="outline" className="flex-1 sm:flex-none">{t("updateStatus")}</Button>
                   {(lead.status === "interested" || lead.status === "negotiating") && (
-                    <Button size="sm" className="flex-1 sm:flex-none">Convert to Application</Button>
+                    <Button size="sm" className="flex-1 sm:flex-none">{t("convertToApplication")}</Button>
                   )}
                 </div>
               )}
