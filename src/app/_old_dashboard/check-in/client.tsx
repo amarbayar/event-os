@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ type Attendee = {
 };
 
 export function CheckInClient({ initialStats, initialAttendees }: { initialStats: CheckInStats; initialAttendees: Attendee[] }) {
+  const t = useTranslations("CheckIn");
   const [mode, setMode] = useState<CheckInMode>("dashboard");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,18 +80,18 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
     if (!isKnown) {
       setScanResult({
         status: "not_found",
-        message: "Attendee not found. Try searching by name.",
+        message: t("notFound"),
       });
     } else {
       setScanResult({
         status: "success",
         attendee: { name: "Oyungerel B.", ticketType: "VIP / Speaker" },
-        message: "Checked in successfully!",
+        message: t("checkedInSuccess"),
       });
     }
     // Clear result after 3 seconds
     setTimeout(() => setScanResult(null), 3000);
-  }, []);
+  }, [t]);
 
   const filteredAttendees = initialAttendees.filter((a) =>
     a.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -107,25 +109,25 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
             className="bg-white text-stone-900 hover:bg-stone-100 font-medium"
             onClick={() => setMode("dashboard")}
           >
-            <Monitor className="mr-2 h-4 w-4" /> Back to Dashboard
+            <Monitor className="mr-2 h-4 w-4" /> {t("backToDashboard")}
           </Button>
           <div className="flex items-center gap-4 text-sm">
             <div className="text-center">
               <p className="text-lg font-bold text-emerald-400 tabular-nums">{stats.checkedIn}</p>
-              <p className="text-[10px] text-stone-500 uppercase">In</p>
+              <p className="text-[10px] text-stone-500 uppercase">{t("in")}</p>
             </div>
             <div className="text-center">
               <p className="text-lg font-bold text-white tabular-nums">{stats.remaining}</p>
-              <p className="text-[10px] text-stone-500 uppercase">Left</p>
+              <p className="text-[10px] text-stone-500 uppercase">{t("left")}</p>
             </div>
             <div className="text-center">
               <p className="text-lg font-bold text-yellow-400 tabular-nums">{stats.percentage}%</p>
-              <p className="text-[10px] text-stone-500 uppercase">Rate</p>
+              <p className="text-[10px] text-stone-500 uppercase">{t("rate")}</p>
             </div>
             {!isOnline && (
               <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
                 <WifiOff className="mr-1 h-3 w-3" />
-                Offline
+                {t("offline")}
               </Badge>
             )}
           </div>
@@ -134,7 +136,7 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
         {/* Camera area — larger */}
         <div className="flex-1 flex items-center justify-center relative">
           <div className="w-[90vw] max-w-lg aspect-square border-2 border-dashed border-stone-600 rounded-2xl flex items-center justify-center">
-            <p className="text-stone-500 text-sm">Point camera at QR code</p>
+            <p className="text-stone-500 text-sm">{t("pointCamera")}</p>
             <div className="absolute inset-[15%] border-2 border-yellow-500/40 rounded-lg" />
           </div>
 
@@ -174,7 +176,7 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-500" />
             <Input
-              placeholder="Search by name if QR fails..."
+              placeholder={t("searchByName")}
               className="pl-9 bg-stone-800 border-stone-700 text-white placeholder:text-stone-500"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -186,7 +188,7 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
             size="sm"
             onClick={() => handleScan("test-qr-hash")}
           >
-            <ScanLine className="mr-2 h-4 w-4" /> Simulate Scan (Demo)
+            <ScanLine className="mr-2 h-4 w-4" /> {t("simulateScan")}
           </Button>
         </div>
       </div>
@@ -199,7 +201,7 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">
-            Check-in
+            {t("title")}
           </h1>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-sm text-muted-foreground">
@@ -207,27 +209,27 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
             </p>
             {isOnline ? (
               <Badge variant="outline" className="text-emerald-600 border-emerald-200">
-                <Wifi className="mr-1 h-3 w-3" /> Live
+                <Wifi className="mr-1 h-3 w-3" /> {t("live")}
               </Badge>
             ) : (
               <Badge className="bg-yellow-500/20 text-yellow-700 border-yellow-300">
-                <WifiOff className="mr-1 h-3 w-3" /> Offline
+                <WifiOff className="mr-1 h-3 w-3" /> {t("offline")}
               </Badge>
             )}
           </div>
         </div>
         <Button onClick={() => setMode("scanner")}>
-          <ScanLine className="mr-2 h-4 w-4" /> Open Scanner
+          <ScanLine className="mr-2 h-4 w-4" /> {t("openScanner")}
         </Button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-6">
         {[
-          { label: "Checked In", value: stats.checkedIn, color: "text-emerald-600" },
-          { label: "Remaining", value: stats.remaining, color: "text-foreground" },
-          { label: "Attendance", value: `${stats.percentage}%`, color: "text-foreground" },
-          { label: "Avg Wait", value: "~2min", color: "text-foreground" },
+          { label: t("checkedIn"), value: stats.checkedIn, color: "text-emerald-600" },
+          { label: t("remaining"), value: stats.remaining, color: "text-foreground" },
+          { label: t("attendance"), value: `${stats.percentage}%`, color: "text-foreground" },
+          { label: t("avgWait"), value: "~2min", color: "text-foreground" },
         ].map((stat) => (
           <Card key={stat.label}>
             <CardContent className="p-4">
@@ -246,7 +248,7 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
       <div className="relative mb-4">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search attendees by name..."
+          placeholder={t("searchPlaceholder")}
           className="pl-9"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -272,11 +274,11 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
                   <CheckCircle2 className="mr-1 h-3 w-3" />
                   {attendee.checkedInAt
                     ? new Date(attendee.checkedInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
-                    : "Checked in"}
+                    : t("checkedIn")}
                 </Badge>
               ) : (
                 <span className="text-xs text-muted-foreground">
-                  Not checked in
+                  {t("notCheckedIn")}
                 </span>
               )}
             </div>
