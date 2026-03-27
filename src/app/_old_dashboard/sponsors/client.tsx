@@ -21,6 +21,7 @@ import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Building2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 import { PortalInviteSection } from "@/components/portal-invite-section";
 
@@ -40,6 +41,10 @@ type Sponsor = {
 };
 
 export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[] }) {
+  const t = useTranslations("Sponsors");
+  const tP = useTranslations("Pipeline");
+  const tE = useTranslations("Entity");
+  const tC = useTranslations("Common");
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [sponsors, setSponsors] = useState(initialSponsors);
   const [showForm, setShowForm] = useState(false);
@@ -80,7 +85,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
       body: JSON.stringify(drawerForm),
     });
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to save changes"));
+      toast.error(await getApiError(res, tC("failedTo", { action: tC("save").toLowerCase() })));
       setDrawerSaving(false);
       return;
     }
@@ -106,7 +111,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
     });
 
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to create sponsor"));
+      toast.error(await getApiError(res, tC("failedTo", { action: t("addSponsor").toLowerCase() })));
       return;
     }
 
@@ -117,13 +122,13 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
   const columns = [
     {
       key: "companyName",
-      label: "Company",
+      label: tE("company"),
       width: "180px",
       render: (s: Sponsor) => <p className="font-medium text-sm">{s.companyName}</p>,
     },
     {
       key: "contact",
-      label: "Contact",
+      label: tC("contact"),
       width: "140px",
       render: (s: Sponsor) => (
         <div>
@@ -134,7 +139,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
     },
     {
       key: "package",
-      label: "Package",
+      label: t("package"),
       width: "90px",
       render: (s: Sponsor) => <span className="text-xs capitalize">{s.packagePreference || "—"}</span>,
     },
@@ -143,47 +148,47 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
   const drawerSections = selectedSponsor
     ? [
         {
-          label: "Company",
+          label: tE("company"),
           content: (
             <div className="space-y-3">
               <FileUpload
                 value={(drawerForm.logoUrl as string) || ""}
                 onChange={(url) => updateField("logoUrl", url)}
                 folder="sponsor-logos"
-                label="Company Logo"
+                label={tE("logo")}
               />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Company Name</Label>
+                  <Label>{tE("company")}</Label>
                   <Input value={(drawerForm.companyName as string) || ""} onChange={(e) => updateField("companyName", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Package</Label>
+                  <Label>{t("package")}</Label>
                   <Select value={String(drawerForm.packagePreference || "gold")} onValueChange={(v) => updateField("packagePreference", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="platinum">Platinum</SelectItem>
-                      <SelectItem value="gold">Gold</SelectItem>
-                      <SelectItem value="silver">Silver</SelectItem>
-                      <SelectItem value="bronze">Bronze</SelectItem>
-                      <SelectItem value="community">Community</SelectItem>
+                      <SelectItem value="platinum">{t("platinum")}</SelectItem>
+                      <SelectItem value="gold">{t("gold")}</SelectItem>
+                      <SelectItem value="silver">{t("silver")}</SelectItem>
+                      <SelectItem value="bronze">{t("bronze")}</SelectItem>
+                      <SelectItem value="community">{t("community")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Contact Name</Label>
+                  <Label>{tE("contactName")}</Label>
                   <Input value={(drawerForm.contactName as string) || ""} onChange={(e) => updateField("contactName", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Contact Email</Label>
+                  <Label>{tE("contactEmail")}</Label>
                   <Input value={(drawerForm.contactEmail as string) || ""} onChange={(e) => updateField("contactEmail", e.target.value)} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Notes</Label>
-                <Textarea rows={4} placeholder="Sponsorship notes, negotiations, deliverables..." value={(drawerForm.message as string) || ""} onChange={(e) => updateField("message", e.target.value)} />
+                <Label>{tE("notes")}</Label>
+                <Textarea rows={4} placeholder={t("notesPlaceholder")} value={(drawerForm.message as string) || ""} onChange={(e) => updateField("message", e.target.value)} />
               </div>
 
               {/* Portal Invite — only for confirmed sponsors with email */}
@@ -194,35 +199,35 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
           ),
         },
         {
-          label: "Pipeline",
+          label: tE("tabPipeline"),
           content: (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
+                  <Label>{tP("source")}</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
+                      <SelectItem value="intake">{tP("sourceIntake")}</SelectItem>
+                      <SelectItem value="outreach">{tP("sourceOutreach")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Stage</Label>
+                  <Label>{tP("stage")}</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="engaged">Engaged</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="declined">Declined</SelectItem>
+                      <SelectItem value="lead">{tP("stageLead")}</SelectItem>
+                      <SelectItem value="engaged">{tP("stageEngaged")}</SelectItem>
+                      <SelectItem value="confirmed">{tP("stageConfirmed")}</SelectItem>
+                      <SelectItem value="declined">{tP("stageDeclined")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Assigned To</Label>
+                <Label>{tP("assignedTo")}</Label>
                 <AssignedToSelect value={(drawerForm.assignedTo as string) || ""} onChange={(val) => updateField("assignedTo", val)} />
               </div>
             </div>
@@ -232,7 +237,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
         ...(selectedSponsor?.stage === "confirmed"
           ? [
               {
-                label: "Checklist",
+                label: tE("tabChecklist"),
                 content: (
                   <ChecklistPanel entityType="sponsor" entityId={selectedSponsor.id} />
                 ),
@@ -246,11 +251,11 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
     <div>
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Sponsors</h1>
-          <p className="text-sm text-muted-foreground">{sponsors.length} total</p>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground">{tC("total", { count: sponsors.length })}</p>
         </div>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
-          {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Add Sponsor</>}
+          {showForm ? <><X className="mr-2 h-3 w-3" /> {tC("cancel")}</> : <><Plus className="mr-2 h-3 w-3" /> {t("addSponsor")}</>}
         </Button>
       </div>
 
@@ -260,34 +265,34 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Company Name *</Label>
+                  <Label>{t("companyNameLabel")}</Label>
                   <Input name="companyName" placeholder="e.g., Khan Bank" aria-invalid={!!errors.companyName} onChange={() => setErrors((prev) => { const { companyName: _, ...rest } = prev; return rest; })} />
                   {errors.companyName && <p className="text-xs text-destructive">{errors.companyName}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Contact Name</Label>
+                  <Label>{tE("contactName")}</Label>
                   <Input name="contactName" placeholder="e.g., Bat-Erdene D." />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Contact Email</Label>
+                  <Label>{tE("contactEmail")}</Label>
                   <Input name="contactEmail" type="email" placeholder="events@company.mn" aria-invalid={!!errors.contactEmail} onChange={() => setErrors((prev) => { const { contactEmail: _, ...rest } = prev; return rest; })} />
                   {errors.contactEmail && <p className="text-xs text-destructive">{errors.contactEmail}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Package</Label>
+                  <Label>{t("package")}</Label>
                   <Select name="packagePreference" defaultValue="gold">
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="platinum">Platinum</SelectItem>
-                      <SelectItem value="gold">Gold</SelectItem>
-                      <SelectItem value="silver">Silver</SelectItem>
-                      <SelectItem value="bronze">Bronze</SelectItem>
-                      <SelectItem value="community">Community</SelectItem>
+                      <SelectItem value="platinum">{t("platinum")}</SelectItem>
+                      <SelectItem value="gold">{t("gold")}</SelectItem>
+                      <SelectItem value="silver">{t("silver")}</SelectItem>
+                      <SelectItem value="bronze">{t("bronze")}</SelectItem>
+                      <SelectItem value="community">{t("community")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <Button type="submit" className="w-full sm:w-auto">Add Sponsor</Button>
+              <Button type="submit" className="w-full sm:w-auto">{t("addSponsor")}</Button>
             </form>
           </CardContent>
         </Card>
@@ -306,9 +311,9 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Building2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <h3 className="text-lg font-medium mb-1">No sponsors yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">Add sponsors or paste info into agent chat.</p>
-            <Button onClick={() => setShowForm(true)}><Plus className="mr-2 h-4 w-4" /> Add Sponsor</Button>
+            <h3 className="text-lg font-medium mb-1">{tC("noYet", { entity: t("title").toLowerCase() })}</h3>
+            <p className="text-sm text-muted-foreground mb-4">{t("emptyDescription")}</p>
+            <Button onClick={() => setShowForm(true)}><Plus className="mr-2 h-4 w-4" /> {t("addSponsor")}</Button>
           </CardContent>
         </Card>
       ) : (
@@ -323,7 +328,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
       )}
 
       {filtered.length === 0 && sponsors.length > 0 && (
-        <p className="text-center text-sm text-muted-foreground py-8">No sponsors match filters.</p>
+        <p className="text-center text-sm text-muted-foreground py-8">{tC("noMatch", { entity: t("title").toLowerCase() })}</p>
       )}
 
       <EntityDrawer
