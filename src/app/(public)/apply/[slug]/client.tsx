@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate } from "@/lib/i18n/date";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,12 +35,14 @@ export function CFPFormClient({
   endDate: string | null;
   venue: string | null;
 }) {
+  const t = useTranslations("CFP");
+  const locale = useLocale();
   const [state, setState] = useState<FormState>("editing");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState("");
 
   const dateRange = startDate
-    ? `${new Date(startDate).toLocaleDateString("en-US", { month: "long", day: "numeric" })}${endDate ? ` — ${new Date(endDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : ""}`
+    ? `${formatDate(startDate, locale, { month: "long", day: "numeric" })}${endDate ? ` — ${formatDate(endDate, locale, { month: "long", day: "numeric", year: "numeric" })}` : ""}`
     : "";
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -47,10 +51,10 @@ export function CFPFormClient({
     const data = Object.fromEntries(form);
 
     const newErrors: Record<string, string> = {};
-    if (!data.name) newErrors.name = "Name is required";
-    if (!data.email) newErrors.email = "Email is required";
-    else if (!isValidEmail(data.email as string)) newErrors.email = "Email must be a valid email address";
-    if (!data.talkTitle) newErrors.talkTitle = "Talk title is required";
+    if (!data.name) newErrors.name = t("nameRequired");
+    if (!data.email) newErrors.email = t("emailRequired");
+    else if (!isValidEmail(data.email as string)) newErrors.email = t("emailInvalid");
+    if (!data.talkTitle) newErrors.talkTitle = t("talkTitleRequired");
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -81,14 +85,14 @@ export function CFPFormClient({
 
       if (!res.ok) {
         const json = await res.json();
-        setServerError(json.error || "Submission failed");
+        setServerError(json.error || t("submissionFailed"));
         setState("error");
         return;
       }
 
       setState("success");
     } catch {
-      setServerError("Network error. Please try again.");
+      setServerError(t("networkError"));
       setState("error");
     }
   };
@@ -100,11 +104,10 @@ export function CFPFormClient({
           <CardContent className="flex flex-col items-center py-12 px-6">
             <CheckCircle2 className="h-16 w-16 text-emerald-500 mb-4" />
             <h2 className="font-heading text-xl font-bold mb-2">
-              Application submitted!
+              {t("submitted")}
             </h2>
             <p className="text-sm text-muted-foreground text-center">
-              Thank you for your interest in speaking at {eventName}.
-              You&apos;ll hear back from our team soon.
+              {t("thankYou", { eventName })}
             </p>
           </CardContent>
         </Card>
@@ -117,7 +120,7 @@ export function CFPFormClient({
       <div className="mx-auto max-w-lg">
         <div className="mb-8 text-center">
           <h1 className="font-heading text-3xl font-bold tracking-tight mb-2">
-            Call for Speakers
+            {t("title")}
           </h1>
           <p className="text-muted-foreground">
             {eventName}
@@ -131,7 +134,7 @@ export function CFPFormClient({
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="name">Full Name *</Label>
+                  <Label htmlFor="name">{t("fullName")}</Label>
                   <Input
                     id="name"
                     name="name"
@@ -141,7 +144,7 @@ export function CFPFormClient({
                   {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="email">{t("email")}</Label>
                   <Input
                     id="email"
                     name="email"
@@ -155,17 +158,17 @@ export function CFPFormClient({
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="company">Company / Organization</Label>
+                  <Label htmlFor="company">{t("company")}</Label>
                   <Input id="company" name="company" placeholder="DataMN Inc." />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="title">Job Title</Label>
+                  <Label htmlFor="title">{t("jobTitle")}</Label>
                   <Input id="title" name="title" placeholder="Senior Engineer" />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="talkTitle">Talk Title *</Label>
+                <Label htmlFor="talkTitle">{t("talkTitle")}</Label>
                 <Input
                   id="talkTitle"
                   name="talkTitle"
@@ -176,37 +179,37 @@ export function CFPFormClient({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="talkAbstract">Abstract</Label>
+                <Label htmlFor="talkAbstract">{t("abstract")}</Label>
                 <Textarea
                   id="talkAbstract"
                   name="talkAbstract"
                   rows={4}
-                  placeholder="Describe your talk in 2-3 paragraphs..."
+                  placeholder={t("abstractPlaceholder")}
                 />
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Session Type</Label>
+                  <Label>{t("sessionType")}</Label>
                   <Select name="talkType" defaultValue="talk">
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="talk">Talk (30 min)</SelectItem>
-                      <SelectItem value="workshop">Workshop (1-3 hrs)</SelectItem>
-                      <SelectItem value="panel">Panel</SelectItem>
-                      <SelectItem value="keynote">Keynote</SelectItem>
+                      <SelectItem value="talk">{t("typeTalk")}</SelectItem>
+                      <SelectItem value="workshop">{t("typeWorkshop")}</SelectItem>
+                      <SelectItem value="panel">{t("typePanel")}</SelectItem>
+                      <SelectItem value="keynote">{t("typeKeynote")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="trackPreference">Track Preference</Label>
+                  <Label htmlFor="trackPreference">{t("trackPreference")}</Label>
                   <Input id="trackPreference" name="trackPreference" placeholder="e.g., Main Stage" />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="bio">Speaker Bio</Label>
-                <Textarea id="bio" name="bio" rows={3} placeholder="A short bio for the event website..." />
+                <Label htmlFor="bio">{t("speakerBio")}</Label>
+                <Textarea id="bio" name="bio" rows={3} placeholder={t("bioPlaceholder")} />
               </div>
 
               {serverError && (
@@ -215,9 +218,9 @@ export function CFPFormClient({
 
               <Button type="submit" className="w-full" disabled={state === "submitting"}>
                 {state === "submitting" ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("submitting")}</>
                 ) : (
-                  "Submit Application"
+                  t("submitApplication")
                 )}
               </Button>
             </form>

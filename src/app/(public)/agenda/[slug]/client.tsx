@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate, formatTime as formatTimeI18n } from "@/lib/i18n/date";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Clock } from "lucide-react";
@@ -26,11 +28,6 @@ type Edition = {
   agendaStatus: string;
 };
 
-function formatTime(iso: string | null): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-}
-
 export function PublicAgendaClient({
   edition,
   sessions,
@@ -38,6 +35,8 @@ export function PublicAgendaClient({
   edition: Edition;
   sessions: Session[];
 }) {
+  const t = useTranslations("PublicAgenda");
+  const locale = useLocale();
   const [selectedDay, setSelectedDay] = useState(1);
   const [selectedTrack, setSelectedTrack] = useState<string | "all">("all");
 
@@ -54,6 +53,11 @@ export function PublicAgendaClient({
   const startDate = edition.startDate ? new Date(edition.startDate) : null;
   const endDate = edition.endDate ? new Date(edition.endDate) : null;
 
+  const fmtTime = (iso: string | null): string => {
+    if (!iso) return "";
+    return formatTimeI18n(iso, locale);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -66,8 +70,8 @@ export function PublicAgendaClient({
             {startDate && (
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                {startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
-                {endDate && ` — ${endDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`}
+                {formatDate(startDate, locale, { month: "long", day: "numeric" })}
+                {endDate && ` — ${formatDate(endDate, locale, { month: "long", day: "numeric", year: "numeric" })}`}
               </span>
             )}
             {edition.venue && (
@@ -91,7 +95,7 @@ export function PublicAgendaClient({
                 size="sm"
                 onClick={() => setSelectedDay(day)}
               >
-                Day {day}
+                {t("day", { day })}
               </Button>
             ))}
           </div>
@@ -102,7 +106,7 @@ export function PublicAgendaClient({
               size="sm"
               onClick={() => setSelectedTrack("all")}
             >
-              All
+              {t("all")}
             </Button>
             {tracks.map((track) => (
               <Button
@@ -122,9 +126,9 @@ export function PublicAgendaClient({
       <div className="mx-auto max-w-3xl px-4 py-6">
         {edition.agendaStatus !== "published" && sessions.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-lg font-medium mb-1">Agenda coming soon</p>
+            <p className="text-lg font-medium mb-1">{t("comingSoon")}</p>
             <p className="text-sm text-muted-foreground">
-              Check back closer to the event.
+              {t("checkBack")}
             </p>
           </div>
         ) : (
@@ -140,7 +144,7 @@ export function PublicAgendaClient({
               >
                 {session.type === "break" || session.type === "networking" ? (
                   <p className="text-sm text-muted-foreground">
-                    {formatTime(session.startTime)} — {session.title}
+                    {fmtTime(session.startTime)} — {session.title}
                   </p>
                 ) : (
                   <div>
@@ -171,8 +175,8 @@ export function PublicAgendaClient({
                       {session.startTime && (
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {formatTime(session.startTime)}
-                          {session.endTime && ` — ${formatTime(session.endTime)}`}
+                          {fmtTime(session.startTime)}
+                          {session.endTime && ` — ${fmtTime(session.endTime)}`}
                         </span>
                       )}
                       <Badge variant="secondary" className="text-[10px]">
@@ -185,7 +189,7 @@ export function PublicAgendaClient({
             ))}
             {filtered.length === 0 && (
               <p className="text-center text-sm text-muted-foreground py-8">
-                No sessions scheduled for this day/track yet.
+                {t("noSessions")}
               </p>
             )}
           </div>
@@ -195,7 +199,7 @@ export function PublicAgendaClient({
       {/* Footer */}
       <div className="border-t mt-8">
         <div className="mx-auto max-w-3xl px-4 py-6 text-center text-xs text-muted-foreground">
-          Powered by Event OS
+          {t("poweredBy")}
         </div>
       </div>
     </div>

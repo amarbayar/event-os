@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { eventEditions, sessions } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 import { PublicAgendaClient } from "./client";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export default async function PublicAgendaPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslations("Common");
 
   const edition = await db.query.eventEditions.findFirst({
     where: eq(eventEditions.slug, slug),
@@ -19,7 +21,7 @@ export default async function PublicAgendaPage({
   if (!edition) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Event not found.</p>
+        <p className="text-muted-foreground">{t("eventNotFound")}</p>
       </div>
     );
   }

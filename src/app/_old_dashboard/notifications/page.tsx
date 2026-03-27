@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Bell, Check, Trash2, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 type Notification = {
   id: string;
@@ -18,16 +19,9 @@ type Notification = {
   createdAt: string;
 };
 
-const TYPE_ICONS: Record<string, string> = {
-  assignment: "You were assigned",
-  checklist_submitted: "Checklist item submitted",
-  stage_change: "Stage changed",
-  comment: "New comment",
-  team_added: "Added to team",
-  entity_created: "New entity in your scope",
-};
-
 export default function NotificationsPage() {
+  const t = useTranslations("Notifications");
+  const tC = useTranslations("Common");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread">("all");
@@ -66,9 +60,9 @@ export default function NotificationsPage() {
 
   const deleteAllRead = async () => {
     const confirmed = await confirmDialog({
-      title: "Delete all read notifications",
-      message: "Remove all read notifications? This cannot be undone.",
-      confirmLabel: "Delete",
+      title: t("deleteAllTitle"),
+      message: t("deleteAllMessage"),
+      confirmLabel: tC("delete"),
       variant: "danger",
     });
     if (!confirmed) return;
@@ -85,32 +79,37 @@ export default function NotificationsPage() {
   const timeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1) return t("justNow");
+    if (mins < 60) return t("minutesAgo", { count: mins });
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return t("hoursAgo", { count: hours });
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return t("daysAgo", { count: days });
+  };
+
+  const FILTER_LABELS: Record<string, string> = {
+    all: t("filterAll"),
+    unread: t("filterUnread"),
   };
 
   return (
     <div>
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Notifications</h1>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">
-            {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+            {unreadCount > 0 ? t("unreadCount", { count: unreadCount }) : t("allCaughtUp")}
           </p>
         </div>
         <div className="flex gap-2">
           {unreadCount > 0 && (
             <Button size="sm" variant="outline" onClick={markAllRead}>
-              <Check className="mr-2 h-3 w-3" /> Mark all read
+              <Check className="mr-2 h-3 w-3" /> {t("markAllRead")}
             </Button>
           )}
           {notifications.some((n) => n.read) && (
             <Button size="sm" variant="outline" onClick={deleteAllRead}>
-              <Trash2 className="mr-2 h-3 w-3" /> Clear read
+              <Trash2 className="mr-2 h-3 w-3" /> {t("clearRead")}
             </Button>
           )}
         </div>
@@ -122,11 +121,11 @@ export default function NotificationsPage() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               filter === f ? "border-yellow-500 text-yellow-700" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            {f} {f === "unread" && unreadCount > 0 && `(${unreadCount})`}
+            {FILTER_LABELS[f]} {f === "unread" && unreadCount > 0 && `(${unreadCount})`}
           </button>
         ))}
       </div>
@@ -140,7 +139,7 @@ export default function NotificationsPage() {
         <div className="rounded-lg border-2 border-dashed p-12 text-center">
           <Bell className="h-10 w-10 text-stone-300 mx-auto mb-3" />
           <p className="text-muted-foreground">
-            {filter === "unread" ? "No unread notifications" : "No notifications yet"}
+            {filter === "unread" ? t("noUnread") : t("noNotifications")}
           </p>
         </div>
       ) : (
@@ -167,7 +166,7 @@ export default function NotificationsPage() {
                 {n.message && <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>}
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-[10px] text-muted-foreground">{timeAgo(n.createdAt)}</span>
-                  {n.actorName && <span className="text-[10px] text-stone-400">by {n.actorName}</span>}
+                  {n.actorName && <span className="text-[10px] text-stone-400">{t("byActor", { name: n.actorName })}</span>}
                 </div>
               </div>
 
@@ -179,11 +178,11 @@ export default function NotificationsPage() {
                   </Link>
                 )}
                 {!n.read && (
-                  <button onClick={() => markRead(n.id)} className="rounded p-1.5 hover:bg-stone-100 text-stone-400 hover:text-stone-600 transition-colors" title="Mark read">
+                  <button onClick={() => markRead(n.id)} className="rounded p-1.5 hover:bg-stone-100 text-stone-400 hover:text-stone-600 transition-colors" title={t("markRead")}>
                     <Check className="h-3.5 w-3.5" />
                   </button>
                 )}
-                <button onClick={() => deleteOne(n.id)} className="rounded p-1.5 hover:bg-red-50 text-stone-400 hover:text-red-500 transition-colors" title="Delete">
+                <button onClick={() => deleteOne(n.id)} className="rounded p-1.5 hover:bg-red-50 text-stone-400 hover:text-red-500 transition-colors" title={tC("delete")}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>

@@ -23,6 +23,7 @@ import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequired, getApiError } from "@/lib/validation";
 import { PortalInviteSection } from "@/components/portal-invite-section";
+import { useTranslations } from "next-intl";
 
 type Booth = {
   id: string;
@@ -52,12 +53,17 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
   const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const t = useTranslations("Booths");
+  const tP = useTranslations("Pipeline");
+  const tE = useTranslations("Entity");
+  const tC = useTranslations("Common");
+
   const filtered = filter(booths);
 
   const columns = [
     {
       key: "name",
-      label: "Name",
+      label: tE("name"),
       width: "140px",
       render: (b: Booth) => (
         <p className="font-medium text-sm">{b.name}</p>
@@ -65,7 +71,7 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
     },
     {
       key: "location",
-      label: "Location",
+      label: t("location"),
       width: "140px",
       render: (b: Booth) => (
         <span className="text-xs text-muted-foreground">{b.location || "—"}</span>
@@ -73,7 +79,7 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
     },
     {
       key: "size",
-      label: "Size",
+      label: t("size"),
       width: "90px",
       render: (b: Booth) => (
         <span className="text-xs capitalize">{b.size || "—"}</span>
@@ -81,14 +87,14 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
     },
     {
       key: "equipment",
-      label: "Equipment",
+      label: t("equipment"),
       render: (b: Booth) => (
         <span className="text-xs text-muted-foreground">{b.equipment || "—"}</span>
       ),
     },
     {
       key: "status",
-      label: "Status",
+      label: t("status"),
       width: "90px",
       render: (b: Booth) => (
         <span className="text-xs">{b.status}</span>
@@ -138,7 +144,7 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
       body: JSON.stringify(drawerForm),
     });
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to save changes"));
+      toast.error(await getApiError(res, tC("failedTo", { action: tC("save").toLowerCase() })));
       setDrawerSaving(false);
       return;
     }
@@ -162,7 +168,7 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
     });
 
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to create booth"));
+      toast.error(await getApiError(res, tC("failedTo", { action: t("addBooth").toLowerCase() })));
       return;
     }
 
@@ -174,57 +180,57 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
   const drawerSections = selectedBooth
     ? [
         {
-          label: "Booth",
+          label: t("booth"),
           content: (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Booth Name</Label>
+                <Label>{t("boothName")}</Label>
                 <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Company Name</Label>
-                  <Input value={(drawerForm.companyName as string) || ""} onChange={(e) => updateField("companyName", e.target.value)} placeholder="Company running the booth" />
+                  <Label>{tE("company")}</Label>
+                  <Input value={(drawerForm.companyName as string) || ""} onChange={(e) => updateField("companyName", e.target.value)} placeholder={t("companyPlaceholder")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Contact Name</Label>
+                  <Label>{tE("contactName")}</Label>
                   <Input value={(drawerForm.contactName as string) || ""} onChange={(e) => updateField("contactName", e.target.value)} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Contact Email</Label>
-                <Input type="email" value={(drawerForm.contactEmail as string) || ""} onChange={(e) => updateField("contactEmail", e.target.value)} placeholder="For portal invite" />
+                <Label>{tE("contactEmail")}</Label>
+                <Input type="email" value={(drawerForm.contactEmail as string) || ""} onChange={(e) => updateField("contactEmail", e.target.value)} placeholder={t("portalPlaceholder")} />
               </div>
               <FileUpload
                 value={(drawerForm.companyLogoUrl as string) || ""}
                 onChange={(url) => updateField("companyLogoUrl", url)}
                 folder="booth-logos"
-                label="Company Logo"
+                label={tE("logo")}
               />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Location</Label>
+                  <Label>{t("location")}</Label>
                   <Input value={(drawerForm.location as string) || ""} onChange={(e) => updateField("location", e.target.value)} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Size</Label>
+                <Label>{t("size")}</Label>
                 <Select value={String(drawerForm.size || "standard")} onValueChange={(v) => updateField("size", v)}>
                   <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="small">Small</SelectItem>
-                    <SelectItem value="standard">Standard</SelectItem>
-                    <SelectItem value="premium">Premium</SelectItem>
+                    <SelectItem value="small">{t("sizeSmall")}</SelectItem>
+                    <SelectItem value="standard">{t("sizeStandard")}</SelectItem>
+                    <SelectItem value="premium">{t("sizePremium")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Equipment</Label>
-                <Textarea rows={4} placeholder="Power, wifi, table, chairs, etc." value={(drawerForm.equipment as string) || ""} onChange={(e) => updateField("equipment", e.target.value)} />
+                <Label>{t("equipment")}</Label>
+                <Textarea rows={4} placeholder={t("equipmentPlaceholder")} value={(drawerForm.equipment as string) || ""} onChange={(e) => updateField("equipment", e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Notes</Label>
-                <Textarea rows={4} placeholder="Additional notes about this booth..." value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
+                <Label>{tE("notes")}</Label>
+                <Textarea rows={4} placeholder={t("notesPlaceholder")} value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
               </div>
 
               {/* Portal Invite — only for confirmed booths with email */}
@@ -235,35 +241,35 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
           ),
         },
         {
-          label: "Pipeline",
+          label: tE("tabPipeline"),
           content: (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
+                  <Label>{tP("source")}</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
+                      <SelectItem value="intake">{tP("sourceIntake")}</SelectItem>
+                      <SelectItem value="outreach">{tP("sourceOutreach")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Stage</Label>
+                  <Label>{tP("stage")}</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="engaged">Engaged</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="declined">Declined</SelectItem>
+                      <SelectItem value="lead">{tP("stageLead")}</SelectItem>
+                      <SelectItem value="engaged">{tP("stageEngaged")}</SelectItem>
+                      <SelectItem value="confirmed">{tP("stageConfirmed")}</SelectItem>
+                      <SelectItem value="declined">{tP("stageDeclined")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Assigned To</Label>
+                <Label>{tP("assignedTo")}</Label>
                 <AssignedToSelect value={(drawerForm.assignedTo as string) || ""} onChange={(val) => updateField("assignedTo", val)} />
               </div>
             </div>
@@ -273,7 +279,7 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
         ...(selectedBooth?.stage === "confirmed"
           ? [
               {
-                label: "Checklist",
+                label: tE("tabChecklist"),
                 content: (
                   <ChecklistPanel entityType="booth" entityId={selectedBooth.id} />
                 ),
@@ -287,11 +293,11 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
     <div>
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Booths</h1>
-          <p className="text-sm text-muted-foreground">{booths.length} total</p>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground">{tC("total", { count: booths.length })}</p>
         </div>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
-          {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Add Booth</>}
+          {showForm ? <><X className="mr-2 h-3 w-3" /> {tC("cancel")}</> : <><Plus className="mr-2 h-3 w-3" /> {t("addBooth")}</>}
         </Button>
       </div>
 
@@ -302,52 +308,52 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Name *</Label>
+                  <Label>{t("nameLabel")}</Label>
                   <Input name="name" placeholder="e.g., Booth A1" aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
                   {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Location</Label>
+                  <Label>{t("location")}</Label>
                   <Input name="location" placeholder="e.g., Hall B, Row 3" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Size</Label>
+                  <Label>{t("size")}</Label>
                   <Select name="size" defaultValue="standard">
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="small">Small</SelectItem>
-                      <SelectItem value="standard">Standard</SelectItem>
-                      <SelectItem value="premium">Premium</SelectItem>
+                      <SelectItem value="small">{t("sizeSmall")}</SelectItem>
+                      <SelectItem value="standard">{t("sizeStandard")}</SelectItem>
+                      <SelectItem value="premium">{t("sizePremium")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Equipment</Label>
+                  <Label>{t("equipment")}</Label>
                   <Input name="equipment" placeholder="e.g., Table, chairs, power strip" />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
+                  <Label>{tP("source")}</Label>
                   <Select name="source" defaultValue="outreach">
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
-                      <SelectItem value="sponsored">Sponsored</SelectItem>
+                      <SelectItem value="intake">{tP("sourceIntake")}</SelectItem>
+                      <SelectItem value="outreach">{tP("sourceOutreach")}</SelectItem>
+                      <SelectItem value="sponsored">{tP("sourceSponsored")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Assigned To</Label>
+                  <Label>{tP("assignedTo")}</Label>
                   <AssignedToSelect name="assignedTo" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Notes</Label>
+                <Label>{tE("notes")}</Label>
                 <Textarea name="notes" placeholder="Any additional notes about this booth..." rows={2} />
               </div>
-              <Button type="submit" className="w-full sm:w-auto">Add Booth</Button>
+              <Button type="submit" className="w-full sm:w-auto">{t("addBooth")}</Button>
             </form>
           </CardContent>
         </Card>
@@ -374,7 +380,7 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
       />
 
       {filtered.length === 0 && booths.length > 0 && (
-        <p className="text-center text-sm text-muted-foreground py-8">No booths match the current filters.</p>
+        <p className="text-center text-sm text-muted-foreground py-8">{tC("noMatch", { entity: t("title").toLowerCase() })}</p>
       )}
 
       <EntityDrawer

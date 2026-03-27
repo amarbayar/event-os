@@ -23,6 +23,7 @@ import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 import { PortalInviteSection } from "@/components/portal-invite-section";
+import { useTranslations } from "next-intl";
 
 type MediaPartner = {
   id: string;
@@ -42,6 +43,10 @@ type MediaPartner = {
 };
 
 export function MediaClient({ initialPartners }: { initialPartners: MediaPartner[] }) {
+  const t = useTranslations("Media");
+  const tP = useTranslations("Pipeline");
+  const tE = useTranslations("Entity");
+  const tC = useTranslations("Common");
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [partners, setPartners] = useState(initialPartners);
   const [showForm, setShowForm] = useState(false);
@@ -55,7 +60,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
   const columns = [
     {
       key: "companyName",
-      label: "Company",
+      label: tE("company"),
       width: "160px",
       render: (p: MediaPartner) => (
         <p className="font-medium text-sm">{p.companyName}</p>
@@ -63,7 +68,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
     },
     {
       key: "contactName",
-      label: "Contact",
+      label: tC("contact"),
       width: "140px",
       render: (p: MediaPartner) => (
         <span className="text-xs text-muted-foreground">{p.contactName || "—"}</span>
@@ -71,7 +76,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
     },
     {
       key: "contactEmail",
-      label: "Email",
+      label: tE("email"),
       width: "180px",
       render: (p: MediaPartner) => (
         <span className="text-xs text-muted-foreground">{p.contactEmail || "—"}</span>
@@ -79,7 +84,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
     },
     {
       key: "type",
-      label: "Type",
+      label: tC("type"),
       width: "80px",
       render: (p: MediaPartner) => (
         <span className="text-xs capitalize">{p.type || "—"}</span>
@@ -87,7 +92,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
     },
     {
       key: "reach",
-      label: "Reach",
+      label: t("reach"),
       width: "140px",
       render: (p: MediaPartner) => (
         <span className="text-xs text-muted-foreground">{p.reach || "—"}</span>
@@ -137,7 +142,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
       body: JSON.stringify(drawerForm),
     });
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to save changes"));
+      toast.error(await getApiError(res, tC("failedTo", { action: tC("save").toLowerCase() })));
       setDrawerSaving(false);
       return;
     }
@@ -165,7 +170,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
     });
 
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to create media partner"));
+      toast.error(await getApiError(res, tC("failedTo", { action: t("addMediaPartner").toLowerCase() })));
       return;
     }
 
@@ -177,46 +182,46 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
   const drawerSections = selectedPartner
     ? [
         {
-          label: "Partner",
+          label: t("partner"),
           content: (
             <div className="space-y-3">
               <FileUpload
                 value={(drawerForm.logoUrl as string) || ""}
                 onChange={(url) => updateField("logoUrl", url)}
                 folder="media-logos"
-                label="Company Logo"
+                label={tE("logo")}
               />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Company Name</Label>
+                  <Label>{tE("company")}</Label>
                   <Input value={(drawerForm.companyName as string) || ""} onChange={(e) => updateField("companyName", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Contact Name</Label>
+                  <Label>{tE("contactName")}</Label>
                   <Input value={(drawerForm.contactName as string) || ""} onChange={(e) => updateField("contactName", e.target.value)} />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Contact Email</Label>
+                  <Label>{tE("contactEmail")}</Label>
                   <Input value={(drawerForm.contactEmail as string) || ""} onChange={(e) => updateField("contactEmail", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Type</Label>
+                  <Label>{tC("type")}</Label>
                   <Select value={String(drawerForm.type || "online")} onValueChange={(v) => updateField("type", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="tv">TV</SelectItem>
-                      <SelectItem value="online">Online</SelectItem>
-                      <SelectItem value="print">Print</SelectItem>
-                      <SelectItem value="podcast">Podcast</SelectItem>
-                      <SelectItem value="blog">Blog</SelectItem>
+                      <SelectItem value="tv">{t("typeTv")}</SelectItem>
+                      <SelectItem value="online">{t("typeOnline")}</SelectItem>
+                      <SelectItem value="print">{t("typePrint")}</SelectItem>
+                      <SelectItem value="podcast">{t("typePodcast")}</SelectItem>
+                      <SelectItem value="blog">{t("typeBlog")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Reach</Label>
+                <Label>{t("reach")}</Label>
                 <Input value={(drawerForm.reach as string) || ""} onChange={(e) => updateField("reach", e.target.value)} />
               </div>
 
@@ -228,54 +233,54 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
           ),
         },
         {
-          label: "Deliverables",
+          label: tC("deliverables"),
           content: (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Proposal</Label>
-                <Textarea rows={4} placeholder="Coverage plan or partnership proposal..." value={(drawerForm.proposal as string) || ""} onChange={(e) => updateField("proposal", e.target.value)} />
+                <Label>{tC("proposal")}</Label>
+                <Textarea rows={4} placeholder={t("proposalPlaceholder")} value={(drawerForm.proposal as string) || ""} onChange={(e) => updateField("proposal", e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Deliverables</Label>
-                <Textarea rows={4} placeholder="What we provide to them..." value={(drawerForm.deliverables as string) || ""} onChange={(e) => updateField("deliverables", e.target.value)} />
+                <Label>{tC("deliverables")}</Label>
+                <Textarea rows={4} placeholder={t("deliverablesPlaceholder")} value={(drawerForm.deliverables as string) || ""} onChange={(e) => updateField("deliverables", e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Notes</Label>
-                <Textarea rows={4} placeholder="Additional notes..." value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
+                <Label>{tE("notes")}</Label>
+                <Textarea rows={4} placeholder={t("notesPlaceholder")} value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
               </div>
             </div>
           ),
         },
         {
-          label: "Pipeline",
+          label: tE("tabPipeline"),
           content: (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
+                  <Label>{tP("source")}</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
+                      <SelectItem value="intake">{tP("sourceIntake")}</SelectItem>
+                      <SelectItem value="outreach">{tP("sourceOutreach")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Stage</Label>
+                  <Label>{tP("stage")}</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="engaged">Engaged</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="declined">Declined</SelectItem>
+                      <SelectItem value="lead">{tP("stageLead")}</SelectItem>
+                      <SelectItem value="engaged">{tP("stageEngaged")}</SelectItem>
+                      <SelectItem value="confirmed">{tP("stageConfirmed")}</SelectItem>
+                      <SelectItem value="declined">{tP("stageDeclined")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Assigned To</Label>
+                <Label>{tP("assignedTo")}</Label>
                 <AssignedToSelect value={(drawerForm.assignedTo as string) || ""} onChange={(val) => updateField("assignedTo", val)} />
               </div>
             </div>
@@ -285,7 +290,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
         ...(selectedPartner?.stage === "confirmed"
           ? [
               {
-                label: "Checklist",
+                label: tE("tabChecklist"),
                 content: (
                   <ChecklistPanel entityType="media" entityId={selectedPartner.id} />
                 ),
@@ -299,11 +304,11 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
     <div>
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Media Partners</h1>
-          <p className="text-sm text-muted-foreground">{partners.length} total</p>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground">{tC("total", { count: partners.length })}</p>
         </div>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
-          {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Add Partner</>}
+          {showForm ? <><X className="mr-2 h-3 w-3" /> {tC("cancel")}</> : <><Plus className="mr-2 h-3 w-3" /> {t("addPartner")}</>}
         </Button>
       </div>
 
@@ -314,59 +319,59 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Company Name *</Label>
+                  <Label>{tE("company")} *</Label>
                   <Input name="companyName" placeholder="e.g., Eagle News" aria-invalid={!!errors.companyName} onChange={() => setErrors((prev) => { const { companyName: _, ...rest } = prev; return rest; })} />
                   {errors.companyName && <p className="text-xs text-destructive">{errors.companyName}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Contact Name *</Label>
+                  <Label>{tE("contactName")} *</Label>
                   <Input name="contactName" placeholder="e.g., Oyunaa B." aria-invalid={!!errors.contactName} onChange={() => setErrors((prev) => { const { contactName: _, ...rest } = prev; return rest; })} />
                   {errors.contactName && <p className="text-xs text-destructive">{errors.contactName}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Contact Email *</Label>
+                  <Label>{tE("contactEmail")} *</Label>
                   <Input name="contactEmail" type="email" placeholder="press@media.mn" aria-invalid={!!errors.contactEmail} onChange={() => setErrors((prev) => { const { contactEmail: _, ...rest } = prev; return rest; })} />
                   {errors.contactEmail && <p className="text-xs text-destructive">{errors.contactEmail}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Type</Label>
+                  <Label>{tC("type")}</Label>
                   <Select name="type" defaultValue="online">
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="tv">TV</SelectItem>
-                      <SelectItem value="online">Online</SelectItem>
-                      <SelectItem value="print">Print</SelectItem>
-                      <SelectItem value="podcast">Podcast</SelectItem>
-                      <SelectItem value="blog">Blog</SelectItem>
+                      <SelectItem value="tv">{t("typeTv")}</SelectItem>
+                      <SelectItem value="online">{t("typeOnline")}</SelectItem>
+                      <SelectItem value="print">{t("typePrint")}</SelectItem>
+                      <SelectItem value="podcast">{t("typePodcast")}</SelectItem>
+                      <SelectItem value="blog">{t("typeBlog")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Reach</Label>
+                  <Label>{t("reach")}</Label>
                   <Input name="reach" placeholder="e.g., 50K monthly readers" />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
+                  <Label>{tP("source")}</Label>
                   <Select name="source" defaultValue="outreach">
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
+                      <SelectItem value="intake">{tP("sourceIntake")}</SelectItem>
+                      <SelectItem value="outreach">{tP("sourceOutreach")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Assigned To</Label>
+                  <Label>{tP("assignedTo")}</Label>
                   <AssignedToSelect name="assignedTo" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Proposal</Label>
-                <Textarea name="proposal" placeholder="Coverage plan or partnership proposal..." rows={2} />
+                <Label>{tC("proposal")}</Label>
+                <Textarea name="proposal" placeholder={t("proposalPlaceholder")} rows={2} />
               </div>
-              <Button type="submit" className="w-full sm:w-auto">Add Media Partner</Button>
+              <Button type="submit" className="w-full sm:w-auto">{t("addMediaPartner")}</Button>
             </form>
           </CardContent>
         </Card>
@@ -393,7 +398,7 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
       />
 
       {filtered.length === 0 && partners.length > 0 && (
-        <p className="text-center text-sm text-muted-foreground py-8">No media partners match the current filters.</p>
+        <p className="text-center text-sm text-muted-foreground py-8">{tC("noMatch", { entity: t("title").toLowerCase() })}</p>
       )}
 
       <EntityDrawer

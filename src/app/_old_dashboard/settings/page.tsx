@@ -9,10 +9,9 @@ import { cn } from "@/lib/utils";
 import { UserPlus, Trash2, Loader2, Plus, GripVertical } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirm } from "@/components/confirm-dialog";
-import { OrganizationTab } from "./organization-tab";
 import { useTranslations } from "next-intl";
 
-type Tab = "organization" | "event" | "team" | "checklists" | "ai" | "telegram";
+type Tab = "event" | "team" | "checklists" | "telegram";
 type User = {
   id: string;
   name: string | null;
@@ -47,12 +46,31 @@ const roleBadgeColors: Record<string, string> = {
 // ─── Checklist Templates Tab ──────────────────────────
 
 function ChecklistTemplatesTab() {
+  const t = useTranslations("Settings");
+  const tC = useTranslations("Common");
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState("speaker");
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ name: "", description: "", itemType: "text_input", fieldKey: "", required: true, dueOffsetDays: -14 });
   const [saving, setSaving] = useState(false);
+
+  const ITEM_TYPE_LABELS: Record<string, string> = {
+    file_upload: t("itemTypeFileUpload"),
+    text_input: t("itemTypeTextInput"),
+    link: t("itemTypeLink"),
+    confirmation: t("itemTypeConfirmation"),
+    meeting: t("itemTypeMeeting"),
+  };
+
+  const ENTITY_TYPE_LABELS: Record<string, string> = {
+    speaker: t("entitySpeaker"),
+    sponsor: t("entitySponsor"),
+    venue: t("entityVenue"),
+    booth: t("entityBooth"),
+    volunteer: t("entityVolunteer"),
+    media: t("entityMedia"),
+  };
 
   const fetchTemplates = () => {
     setLoading(true);
@@ -92,9 +110,9 @@ function ChecklistTemplatesTab() {
 
   const handleDelete = async (id: string, name: string) => {
     const confirmed = await confirmDialog({
-      title: "Delete checklist template",
-      message: `Remove "${name}"? Existing checklist items from this template will also be removed.`,
-      confirmLabel: "Delete",
+      title: t("deleteTemplateTitle"),
+      message: t("deleteTemplateMessage", { name }),
+      confirmLabel: tC("delete"),
       variant: "danger",
     });
     if (!confirmed) return;
@@ -105,9 +123,9 @@ function ChecklistTemplatesTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">Checklist Templates</h2>
+        <h2 className="text-lg font-medium">{t("checklistTemplates")}</h2>
         <p className="text-sm text-muted-foreground">
-          Configure what confirmed entities need to complete. Templates auto-generate checklist items when an entity is confirmed.
+          {t("checklistDescription")}
         </p>
       </div>
 
@@ -124,7 +142,7 @@ function ChecklistTemplatesTab() {
                 : "bg-stone-100 text-stone-600 hover:bg-stone-200"
             )}
           >
-            {type}
+            {ENTITY_TYPE_LABELS[type] || type}
           </button>
         ))}
       </div>
@@ -136,23 +154,23 @@ function ChecklistTemplatesTab() {
         </div>
       ) : (
         <div className="space-y-1">
-          {templates.map((t, i) => (
-            <div key={t.id} className="flex items-center gap-3 rounded-md border px-3 py-2.5 hover:bg-accent/30 transition-colors">
+          {templates.map((tpl, i) => (
+            <div key={tpl.id} className="flex items-center gap-3 rounded-md border px-3 py-2.5 hover:bg-accent/30 transition-colors">
               <GripVertical className="h-4 w-4 text-stone-300 shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{t.name}</span>
-                  <Badge variant="outline" className="text-[9px]">{t.itemType.replace("_", " ")}</Badge>
-                  {t.required && <Badge variant="outline" className="text-[9px] text-yellow-700 border-yellow-200">Required</Badge>}
-                  {t.fieldKey && <Badge variant="outline" className="text-[9px] text-sky-600 border-sky-200">{t.fieldKey}</Badge>}
+                  <span className="text-sm font-medium">{tpl.name}</span>
+                  <Badge variant="outline" className="text-[9px]">{ITEM_TYPE_LABELS[tpl.itemType] || tpl.itemType.replace("_", " ")}</Badge>
+                  {tpl.required && <Badge variant="outline" className="text-[9px] text-yellow-700 border-yellow-200">{t("required")}</Badge>}
+                  {tpl.fieldKey && <Badge variant="outline" className="text-[9px] text-sky-600 border-sky-200">{tpl.fieldKey}</Badge>}
                 </div>
-                {t.description && <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>}
-                {t.dueOffsetDays && (
-                  <p className="text-[10px] text-stone-400 mt-0.5">Due {Math.abs(t.dueOffsetDays)} days before event</p>
+                {tpl.description && <p className="text-xs text-muted-foreground mt-0.5">{tpl.description}</p>}
+                {tpl.dueOffsetDays && (
+                  <p className="text-[10px] text-stone-400 mt-0.5">{t("dueDaysBefore", { days: Math.abs(tpl.dueOffsetDays) })}</p>
                 )}
               </div>
               <button
-                onClick={() => handleDelete(t.id, t.name)}
+                onClick={() => handleDelete(tpl.id, tpl.name)}
                 className="rounded p-1 text-stone-300 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -163,7 +181,7 @@ function ChecklistTemplatesTab() {
           {templates.length === 0 && (
             <div className="rounded-lg border-2 border-dashed p-8 text-center">
               <p className="text-sm text-muted-foreground">
-                No checklist templates for {selectedType}s yet.
+                {t("noTemplates", { type: ENTITY_TYPE_LABELS[selectedType] || selectedType })}
               </p>
             </div>
           )}
@@ -173,40 +191,40 @@ function ChecklistTemplatesTab() {
       {/* Add new template */}
       {showAdd ? (
         <div className="rounded-md border p-4 space-y-3">
-          <h3 className="text-sm font-medium">New checklist item for {selectedType}s</h3>
+          <h3 className="text-sm font-medium">{t("newChecklistItem", { type: ENTITY_TYPE_LABELS[selectedType] || selectedType })}</h3>
           <div className="space-y-1.5">
-            <Label>Item name *</Label>
+            <Label>{t("itemNameLabel")}</Label>
             <Input
               autoFocus
               value={newItem.name}
               onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-              placeholder="e.g., Upload headshot photo"
+              placeholder={t("itemNamePlaceholder")}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Description</Label>
+            <Label>{t("description")}</Label>
             <Textarea
               value={newItem.description}
               onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-              placeholder="Instructions for the stakeholder..."
+              placeholder={t("descriptionPlaceholder")}
               rows={2}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Type</Label>
+              <Label>{t("typeLabel")}</Label>
               <select
                 value={newItem.itemType}
                 onChange={(e) => setNewItem({ ...newItem, itemType: e.target.value })}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                {ITEM_TYPES.map((t) => (
-                  <option key={t} value={t}>{t.replace("_", " ")}</option>
+                {ITEM_TYPES.map((it) => (
+                  <option key={it} value={it}>{ITEM_TYPE_LABELS[it] || it.replace("_", " ")}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Due (days before event)</Label>
+              <Label>{t("dueLabel")}</Label>
               <Input
                 type="number"
                 value={Math.abs(newItem.dueOffsetDays)}
@@ -216,11 +234,11 @@ function ChecklistTemplatesTab() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Maps to entity field (optional)</Label>
+              <Label>{t("fieldKeyLabel")}</Label>
               <Input
                 value={newItem.fieldKey}
                 onChange={(e) => setNewItem({ ...newItem, fieldKey: e.target.value })}
-                placeholder="e.g., headshotUrl, bio"
+                placeholder={t("fieldKeyPlaceholder")}
               />
             </div>
             <div className="space-y-1.5 flex items-end gap-2 pb-1">
@@ -231,20 +249,20 @@ function ChecklistTemplatesTab() {
                   onChange={(e) => setNewItem({ ...newItem, required: e.target.checked })}
                   className="rounded"
                 />
-                Required
+                {t("required")}
               </label>
             </div>
           </div>
           <div className="flex gap-2 pt-1">
             <Button size="sm" onClick={handleAdd} disabled={!newItem.name.trim() || saving}>
-              {saving ? "Adding..." : "Add Item"}
+              {saving ? t("adding") : t("addItem")}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+            <Button size="sm" variant="outline" onClick={() => setShowAdd(false)}>{tC("cancel")}</Button>
           </div>
         </div>
       ) : (
         <Button size="sm" variant="outline" onClick={() => setShowAdd(true)}>
-          <Plus className="mr-2 h-3 w-3" /> Add Checklist Item
+          <Plus className="mr-2 h-3 w-3" /> {t("addChecklistItem")}
         </Button>
       )}
     </div>
@@ -252,18 +270,20 @@ function ChecklistTemplatesTab() {
 }
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<Tab>("organization");
-  const t = useTranslations("OrgSettings");
-  const [userRole, setUserRole] = useState("viewer");
-
-  useEffect(() => {
-    fetch("/api/me")
-      .then((r) => r.json())
-      .then((d) => { if (d.data?.role) setUserRole(d.data.role); })
-      .catch(() => {});
-  }, []);
+  const t = useTranslations("Settings");
+  const tC = useTranslations("Common");
+  const tE = useTranslations("Entity");
+  const [tab, setTab] = useState<Tab>("team");
   const [members, setMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const ROLE_LABELS: Record<string, string> = {
+    owner: t("roleOwner"),
+    admin: t("roleAdmin"),
+    organizer: t("roleOrganizer"),
+    coordinator: t("roleCoordinator"),
+    viewer: t("roleViewer"),
+  };
 
   // Invite dialog state
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -305,7 +325,7 @@ export default function SettingsPage() {
 
     if (!res.ok) {
       const data = await res.json();
-      setInviteError(data.error || "Failed to invite");
+      setInviteError(data.error || t("failedToInvite"));
       setInviting(false);
       return;
     }
@@ -331,9 +351,9 @@ export default function SettingsPage() {
 
   const handleRemove = async (userId: string, userName: string | null) => {
     const confirmed = await confirmDialog({
-      title: "Remove team member",
-      message: `Remove ${userName || "this user"} from the organization? They will lose access to all event data.`,
-      confirmLabel: "Remove",
+      title: t("removeTitle"),
+      message: t("removeMessage", { name: userName || "this user" }),
+      confirmLabel: t("remove"),
       variant: "danger",
     });
     if (!confirmed) return;
@@ -350,22 +370,20 @@ export default function SettingsPage() {
       .slice(0, 2);
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "organization", label: t("tab") },
-    { key: "event", label: "Event" },
-    { key: "team", label: "Team" },
-    { key: "checklists", label: "Checklists" },
-    { key: "ai", label: "AI Model" },
-    { key: "telegram", label: "Messaging" },
+    { key: "event", label: t("tabEvent") },
+    { key: "team", label: t("tabTeam") },
+    { key: "checklists", label: t("tabChecklists") },
+    { key: "telegram", label: t("tabMessaging") },
   ];
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="font-heading text-2xl font-bold tracking-tight">
-          Settings
+          {t("title")}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Configure your event and organization
+          {t("subtitle")}
         </p>
       </div>
 
@@ -387,31 +405,28 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {/* Organization tab */}
-      {tab === "organization" && <OrganizationTab userRole={userRole} />}
-
       {/* Event tab */}
       {tab === "event" && (
         <div className="max-w-lg space-y-4">
           <div className="space-y-1.5">
-            <Label>Event Name</Label>
+            <Label>{t("eventName")}</Label>
             <Input defaultValue="Dev Summit 2026" />
           </div>
           <div className="space-y-1.5">
-            <Label>Venue</Label>
+            <Label>{t("venue")}</Label>
             <Input defaultValue="Chinggis Khaan Hotel, Ulaanbaatar" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Start Date</Label>
+              <Label>{t("startDate")}</Label>
               <Input type="date" defaultValue="2026-03-28" />
             </div>
             <div className="space-y-1.5">
-              <Label>End Date</Label>
+              <Label>{t("endDate")}</Label>
               <Input type="date" defaultValue="2026-03-29" />
             </div>
           </div>
-          <Button>Save Changes</Button>
+          <Button>{t("saveChanges")}</Button>
         </div>
       )}
 
@@ -422,15 +437,15 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-medium">
-                Team Members ({members.length})
+                {t("teamMembers", { count: members.length })}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Manage who has access to your event workspace
+                {t("teamDescription")}
               </p>
             </div>
             <Button size="sm" onClick={() => setInviteOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
-              Invite Member
+              {t("inviteMember")}
             </Button>
 
             {/* Invite modal */}
@@ -442,38 +457,38 @@ export default function SettingsPage() {
                 />
                 <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg">
                   <h3 className="text-lg font-semibold mb-4">
-                    Invite Team Member
+                    {t("inviteTeamMember")}
                   </h3>
                   <div className="space-y-4">
                     <div className="space-y-1.5">
-                      <Label>Name</Label>
+                      <Label>{tE("name")}</Label>
                       <Input
                         value={inviteName}
                         onChange={(e) => setInviteName(e.target.value)}
-                        placeholder="e.g., Tuvshin"
+                        placeholder={t("namePlaceholder")}
                         autoFocus
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Email *</Label>
+                      <Label>{t("emailLabel")}</Label>
                       <Input
                         type="email"
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="tuvshin@devsummit.mn"
+                        placeholder={t("emailPlaceholder")}
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Role</Label>
+                      <Label>{t("role")}</Label>
                       <select
                         value={inviteRole}
                         onChange={(e) => setInviteRole(e.target.value)}
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
-                        <option value="organizer">Organizer</option>
-                        <option value="coordinator">Coordinator</option>
-                        <option value="viewer">Viewer</option>
-                        <option value="admin">Admin</option>
+                        <option value="organizer">{t("roleOrganizer")}</option>
+                        <option value="coordinator">{t("roleCoordinator")}</option>
+                        <option value="viewer">{t("roleViewer")}</option>
+                        <option value="admin">{t("roleAdmin")}</option>
                       </select>
                     </div>
                     {inviteError && (
@@ -484,7 +499,7 @@ export default function SettingsPage() {
                         variant="outline"
                         onClick={() => setInviteOpen(false)}
                       >
-                        Cancel
+                        {tC("cancel")}
                       </Button>
                       <Button
                         onClick={handleInvite}
@@ -493,10 +508,10 @@ export default function SettingsPage() {
                         {inviting ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Inviting...
+                            {t("inviting")}
                           </>
                         ) : (
-                          "Invite"
+                          t("invite")
                         )}
                       </Button>
                     </div>
@@ -519,11 +534,11 @@ export default function SettingsPage() {
           ) : members.length === 0 ? (
             <div className="rounded-lg border-2 border-dashed p-12 text-center">
               <p className="text-muted-foreground mb-2">
-                No team members yet. Invite your first teammate to get started.
+                {t("noMembers")}
               </p>
               <Button onClick={() => setInviteOpen(true)} size="sm">
                 <UserPlus className="mr-2 h-4 w-4" />
-                Invite Member
+                {t("inviteMember")}
               </Button>
             </div>
           ) : (
@@ -552,7 +567,7 @@ export default function SettingsPage() {
                         className={roleBadgeColors.owner}
                         variant="outline"
                       >
-                        Owner
+                        {t("roleOwner")}
                       </Badge>
                     ) : (
                       <select
@@ -562,10 +577,10 @@ export default function SettingsPage() {
                         }
                         className="rounded border border-input bg-background px-2 py-1 text-xs"
                       >
-                        <option value="admin">Admin</option>
-                        <option value="organizer">Organizer</option>
-                        <option value="coordinator">Coordinator</option>
-                        <option value="viewer">Viewer</option>
+                        <option value="admin">{t("roleAdmin")}</option>
+                        <option value="organizer">{t("roleOrganizer")}</option>
+                        <option value="coordinator">{t("roleCoordinator")}</option>
+                        <option value="viewer">{t("roleViewer")}</option>
                       </select>
                     )}
                     {m.role !== "owner" && (
@@ -587,16 +602,6 @@ export default function SettingsPage() {
       {/* Checklists tab */}
       {tab === "checklists" && (
         <ChecklistTemplatesTab />
-      )}
-
-      {/* AI Model tab */}
-      {tab === "ai" && (
-        <div className="max-w-lg space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Choose the LLM that powers the agent — both the web chat and messaging bots (Telegram, Discord).
-          </p>
-          <LlmSettings />
-        </div>
       )}
 
       {/* Messaging tab */}
@@ -625,6 +630,7 @@ type PlatformLink = {
 type OrgMember = { userId: string; name: string | null; email: string; role: string };
 
 function MessagingTab() {
+  const t = useTranslations("Settings");
   const [activePlatform, setActivePlatform] = useState<"telegram" | "discord" | null>(null);
   const [links, setLinks] = useState<PlatformLink[]>([]);
   const [members, setMembers] = useState<OrgMember[]>([]);
@@ -662,18 +668,14 @@ function MessagingTab() {
   };
 
   if (!loaded) {
-    return <div className="py-8 text-sm text-muted-foreground">Loading messaging config...</div>;
+    return <div className="py-8 text-sm text-muted-foreground">{t("loadingMessaging")}</div>;
   }
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Connect your team&apos;s chat to Event OS. The bot joins your group and responds
-        when @mentioned — query data, create records, manage your event through conversation.
+        {t("messagingIntro")}
       </p>
-
-      {/* Bot personality */}
-      <BotPersonality />
 
       {/* Platform selector cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -689,7 +691,7 @@ function MessagingTab() {
                 {tgConfig?.enabled && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
               </div>
               <p className="text-xs text-muted-foreground truncate">
-                {tgConfig?.enabled ? `@${tgConfig.botUsername} · ${tgLinks.length} member${tgLinks.length !== 1 ? "s" : ""}` : "Not connected"}
+                {tgConfig?.enabled ? `@${tgConfig.botUsername} · ${t("connectedMembers", { count: tgLinks.length })}` : t("notConnected")}
               </p>
             </div>
           </div>
@@ -707,7 +709,7 @@ function MessagingTab() {
                 {dcConfig?.enabled && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
               </div>
               <p className="text-xs text-muted-foreground truncate">
-                {dcConfig?.enabled ? `${dcConfig.botUsername} · ${dcLinks.length} member${dcLinks.length !== 1 ? "s" : ""}` : "Not connected"}
+                {dcConfig?.enabled ? `${dcConfig.botUsername} · ${t("connectedMembers", { count: dcLinks.length })}` : t("notConnected")}
               </p>
             </div>
           </div>
@@ -743,254 +745,6 @@ function MessagingTab() {
   );
 }
 
-// ─── Bot Personality ──────────────────────────────────
-
-const LANGUAGES = [
-  { value: "auto", label: "Auto (match user's language)" },
-  { value: "en", label: "English" },
-  { value: "mn", label: "Mongolian" },
-  { value: "ko", label: "Korean" },
-  { value: "ja", label: "Japanese" },
-  { value: "zh", label: "Chinese" },
-  { value: "ru", label: "Russian" },
-];
-
-const MOODS = [
-  { value: "professional", label: "Professional", desc: "Straight to the point" },
-  { value: "friendly", label: "Friendly", desc: "Warm and encouraging" },
-  { value: "sarcastic", label: "Sarcastic", desc: "Witty and dry humor" },
-  { value: "nerdy", label: "Nerdy", desc: "Enthusiastic tech nerd" },
-  { value: "funny", label: "Funny", desc: "Light-hearted and humorous" },
-];
-
-const LLM_PROVIDERS = [
-  { value: "gemini", label: "Google Gemini", desc: "Google's Gemini models" },
-  { value: "zai", label: "z.ai (Zhipu)", desc: "GLM models from z.ai" },
-  { value: "xai", label: "xAI (Grok)", desc: "Grok models from xAI" },
-  { value: "ollama", label: "Ollama (Local)", desc: "Self-hosted open-source models" },
-];
-
-function LlmSettings() {
-  const [provider, setProvider] = useState<string | null>(null);
-  const [model, setModel] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState("");
-  const [apiKeyMasked, setApiKeyMasked] = useState<string | null>(null);
-  const [apiKeySet, setApiKeySet] = useState(false);
-  const [providerModels, setProviderModels] = useState<Record<string, { id: string; label: string; note?: string }[]>>({});
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editingKey, setEditingKey] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/messaging/llm-settings").then(async (res) => {
-      const json = await res.json();
-      if (json.data) {
-        setProvider(json.data.provider);
-        setModel(json.data.model);
-        setApiKeySet(json.data.apiKeySet);
-        setApiKeyMasked(json.data.apiKeyMasked);
-        if (json.data.providerModels) setProviderModels(json.data.providerModels);
-      }
-      setLoaded(true);
-    }).catch(() => setLoaded(true));
-  }, []);
-
-  const save = async (updates: Record<string, unknown>) => {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/messaging/llm-settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-      const json = await res.json();
-      if (json.data) {
-        if (json.data.apiKeySet !== undefined) {
-          setApiKeySet(json.data.apiKeySet);
-          setEditingKey(false);
-          setApiKey("");
-          // Refetch to get masked key
-          const r = await fetch("/api/messaging/llm-settings");
-          const j = await r.json();
-          if (j.data) setApiKeyMasked(j.data.apiKeyMasked);
-        }
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!loaded) return null;
-
-  const models = provider ? (providerModels[provider] || []) : [];
-  const needsApiKey = provider && provider !== "ollama";
-
-  return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <h3 className="text-sm font-medium">AI Model</h3>
-      <p className="text-xs text-muted-foreground">
-        Choose the LLM that powers the agent — both the web chat and messaging bots.
-        {!provider && " Using server default (env vars)."}
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Provider */}
-        <div className="space-y-1.5">
-          <Label className="text-xs">Provider</Label>
-          <select
-            className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
-            value={provider || ""}
-            onChange={(e) => {
-              const v = e.target.value || null;
-              setProvider(v);
-              setModel(null);
-              setApiKeySet(false);
-              setApiKeyMasked(null);
-              setEditingKey(false);
-              if (v) save({ provider: v, model: null, apiKey: null });
-              else save({ provider: null, model: null, apiKey: null });
-            }}
-          >
-            <option value="">Server default (env vars)</option>
-            {LLM_PROVIDERS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Model */}
-        {provider && (
-          <div className="space-y-1.5">
-            <Label className="text-xs">Model</Label>
-            <select
-              className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
-              value={model || ""}
-              onChange={(e) => {
-                const v = e.target.value || null;
-                setModel(v);
-                save({ model: v });
-              }}
-            >
-              <option value="">Default</option>
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}{m.note ? ` — ${m.note}` : ""}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* API Key */}
-      {needsApiKey && (
-        <div className="space-y-1.5">
-          <Label className="text-xs">API Key</Label>
-          {apiKeySet && !editingKey ? (
-            <div className="flex items-center gap-2">
-              <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{apiKeyMasked}</code>
-              <button
-                onClick={() => setEditingKey(true)}
-                className="text-xs text-primary hover:underline"
-              >
-                Change
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Input
-                type="password"
-                placeholder={`Enter your ${LLM_PROVIDERS.find((p) => p.value === provider)?.label} API key`}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="text-sm font-mono"
-              />
-              <Button
-                size="sm"
-                disabled={!apiKey.trim() || saving}
-                onClick={() => save({ apiKey: apiKey.trim() })}
-              >
-                {saving ? "Saving..." : "Save"}
-              </Button>
-              {editingKey && (
-                <Button size="sm" variant="ghost" onClick={() => { setEditingKey(false); setApiKey(""); }}>
-                  Cancel
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {saving && <p className="text-xs text-muted-foreground">Saving & syncing with messaging bots...</p>}
-    </div>
-  );
-}
-
-function BotPersonality() {
-  const [language, setLanguage] = useState("auto");
-  const [mood, setMood] = useState("professional");
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/messaging/bot-settings").then(async (res) => {
-      const json = await res.json();
-      if (json.data) {
-        setLanguage(json.data.language || "auto");
-        setMood(json.data.mood || "professional");
-      }
-      setLoaded(true);
-    }).catch(() => setLoaded(true));
-  }, []);
-
-  const save = async (newLang?: string, newMood?: string) => {
-    setSaving(true);
-    await fetch("/api/messaging/bot-settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ language: newLang || language, mood: newMood || mood }),
-    });
-    setSaving(false);
-  };
-
-  if (!loaded) return null;
-
-  return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <h3 className="text-sm font-medium">Bot Personality</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs">Response Language</Label>
-          <select
-            className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
-            value={language}
-            onChange={(e) => { setLanguage(e.target.value); save(e.target.value, undefined); }}
-          >
-            {LANGUAGES.map((l) => (
-              <option key={l.value} value={l.value}>{l.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Mood</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {MOODS.map((m) => (
-              <button
-                key={m.value}
-                onClick={() => { setMood(m.value); save(undefined, m.value); }}
-                className={`px-2.5 py-1 rounded-full text-xs transition-colors ${mood === m.value ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"}`}
-                title={m.desc}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-      {saving && <p className="text-xs text-muted-foreground">Saving...</p>}
-    </div>
-  );
-}
-
 // ─── Platform Section — unified layout per platform ───
 
 function PlatformSection({
@@ -1005,6 +759,8 @@ function PlatformSection({
   onLinksChange: () => void;
   setupComponent: React.ReactNode;
 }) {
+  const t = useTranslations("Settings");
+  const tC = useTranslations("Common");
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [formMember, setFormMember] = useState("");
   const [formPlatformId, setFormPlatformId] = useState("");
@@ -1013,7 +769,7 @@ function PlatformSection({
 
   const addLink = async () => {
     if (!formMember || !formPlatformId.trim()) {
-      setLinkError("Select a team member and enter their platform ID");
+      setLinkError(t("linkError"));
       return;
     }
     setLinkError("");
@@ -1072,7 +828,7 @@ function PlatformSection({
               )}
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={disconnect}>Disconnect</Button>
+          <Button variant="outline" size="sm" onClick={disconnect}>{t("disconnect")}</Button>
         </div>
       </div>
 
@@ -1080,10 +836,10 @@ function PlatformSection({
       <div>
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-medium">
-            Team Members ({platform === "telegram" ? "Telegram" : "Discord"})
+            {t("teamMembersPlatform", { platform: platform === "telegram" ? "Telegram" : "Discord" })}
           </h4>
           <Button size="sm" variant="outline" onClick={() => setShowLinkForm(!showLinkForm)}>
-            {showLinkForm ? "Cancel" : "+ Link Member"}
+            {showLinkForm ? tC("cancel") : t("linkMember")}
           </Button>
         </div>
 
@@ -1091,13 +847,13 @@ function PlatformSection({
           <div className="rounded-lg border p-3 mb-3 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Team Member</Label>
+                <Label className="text-xs">{t("teamMemberLabel")}</Label>
                 <select
                   className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
                   value={formMember}
                   onChange={(e) => setFormMember(e.target.value)}
                 >
-                  <option value="">Select...</option>
+                  <option value="">{t("selectMember")}</option>
                   {members.map((m) => (
                     <option key={m.userId} value={m.userId}>
                       {m.name || m.email} ({m.role})
@@ -1107,7 +863,7 @@ function PlatformSection({
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">
-                  {platform === "telegram" ? "Telegram User ID" : "Discord User ID"}
+                  {platform === "telegram" ? t("telegramUserId") : t("discordUserId")}
                 </Label>
                 <Input
                   className="h-8 text-sm"
@@ -1117,10 +873,10 @@ function PlatformSection({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Display Name</Label>
+                <Label className="text-xs">{t("displayName")}</Label>
                 <Input
                   className="h-8 text-sm"
-                  placeholder="@username"
+                  placeholder={t("displayNamePlaceholder")}
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                 />
@@ -1128,11 +884,11 @@ function PlatformSection({
             </div>
             <p className="text-xs text-muted-foreground">
               {platform === "telegram"
-                ? "To find your Telegram ID: message @userinfobot in Telegram."
-                : "To find your Discord ID: right-click your name → Copy User ID. (Turn on Developer Mode in Settings → Advanced first.)"}
+                ? t("telegramIdHint")
+                : t("discordIdHint")}
             </p>
             {linkError && <p className="text-xs text-destructive">{linkError}</p>}
-            <Button size="sm" onClick={addLink}>Link Account</Button>
+            <Button size="sm" onClick={addLink}>{t("linkAccount")}</Button>
           </div>
         )}
 
@@ -1150,14 +906,14 @@ function PlatformSection({
                   onClick={() => removeLink(link.id)}
                   className="text-xs text-muted-foreground hover:text-destructive transition-colors"
                 >
-                  Remove
+                  {t("remove")}
                 </button>
               </div>
             ))}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground border rounded-lg p-3">
-            No team members linked yet. The bot won&apos;t recognize anyone until you link their accounts.
+            {t("noLinkedMembers")}
           </p>
         )}
       </div>
@@ -1327,6 +1083,7 @@ function __old_PlatformLinks() {
 // ─── Discord Setup Component ──────────────────────────
 
 function DiscordSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => void }) {
+  const t = useTranslations("Settings");
   const [step, setStep] = useState<"loading" | "idle" | "token" | "server">("loading");
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1380,7 +1137,7 @@ function DiscordSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => 
   };
 
   if (step === "loading") {
-    return <div className="py-4 text-sm text-muted-foreground">Loading...</div>;
+    return <div className="py-4 text-sm text-muted-foreground">{t("loadingMessaging")}</div>;
   }
 
   return (
@@ -1389,35 +1146,35 @@ function DiscordSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => 
       <div className="rounded-lg border p-4 space-y-3">
         <div className="flex items-center gap-2">
           <span className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-medium ${botInfo || step === "server" ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"}`}>1</span>
-          <h4 className="text-sm font-medium">Create a Discord bot</h4>
+          <h4 className="text-sm font-medium">{t("createDiscordBot")}</h4>
         </div>
         {step === "idle" || step === "token" ? (
           <div className="space-y-2 pl-7">
             <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-              <li>Go to <a href="https://discord.com/developers/applications" target="_blank" rel="noopener" className="underline">Discord Developer Portal</a></li>
-              <li>Click <span className="font-medium">New Application</span> → name it (e.g., &quot;Event OS&quot;)</li>
-              <li>Go to <span className="font-medium">Bot</span> tab → click <span className="font-medium">Reset Token</span> → copy it</li>
-              <li>Under <span className="font-medium">Privileged Gateway Intents</span>, turn on <span className="font-medium">Message Content Intent</span></li>
-              <li>Go to <span className="font-medium">OAuth2</span> → check <span className="font-medium">bot</span> + <span className="font-medium">applications.commands</span></li>
-              <li>Under Bot Permissions, check: View Channels, Send Messages, Read Message History, Add Reactions</li>
-              <li>Copy the invite URL → open it → add bot to your server</li>
+              <li><a href="https://discord.com/developers/applications" target="_blank" rel="noopener" className="underline">{t("discordStep1")}</a></li>
+              <li>{t("discordStep2")}</li>
+              <li>{t("discordStep3")}</li>
+              <li>{t("discordStep4")}</li>
+              <li>{t("discordStep5")}</li>
+              <li>{t("discordStep6")}</li>
+              <li>{t("discordStep7")}</li>
             </ol>
             <div className="flex gap-2 pt-1">
               <Input
                 type="password"
-                placeholder="Paste bot token..."
+                placeholder={t("pasteBotToken")}
                 value={token}
                 onChange={(e) => { setToken(e.target.value); setError(""); }}
               />
               <Button size="sm" disabled={!token || loading} onClick={validateToken}>
-                {loading ? "Checking..." : "Verify"}
+                {loading ? t("checking") : t("verify")}
               </Button>
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground pl-7">
-            Bot: <span className="font-medium">{botInfo?.username || config?.botUsername}</span>
+            {t("bot")}: <span className="font-medium">{botInfo?.username || config?.botUsername}</span>
           </p>
         )}
       </div>
@@ -1427,16 +1184,15 @@ function DiscordSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => 
         <div className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span className="w-5 h-5 rounded-full text-xs flex items-center justify-center font-medium bg-muted text-muted-foreground">2</span>
-            <h4 className="text-sm font-medium">Connect to your server</h4>
+            <h4 className="text-sm font-medium">{t("connectToServer")}</h4>
           </div>
           <div className="space-y-2 pl-7">
             <p className="text-xs text-muted-foreground">
-              Right-click your server icon in Discord → <span className="font-medium">Copy Server ID</span>.
-              (Enable Developer Mode first: User Settings → Advanced → Developer Mode)
+              {t("serverIdHint")}
             </p>
             <div className="flex gap-2">
               <Input
-                placeholder="Paste Server ID..."
+                placeholder={t("pasteServerId")}
                 id="discord-server-id"
                 onChange={() => setError("")}
               />
@@ -1445,10 +1201,10 @@ function DiscordSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => 
                 if (id && /^\d+$/.test(id)) {
                   connectServer(id);
                 } else {
-                  setError("Server ID should be a number (e.g., 1234567890)");
+                  setError(t("serverIdError"));
                 }
               }}>
-                {loading ? "Connecting..." : "Connect"}
+                {loading ? t("connecting") : t("connect")}
               </Button>
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
@@ -1462,6 +1218,7 @@ function DiscordSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => 
 // ─── Telegram Setup Component ─────────────────────────
 
 function TelegramSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => void }) {
+  const t = useTranslations("Settings");
   const [step, setStep] = useState<"loading" | "idle" | "token" | "group">("loading");
   const [token, setToken] = useState("");
   const [botInfo, setBotInfo] = useState<{ botUsername: string; botName: string } | null>(null);
@@ -1554,44 +1311,43 @@ function TelegramSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) =>
   // Loading state — prevents flash of empty form
   if (step === "loading") {
     return (
-      <div className="max-w-lg py-8 text-sm text-muted-foreground">Loading messaging config...</div>
+      <div className="max-w-lg py-8 text-sm text-muted-foreground">{t("loadingMessaging")}</div>
     );
   }
 
   return (
     <div className="max-w-lg space-y-4">
       <p className="text-sm text-muted-foreground">
-        Connect a Telegram bot to your team group chat. The bot can answer questions,
-        create records, and manage your event through natural conversation.
+        {t("telegramSetupIntro")}
       </p>
 
       {/* Step 1: Bot token */}
       <div className="rounded-lg border p-4 space-y-3">
         <div className="flex items-center gap-2">
           <span className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-medium ${botInfo || step === "group" ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"}`}>1</span>
-          <h4 className="text-sm font-medium">Create a bot</h4>
+          <h4 className="text-sm font-medium">{t("createTelegramBot")}</h4>
         </div>
         {step === "idle" || step === "token" ? (
           <div className="space-y-2 pl-7">
             <p className="text-xs text-muted-foreground">
-              Open Telegram, message <span className="font-medium">@BotFather</span>, send <code className="bg-muted px-1 rounded">/newbot</code>, and paste the token below.
+              {t("telegramBotInstructions")}
             </p>
             <div className="flex gap-2">
               <Input
                 type="password"
-                placeholder="Paste bot token..."
+                placeholder={t("pasteBotToken")}
                 value={token}
                 onChange={(e) => { setToken(e.target.value); setError(""); }}
               />
               <Button size="sm" disabled={!token.includes(":") || loading} onClick={validateToken}>
-                {loading ? "Checking..." : "Verify"}
+                {loading ? t("checking") : t("verify")}
               </Button>
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground pl-7">
-            Bot: <span className="font-medium">@{botInfo?.botUsername || config?.botUsername}</span>
+            {t("bot")}: <span className="font-medium">@{botInfo?.botUsername || config?.botUsername}</span>
           </p>
         )}
       </div>
@@ -1601,17 +1357,15 @@ function TelegramSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) =>
         <div className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-medium ${groups.length > 0 ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"}`}>2</span>
-            <h4 className="text-sm font-medium">Connect to group chat</h4>
+            <h4 className="text-sm font-medium">{t("connectToGroup")}</h4>
           </div>
           <div className="space-y-3 pl-7">
             <p className="text-xs text-muted-foreground">
-              Add <span className="font-medium">@{botInfo?.botUsername || config?.botUsername}</span> to your team group chat,
-              send any message in the group, then click Detect. If detect doesn&apos;t find your group,
-              enter the chat ID manually below.
+              {t("groupDetectInstructions", { bot: botInfo?.botUsername || config?.botUsername || "" })}
             </p>
             <div className="flex gap-2">
               <Button size="sm" disabled={loading} onClick={detectGroups}>
-                {loading ? "Detecting..." : "Detect Group"}
+                {loading ? t("detecting") : t("detectGroup")}
               </Button>
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
@@ -1624,16 +1378,16 @@ function TelegramSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) =>
                     onClick={() => connectGroup(g.chatId, g.title)}
                   >
                     <span>{g.title}</span>
-                    <span className="text-xs font-medium text-primary">Connect</span>
+                    <span className="text-xs font-medium text-primary">{t("connect")}</span>
                   </button>
                 ))}
               </div>
             )}
             <div className="border-t pt-3 space-y-2">
-              <p className="text-xs text-muted-foreground">Or enter group chat ID manually:</p>
+              <p className="text-xs text-muted-foreground">{t("manualGroupId")}</p>
               <div className="flex gap-2">
                 <Input
-                  placeholder="e.g., -1001234567890"
+                  placeholder={t("groupIdPlaceholder")}
                   onChange={(e) => setError("")}
                   id="manual-group-id"
                 />
@@ -1642,10 +1396,10 @@ function TelegramSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) =>
                   if (input && input.startsWith("-")) {
                     connectGroup(input, "Group chat");
                   } else {
-                    setError("Group chat IDs start with a dash (e.g., -1001234567890)");
+                    setError(t("groupIdError"));
                   }
                 }}>
-                  Connect
+                  {t("connect")}
                 </Button>
               </div>
             </div>

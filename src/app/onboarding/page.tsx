@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { CheckCircle2, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 type Step = "org" | "event" | "account" | "done";
 
 export default function OnboardingPage() {
+  const t = useTranslations("Onboarding");
   const [step, setStep] = useState<Step>("org");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,14 +48,14 @@ export default function OnboardingPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "Something went wrong");
+        setError(data.error || t("somethingWrong"));
         setLoading(false);
         return;
       }
 
       setStep("done");
     } catch {
-      setError("Failed to create. Please try again.");
+      setError(t("failedToCreate"));
     } finally {
       setLoading(false);
     }
@@ -68,7 +70,7 @@ export default function OnboardingPage() {
             Event OS
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Set up your event workspace in 60 seconds
+            {t("setupTitle")}
           </p>
         </div>
 
@@ -103,15 +105,15 @@ export default function OnboardingPage() {
           <Card>
             <CardContent className="p-6 space-y-4">
               <div>
-                <h2 className="font-heading text-lg font-semibold">Your organization</h2>
-                <p className="text-sm text-muted-foreground">This is the team or company running the event.</p>
+                <h2 className="font-heading text-lg font-semibold">{t("orgTitle")}</h2>
+                <p className="text-sm text-muted-foreground">{t("orgDescription")}</p>
               </div>
               <div className="space-y-1.5">
-                <Label>Organization Name *</Label>
+                <Label>{t("orgNameLabel")}</Label>
                 <Input
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="e.g., Dev Summit Mongolia"
+                  placeholder={t("orgNamePlaceholder")}
                   autoFocus
                 />
               </div>
@@ -120,7 +122,7 @@ export default function OnboardingPage() {
                 disabled={!orgName.trim()}
                 onClick={() => setStep("event")}
               >
-                Next <ArrowRight className="ml-2 h-4 w-4" />
+                {t("next")} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </CardContent>
           </Card>
@@ -131,21 +133,21 @@ export default function OnboardingPage() {
           <Card>
             <CardContent className="p-6 space-y-4">
               <div>
-                <h2 className="font-heading text-lg font-semibold">Your event</h2>
-                <p className="text-sm text-muted-foreground">You can always change these later.</p>
+                <h2 className="font-heading text-lg font-semibold">{t("eventTitle")}</h2>
+                <p className="text-sm text-muted-foreground">{t("eventDescription")}</p>
               </div>
               <div className="space-y-1.5">
-                <Label>Event Name *</Label>
+                <Label>{t("eventNameLabel")}</Label>
                 <Input
                   value={eventName}
                   onChange={(e) => setEventName(e.target.value)}
-                  placeholder="e.g., Dev Summit 2026"
+                  placeholder={t("eventNamePlaceholder")}
                   autoFocus
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label>Start Date</Label>
+                  <Label>{t("startDate")}</Label>
                   <Input
                     type="date"
                     value={startDate}
@@ -153,7 +155,7 @@ export default function OnboardingPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>End Date</Label>
+                  <Label>{t("endDate")}</Label>
                   <Input
                     type="date"
                     value={endDate}
@@ -162,23 +164,23 @@ export default function OnboardingPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Venue</Label>
+                <Label>{t("venue")}</Label>
                 <Input
                   value={venue}
                   onChange={(e) => setVenue(e.target.value)}
-                  placeholder="e.g., Chinggis Khaan Hotel, Ulaanbaatar"
+                  placeholder={t("venuePlaceholder")}
                 />
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setStep("org")}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                  <ArrowLeft className="mr-2 h-4 w-4" /> {t("back")}
                 </Button>
                 <Button
                   className="flex-1"
                   disabled={!eventName.trim()}
                   onClick={() => setStep("account")}
                 >
-                  Next <ArrowRight className="ml-2 h-4 w-4" />
+                  {t("next")} <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </CardContent>
@@ -190,34 +192,34 @@ export default function OnboardingPage() {
           <Card>
             <CardContent className="p-6 space-y-4">
               <div>
-                <h2 className="font-heading text-lg font-semibold">Your account</h2>
-                <p className="text-sm text-muted-foreground">Create your admin login.</p>
+                <h2 className="font-heading text-lg font-semibold">{t("accountTitle")}</h2>
+                <p className="text-sm text-muted-foreground">{t("accountDescription")}</p>
               </div>
               <div className="space-y-1.5">
-                <Label>Your Name</Label>
+                <Label>{t("yourName")}</Label>
                 <Input
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
-                  placeholder="e.g., Amarbayar"
+                  placeholder={t("namePlaceholder")}
                   autoFocus
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Email *</Label>
+                <Label>{t("emailLabel")}</Label>
                 <Input
                   type="email"
                   value={userEmail}
                   onChange={(e) => setUserEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder={t("emailPlaceholder")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Password *</Label>
+                <Label>{t("passwordLabel")}</Label>
                 <Input
                   type="password"
                   value={userPassword}
                   onChange={(e) => setUserPassword(e.target.value)}
-                  placeholder="Choose a password"
+                  placeholder={t("passwordPlaceholder")}
                 />
               </div>
               {error && (
@@ -227,7 +229,7 @@ export default function OnboardingPage() {
               )}
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setStep("event")}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                  <ArrowLeft className="mr-2 h-4 w-4" /> {t("back")}
                 </Button>
                 <Button
                   className="flex-1"
@@ -235,9 +237,9 @@ export default function OnboardingPage() {
                   onClick={handleSubmit}
                 >
                   {loading ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("creating")}</>
                   ) : (
-                    "Create Workspace"
+                    t("createWorkspace")
                   )}
                 </Button>
               </div>
@@ -251,14 +253,13 @@ export default function OnboardingPage() {
             <CardContent className="flex flex-col items-center py-12 px-6">
               <CheckCircle2 className="h-16 w-16 text-emerald-500 mb-4" />
               <h2 className="font-heading text-xl font-bold mb-2">
-                You&apos;re all set!
+                {t("doneTitle")}
               </h2>
               <p className="text-sm text-muted-foreground text-center mb-6">
-                <strong>{eventName}</strong> workspace is ready. Start adding speakers,
-                building your schedule, and managing your event.
+                {t.rich("doneDescription", { eventName, strong: (chunks) => <strong>{chunks}</strong> })}
               </p>
               <Button className="w-full" onClick={() => window.location.href = "/"}>
-                Go to Dashboard
+                {t("goToDashboard")}
               </Button>
             </CardContent>
           </Card>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
@@ -47,43 +48,46 @@ export function PortalInviteSection({
     setShowConfirm(false);
   };
 
+  const t = useTranslations("Portal");
+  const tC = useTranslations("Common");
+
   return (
     <div className="pt-4 border-t space-y-2">
-      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Stakeholder Portal</Label>
+      <Label className="text-xs text-muted-foreground uppercase tracking-wider">{t("title")}</Label>
 
       {status === "already" && (
         <div className="rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-700">
-          Already invited — {entityEmail} has portal access.
+          {t("alreadyInvited", { email: entityEmail })}
           <Button size="sm" variant="outline" className="h-6 text-[10px] ml-2" onClick={() => { setStatus("idle"); setShowConfirm(true); }}>
-            Resend invite
+            {t("resendInvite")}
           </Button>
         </div>
       )}
 
       {status === "invited" && inviteInfo && (
         <div className="rounded-md bg-emerald-50 px-3 py-2 space-y-1">
-          <p className="text-xs font-medium text-emerald-800">Portal invite created!</p>
-          <p className="text-xs text-emerald-700">Email: {inviteInfo.email}</p>
-          <p className="text-xs text-emerald-700">Password: {inviteInfo.password}</p>
-          <p className="text-xs text-emerald-600">Share these credentials with them.</p>
+          <p className="text-xs font-medium text-emerald-800">{t("inviteCreated")}</p>
+          <p className="text-xs text-emerald-700">{t("inviteEmail", { email: inviteInfo.email })}</p>
+          <p className="text-xs text-emerald-700">{t("invitePassword", { password: inviteInfo.password })}</p>
+          <p className="text-xs text-emerald-600">{t("shareCredentials")}</p>
         </div>
       )}
 
       {status === "error" && (
-        <p className="text-xs text-red-600">Failed to create invite. The email may already be in use.</p>
+        <p className="text-xs text-red-600">{t("inviteFailed")}</p>
       )}
 
       {showConfirm && (
         <div className="rounded-md border p-3 space-y-2">
           <p className="text-xs text-stone-600">
-            This will create a portal login for <strong>{entityEmail}</strong> where they can self-service their checklist items and update their profile.
+            {t.rich("inviteExplainer", { email: entityEmail, strong: (chunks) => <strong>{chunks}</strong> })}
           </p>
           <div className="flex gap-2">
             <Button size="sm" className="h-7 text-xs" onClick={handleInvite} disabled={status === "loading"}>
-              {status === "loading" ? "Inviting..." : "Confirm Invite"}
+              {status === "loading" ? t("inviting") : t("confirmInvite")}
             </Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowConfirm(false)}>
-              Cancel
+              {tC("cancel")}
             </Button>
           </div>
         </div>
@@ -91,7 +95,7 @@ export function PortalInviteSection({
 
       {status === "idle" && !showConfirm && (
         <Button size="sm" className="w-full" onClick={() => setShowConfirm(true)}>
-          <UserPlus className="mr-2 h-3 w-3" /> Invite to Portal
+          <UserPlus className="mr-2 h-3 w-3" /> {t("inviteToPortal")}
         </Button>
       )}
     </div>

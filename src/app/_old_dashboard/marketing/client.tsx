@@ -11,6 +11,8 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Plus, ChevronLeft, ChevronRight, X, Trash2, Calendar, Check } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequired, getApiError } from "@/lib/validation";
+import { useTranslations } from "next-intl";
+import { useLocale } from "next-intl";
 
 type Campaign = {
   id: string;
@@ -38,10 +40,10 @@ const PLATFORM_COLORS: Record<string, string> = {
   telegram: "bg-cyan-100 text-cyan-700",
 };
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
 export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campaign[] }) {
+  const t = useTranslations("Marketing");
+  const tC = useTranslations("Common");
+  const locale = useLocale();
   const [campaigns, setCampaigns] = useState(initialCampaigns);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
@@ -50,6 +52,16 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [createDate, setCreateDate] = useState("");
+
+  const monthNames = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) =>
+      new Intl.DateTimeFormat(locale, { month: "long" }).format(new Date(2024, i))
+    ), [locale]);
+
+  const dayNames = useMemo(() =>
+    Array.from({ length: 7 }, (_, i) =>
+      new Intl.DateTimeFormat(locale, { weekday: "short" }).format(new Date(2024, 0, i))
+    ), [locale]);
 
   const refreshCampaigns = async () => {
     const res = await fetch("/api/campaigns");
@@ -109,13 +121,13 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
       {/* Header */}
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Marketing</h1>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">
-            {counts.total} items — {counts.unscheduled} unscheduled, {counts.scheduled} scheduled, {counts.published} done
+            {t("subtitle", { total: counts.total, unscheduled: counts.unscheduled, scheduled: counts.scheduled, published: counts.published })}
           </p>
         </div>
         <Button size="sm" onClick={() => { setCreateDate(""); setShowCreate(true); }}>
-          <Plus className="mr-2 h-3 w-3" /> Add Campaign
+          <Plus className="mr-2 h-3 w-3" /> {t("addCampaign")}
         </Button>
       </div>
 
@@ -124,7 +136,7 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
         <button onClick={() => setCurrentMonth((p) => ({ year: p.month === 0 ? p.year - 1 : p.year, month: p.month === 0 ? 11 : p.month - 1 }))} className="rounded p-1.5 hover:bg-stone-100 transition-colors">
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <h2 className="text-lg font-semibold">{MONTHS[currentMonth.month]} {currentMonth.year}</h2>
+        <h2 className="text-lg font-semibold">{monthNames[currentMonth.month]} {currentMonth.year}</h2>
         <button onClick={() => setCurrentMonth((p) => ({ year: p.month === 11 ? p.year + 1 : p.year, month: p.month === 11 ? 0 : p.month + 1 }))} className="rounded p-1.5 hover:bg-stone-100 transition-colors">
           <ChevronRight className="h-5 w-5" />
         </button>
@@ -133,7 +145,7 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
       {/* Calendar grid */}
       <div className="border rounded-lg overflow-hidden">
         <div className="grid grid-cols-7 border-b bg-stone-50">
-          {DAYS.map((day) => (
+          {dayNames.map((day) => (
             <div key={day} className="px-2 py-2 text-center text-xs font-medium text-stone-500">{day}</div>
           ))}
         </div>
@@ -171,7 +183,7 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
                     </button>
                   ))}
                   {dayCampaigns.length > 3 && (
-                    <span className="text-[9px] text-stone-400 pl-1">+{dayCampaigns.length - 3} more</span>
+                    <span className="text-[9px] text-stone-400 pl-1">{t("moreItems", { count: dayCampaigns.length - 3 })}</span>
                   )}
                 </div>
               </div>
@@ -183,7 +195,7 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
       {/* Unscheduled items */}
       {counts.unscheduled > 0 && (
         <div className="mt-6">
-          <h3 className="text-sm font-medium mb-2 text-stone-500">Unscheduled ({counts.unscheduled})</h3>
+          <h3 className="text-sm font-medium mb-2 text-stone-500">{t("unscheduled", { count: counts.unscheduled })}</h3>
           <div className="flex flex-wrap gap-2">
             {campaigns.filter((c) => !c.scheduledDate).map((c) => (
               <button key={c.id} onClick={() => setSelectedCampaign(c)} className="rounded-md border px-3 py-1.5 text-xs hover:border-yellow-400 transition-colors flex items-center gap-1.5">
@@ -208,7 +220,7 @@ export function MarketingClient({ initialCampaigns }: { initialCampaigns: Campai
               body: JSON.stringify(data),
             });
             if (!res.ok) {
-              toast.error(await getApiError(res, "Failed to create campaign"));
+              toast.error(await getApiError(res, tC("failedTo", { action: t("addCampaign").toLowerCase() })));
               return;
             }
             setShowCreate(false);
@@ -243,6 +255,8 @@ function CreateDialog({ initialDate, onClose, onCreate }: {
   onClose: () => void;
   onCreate: (data: Record<string, string>) => void;
 }) {
+  const t = useTranslations("Marketing");
+  const tC = useTranslations("Common");
   const [form, setForm] = useState({
     title: "",
     type: "social_post",
@@ -266,58 +280,58 @@ function CreateDialog({ initialDate, onClose, onCreate }: {
       <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
       <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">New Marketing Item</h3>
+          <h3 className="text-lg font-semibold">{t("newItem")}</h3>
           <button onClick={onClose} className="rounded p-1 hover:bg-stone-100"><X className="h-4 w-4" /></button>
         </div>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Title *</Label>
-            <Input autoFocus value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((prev) => { const { title: _, ...rest } = prev; return rest; }); }} placeholder="e.g., Speaker Spotlight: Sarah K." aria-invalid={!!errors.title} />
+            <Label>{t("titleLabel")}</Label>
+            <Input autoFocus value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((prev) => { const { title: _, ...rest } = prev; return rest; }); }} placeholder={t("titlePlaceholder")} aria-invalid={!!errors.title} />
             {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
           </div>
           <div className="space-y-1.5">
-            <Label>Notes / Content</Label>
-            <Textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder="Post content, talking points, links..." rows={4} />
+            <Label>{t("notesContent")}</Label>
+            <Textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder={t("contentPlaceholder")} rows={4} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Type</Label>
+              <Label>{t("type")}</Label>
               <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="speaker_announcement">Speaker Announcement</option>
-                <option value="sponsor_promo">Sponsor Promo</option>
-                <option value="event_update">Event Update</option>
-                <option value="social_post">Social Post</option>
+                <option value="speaker_announcement">{t("typeSpeakerAnnouncement")}</option>
+                <option value="sponsor_promo">{t("typeSponsorPromo")}</option>
+                <option value="event_update">{t("typeEventUpdate")}</option>
+                <option value="social_post">{t("typeSocialPost")}</option>
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Platform</Label>
+              <Label>{t("platform")}</Label>
               <select value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="twitter">Twitter/X</option>
-                <option value="facebook">Facebook</option>
-                <option value="instagram">Instagram</option>
-                <option value="linkedin">LinkedIn</option>
-                <option value="telegram">Telegram</option>
+                <option value="twitter">{t("platformTwitter")}</option>
+                <option value="facebook">{t("platformFacebook")}</option>
+                <option value="instagram">{t("platformInstagram")}</option>
+                <option value="linkedin">{t("platformLinkedin")}</option>
+                <option value="telegram">{t("platformTelegram")}</option>
               </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Date</Label>
+              <Label>{t("date")}</Label>
               <Input type="date" value={form.scheduledDate} onChange={(e) => setForm({ ...form, scheduledDate: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>Assigned To</Label>
+              <Label>{t("assignedTo")}</Label>
               <AssignedToSelect value={form.assignedTo} onChange={(val) => setForm({ ...form, assignedTo: val })} />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button variant="outline" onClick={onClose}>{tC("cancel")}</Button>
             <Button onClick={() => {
               const newErrors = validateRequired(form, ["title"]);
               if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
               setErrors({});
               onCreate(form);
-            }}>Create</Button>
+            }}>{tC("create")}</Button>
           </div>
         </div>
       </div>
@@ -333,6 +347,8 @@ function DetailDrawer({ campaign, onClose, onSaved, onDeleted }: {
   onSaved: (updated: Campaign) => void;
   onDeleted: () => void;
 }) {
+  const t = useTranslations("Marketing");
+  const tC = useTranslations("Common");
   const { confirm: confirmDialog } = useConfirm();
   const [form, setForm] = useState({
     title: campaign.title,
@@ -368,15 +384,15 @@ function DetailDrawer({ campaign, onClose, onSaved, onDeleted }: {
     if (res.ok && d.data) {
       onSaved(d.data);
     } else {
-      toast.error(d.message || d.error || "Failed to save changes");
+      toast.error(d.message || d.error || tC("failedTo", { action: tC("save").toLowerCase() }));
     }
   };
 
   const handleDelete = async () => {
     const confirmed = await confirmDialog({
-      title: "Delete marketing item",
-      message: `Delete "${campaign.title}"? This cannot be undone.`,
-      confirmLabel: "Delete",
+      title: t("deleteTitle"),
+      message: t("deleteMessage", { title: campaign.title }),
+      confirmLabel: tC("delete"),
       variant: "danger",
     });
     if (!confirmed) return;
@@ -399,52 +415,52 @@ function DetailDrawer({ campaign, onClose, onSaved, onDeleted }: {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="text-lg font-medium border-0 px-0 focus-visible:ring-0 shadow-none" placeholder="Title" />
+          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="text-lg font-medium border-0 px-0 focus-visible:ring-0 shadow-none" placeholder={t("titleInputPlaceholder")} />
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Notes / Content</Label>
-            <Textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder="Post content, talking points, links..." rows={6} className="resize-none" />
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider">{t("notesContent")}</Label>
+            <Textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder={t("contentPlaceholder")} rows={6} className="resize-none" />
           </div>
 
           <div className="space-y-3 pt-2 border-t">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Status</Label>
+                <Label className="text-xs text-muted-foreground">{t("status")}</Label>
                 <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="draft">Draft</option>
-                  <option value="scheduled">Scheduled</option>
-                  <option value="published">Done / Published</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="draft">{t("statusDraft")}</option>
+                  <option value="scheduled">{t("statusScheduled")}</option>
+                  <option value="published">{t("statusPublished")}</option>
+                  <option value="cancelled">{t("statusCancelled")}</option>
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Platform</Label>
+                <Label className="text-xs text-muted-foreground">{t("platform")}</Label>
                 <select value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="twitter">Twitter/X</option>
-                  <option value="facebook">Facebook</option>
-                  <option value="instagram">Instagram</option>
-                  <option value="linkedin">LinkedIn</option>
-                  <option value="telegram">Telegram</option>
+                  <option value="twitter">{t("platformTwitter")}</option>
+                  <option value="facebook">{t("platformFacebook")}</option>
+                  <option value="instagram">{t("platformInstagram")}</option>
+                  <option value="linkedin">{t("platformLinkedin")}</option>
+                  <option value="telegram">{t("platformTelegram")}</option>
                 </select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Date</Label>
+                <Label className="text-xs text-muted-foreground">{t("date")}</Label>
                 <Input type="date" value={form.scheduledDate} onChange={(e) => setForm({ ...form, scheduledDate: e.target.value })} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Assigned To</Label>
+                <Label className="text-xs text-muted-foreground">{t("assignedTo")}</Label>
                 <AssignedToSelect value={form.assignedTo} onChange={(val) => setForm({ ...form, assignedTo: val })} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Type</Label>
+              <Label className="text-xs text-muted-foreground">{t("type")}</Label>
               <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="speaker_announcement">Speaker Announcement</option>
-                <option value="sponsor_promo">Sponsor Promo</option>
-                <option value="event_update">Event Update</option>
-                <option value="social_post">Social Post</option>
+                <option value="speaker_announcement">{t("typeSpeakerAnnouncement")}</option>
+                <option value="sponsor_promo">{t("typeSponsorPromo")}</option>
+                <option value="event_update">{t("typeEventUpdate")}</option>
+                <option value="social_post">{t("typeSocialPost")}</option>
               </select>
             </div>
           </div>
@@ -452,17 +468,17 @@ function DetailDrawer({ campaign, onClose, onSaved, onDeleted }: {
           {form.status === "draft" && (
             <div className="flex gap-2 pt-2 border-t">
               <Button size="sm" variant="outline" className="flex-1" onClick={() => setForm({ ...form, status: "scheduled" })}>
-                <Calendar className="mr-2 h-3 w-3" /> Mark Scheduled
+                <Calendar className="mr-2 h-3 w-3" /> {t("markScheduled")}
               </Button>
               <Button size="sm" className="flex-1" onClick={() => setForm({ ...form, status: "published" })}>
-                <Check className="mr-2 h-3 w-3" /> Mark Done
+                <Check className="mr-2 h-3 w-3" /> {t("markDone")}
               </Button>
             </div>
           )}
         </div>
 
         <div className="border-t px-4 py-3">
-          <Button className="w-full" onClick={handleSave}>Save Changes</Button>
+          <Button className="w-full" onClick={handleSave}>{t("saveChanges")}</Button>
         </div>
       </aside>
     </>

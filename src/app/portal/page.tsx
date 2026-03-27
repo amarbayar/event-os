@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate } from "@/lib/i18n/date";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -54,33 +56,35 @@ function ProfileSection({
   entityType: string;
   onUpdate: () => void;
 }) {
+  const t = useTranslations("Portal");
+  const tc = useTranslations("Common");
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   // Fields shown per entity type
-  const fieldsByType: Record<string, { key: string; label: string; type: "text" | "textarea" | "url" }[]> = {
+  const fieldsByType: Record<string, { key: string; labelKey: string; type: "text" | "textarea" | "url" }[]> = {
     speaker: [
-      { key: "name", label: "Full Name", type: "text" },
-      { key: "bio", label: "Bio", type: "textarea" },
-      { key: "talkTitle", label: "Talk Title", type: "text" },
-      { key: "talkAbstract", label: "Talk Abstract", type: "textarea" },
-      { key: "phone", label: "Phone", type: "text" },
-      { key: "linkedin", label: "LinkedIn", type: "url" },
-      { key: "website", label: "Website", type: "url" },
+      { key: "name", labelKey: "fullName", type: "text" },
+      { key: "bio", labelKey: "bio", type: "textarea" },
+      { key: "talkTitle", labelKey: "talkTitle", type: "text" },
+      { key: "talkAbstract", labelKey: "talkAbstract", type: "textarea" },
+      { key: "phone", labelKey: "phone", type: "text" },
+      { key: "linkedin", labelKey: "linkedin", type: "url" },
+      { key: "website", labelKey: "website", type: "url" },
     ],
     sponsor: [
-      { key: "contactName", label: "Contact Name", type: "text" },
-      { key: "contactEmail", label: "Contact Email", type: "text" },
-      { key: "message", label: "Company Description", type: "textarea" },
+      { key: "contactName", labelKey: "contactName", type: "text" },
+      { key: "contactEmail", labelKey: "contactEmail", type: "text" },
+      { key: "message", labelKey: "companyDescription", type: "textarea" },
     ],
     volunteer: [
-      { key: "name", label: "Full Name", type: "text" },
-      { key: "phone", label: "Phone", type: "text" },
+      { key: "name", labelKey: "fullName", type: "text" },
+      { key: "phone", labelKey: "phone", type: "text" },
     ],
     media: [
-      { key: "contactName", label: "Contact Name", type: "text" },
-      { key: "contactEmail", label: "Contact Email", type: "text" },
+      { key: "contactName", labelKey: "contactName", type: "text" },
+      { key: "contactEmail", labelKey: "contactEmail", type: "text" },
     ],
   };
 
@@ -111,16 +115,16 @@ function ProfileSection({
   return (
     <div className="rounded-lg border bg-white p-6 space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-sm uppercase tracking-wider text-stone-500">Your Profile</h3>
+        <h3 className="font-medium text-sm uppercase tracking-wider text-stone-500">{t("yourProfile")}</h3>
         {!editing && (
-          <Button variant="outline" size="sm" onClick={startEditing}>Edit</Button>
+          <Button variant="outline" size="sm" onClick={startEditing}>{tc("edit")}</Button>
         )}
       </div>
       {editing ? (
         <div className="space-y-3">
           {fields.map((f) => (
             <div key={f.key} className="space-y-1">
-              <label className="text-xs font-medium text-stone-600">{f.label}</label>
+              <label className="text-xs font-medium text-stone-600">{t(f.labelKey as Parameters<typeof t>[0])}</label>
               {f.type === "textarea" ? (
                 <Textarea
                   value={form[f.key] || ""}
@@ -131,16 +135,16 @@ function ProfileSection({
                 <Input
                   value={form[f.key] || ""}
                   onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                  placeholder={f.label}
+                  placeholder={t(f.labelKey as Parameters<typeof t>[0])}
                 />
               )}
             </div>
           ))}
           <div className="flex gap-2 pt-2">
             <Button size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("saving") : t("saveChanges")}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(false)}>{tc("cancel")}</Button>
           </div>
         </div>
       ) : (
@@ -149,13 +153,13 @@ function ProfileSection({
             const val = entity[f.key] as string;
             return val ? (
               <div key={f.key} className="flex gap-2 text-sm">
-                <span className="text-stone-400 w-28 shrink-0">{f.label}</span>
+                <span className="text-stone-400 w-28 shrink-0">{t(f.labelKey as Parameters<typeof t>[0])}</span>
                 <span className="text-stone-700 truncate">{val}</span>
               </div>
             ) : null;
           })}
           {fields.every((f) => !(entity[f.key])) && (
-            <p className="text-sm text-stone-400 italic">No profile info yet. Click Edit to add your details.</p>
+            <p className="text-sm text-stone-400 italic">{t("noProfileInfo")}</p>
           )}
         </div>
       )}
@@ -174,6 +178,7 @@ function PortalItemInput({
   itemType: string;
   onSubmit: (id: string, value: string) => void;
 }) {
+  const t = useTranslations("Portal");
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -181,15 +186,15 @@ function PortalItemInput({
     return (
       <div className="mt-3">
         <Button size="sm" onClick={async () => { setSubmitting(true); await onSubmit(itemId, "true"); setSubmitting(false); }} disabled={submitting}>
-          {submitting ? "Confirming..." : "Confirm"}
+          {submitting ? t("confirming") : t("confirm")}
         </Button>
       </div>
     );
   }
 
-  const placeholder = itemType === "file_upload" ? "Paste file URL or upload link..."
-    : itemType === "link" ? "Paste URL (Google Slides, Dropbox, etc.)..."
-    : "Enter your response...";
+  const placeholder = itemType === "file_upload" ? t("pasteFileUrl")
+    : itemType === "link" ? t("pasteUrl")
+    : t("enterResponse");
 
   return (
     <div className="mt-3 space-y-2">
@@ -208,13 +213,16 @@ function PortalItemInput({
           setSubmitting(false);
         }}
       >
-        {submitting ? "Submitting..." : "Submit"}
+        {submitting ? t("submitting") : t("submit")}
       </Button>
     </div>
   );
 }
 
 export default function PortalPage() {
+  const t = useTranslations("Portal");
+  const tc = useTranslations("Common");
+  const locale = useLocale();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -245,7 +253,7 @@ export default function PortalPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="animate-pulse text-stone-400">Loading your portal...</div>
+        <div className="animate-pulse text-stone-400">{t("loadingPortal")}</div>
       </div>
     );
   }
@@ -254,11 +262,11 @@ export default function PortalPage() {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <p className="text-stone-600">Unable to load your portal.</p>
-          <p className="text-sm text-stone-400">Please sign in with your portal credentials.</p>
+          <p className="text-stone-600">{t("unableToLoad")}</p>
+          <p className="text-sm text-stone-400">{t("pleaseSignIn")}</p>
           <div className="flex justify-center gap-2">
-            <Button variant="outline" onClick={() => window.location.reload()}>Try Again</Button>
-            <Button onClick={() => window.location.href = "/login"}>Sign In</Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>{t("tryAgain")}</Button>
+            <Button onClick={() => window.location.href = "/login"}>{t("signIn")}</Button>
           </div>
         </div>
       </div>
@@ -271,7 +279,7 @@ export default function PortalPage() {
   const total = activeItems.length;
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const entityName = (entity.name as string) || (entity.companyName as string) || (entity.contactName as string) || "Your Profile";
+  const entityName = (entity.name as string) || (entity.companyName as string) || (entity.contactName as string) || t("yourProfile");
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -280,14 +288,14 @@ export default function PortalPage() {
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="font-heading text-lg font-bold">{edition.name}</h1>
-            <p className="text-xs text-stone-500 capitalize">{user.linkedEntityType} Portal</p>
+            <p className="text-xs text-stone-500 capitalize">{t("portalLabel", { entityType: user.linkedEntityType })}</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-stone-600">{user.name}</span>
             <Button variant="outline" size="sm" onClick={() => {
               fetch("/api/auth/signout", { method: "POST" }).then(() => window.location.href = "/login");
             }}>
-              <LogOut className="h-3 w-3 mr-1" /> Sign out
+              <LogOut className="h-3 w-3 mr-1" /> {t("signOut")}
             </Button>
           </div>
         </div>
@@ -297,11 +305,11 @@ export default function PortalPage() {
         {/* Welcome + Progress */}
         <div>
           <h2 className="text-2xl font-bold tracking-tight">
-            Welcome, {user.name || entityName}!
+            {t("welcome", { name: user.name || entityName })}
           </h2>
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">Your Checklist ({completed}/{total} complete)</span>
+              <span className="font-medium">{t("yourChecklist", { completed, total })}</span>
               <span className="text-stone-500">{pct}%</span>
             </div>
             <div className="h-3 rounded-full bg-stone-200 overflow-hidden">
@@ -327,10 +335,10 @@ export default function PortalPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{item.name}</span>
                       {item.required && (
-                        <Badge variant="outline" className="text-[9px]">Required</Badge>
+                        <Badge variant="outline" className="text-[9px]">{t("required")}</Badge>
                       )}
                       {item.status === "approved" && (
-                        <Badge className="bg-emerald-100 text-emerald-700 text-[9px]">Approved</Badge>
+                        <Badge className="bg-emerald-100 text-emerald-700 text-[9px]">{t("approved")}</Badge>
                       )}
                     </div>
                     {item.description && (
@@ -345,7 +353,7 @@ export default function PortalPage() {
                     {/* Revision feedback */}
                     {item.notes && item.status === "needs_revision" && (
                       <div className="mt-2 rounded bg-orange-100 px-3 py-2">
-                        <p className="text-xs font-medium text-orange-800">Organizer feedback:</p>
+                        <p className="text-xs font-medium text-orange-800">{t("organizerFeedback")}</p>
                         <p className="text-xs text-orange-700 mt-0.5">{item.notes}</p>
                       </div>
                     )}
@@ -374,7 +382,7 @@ export default function PortalPage() {
 
         {/* Event Info */}
         <div className="rounded-lg border bg-white p-6 space-y-3">
-          <h3 className="font-medium text-sm uppercase tracking-wider text-stone-500">Event Info</h3>
+          <h3 className="font-medium text-sm uppercase tracking-wider text-stone-500">{t("eventInfo")}</h3>
           {edition.venue && (
             <div className="flex items-center gap-2 text-sm">
               <MapPin className="h-4 w-4 text-stone-400" />
@@ -385,8 +393,8 @@ export default function PortalPage() {
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 text-stone-400" />
               <span>
-                {new Date(edition.startDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-                {edition.endDate && ` — ${new Date(edition.endDate).toLocaleDateString("en-US", { month: "long", day: "numeric" })}`}
+                {formatDate(edition.startDate, locale, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                {edition.endDate && ` — ${formatDate(edition.endDate, locale, { month: "long", day: "numeric" })}`}
               </span>
             </div>
           )}
@@ -396,8 +404,8 @@ export default function PortalPage() {
         {pct === 100 && (
           <div className="rounded-lg border-2 border-emerald-200 bg-emerald-50 p-6 text-center">
             <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-2" />
-            <p className="font-medium text-emerald-800">All done! Thank you.</p>
-            <p className="text-sm text-emerald-600 mt-1">The organizer will review your submissions.</p>
+            <p className="font-medium text-emerald-800">{t("allDone")}</p>
+            <p className="text-sm text-emerald-600 mt-1">{t("organizerWillReview")}</p>
           </div>
         )}
       </main>

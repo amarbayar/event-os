@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,8 @@ function ChecklistItemActions({
   onApprove: (id: string) => void;
   onReject: (id: string, notes: string) => void;
 }) {
+  const t = useTranslations("Checklist");
+  const tC = useTranslations("Common");
   const [showInput, setShowInput] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [value, setValue] = useState("");
@@ -46,7 +49,7 @@ function ChecklistItemActions({
             rows={2}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={`Enter ${item.name.toLowerCase()}...`}
+            placeholder={t("enterValue", { name: item.name.toLowerCase() })}
             className="text-xs"
           />
         ) : (
@@ -54,7 +57,7 @@ function ChecklistItemActions({
             autoFocus
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={item.itemType === "file_upload" ? "Paste file URL..." : item.itemType === "link" ? "Paste URL..." : "Enter value..."}
+            placeholder={item.itemType === "file_upload" ? t("pasteFileUrl") : item.itemType === "link" ? t("pasteUrl") : t("enterGeneric")}
             className="text-xs h-8"
           />
         )}
@@ -64,10 +67,10 @@ function ChecklistItemActions({
             setValue("");
             setShowInput(false);
           }}>
-            Submit
+            {t("submit")}
           </Button>
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowInput(false); setValue(""); }}>
-            Cancel
+            {tC("cancel")}
           </Button>
         </div>
       </div>
@@ -83,7 +86,7 @@ function ChecklistItemActions({
           rows={2}
           value={rejectNotes}
           onChange={(e) => setRejectNotes(e.target.value)}
-          placeholder="What needs to be changed?"
+          placeholder={t("whatNeedsChanging")}
           className="text-xs"
         />
         <div className="flex gap-2">
@@ -92,10 +95,10 @@ function ChecklistItemActions({
             setRejectNotes("");
             setShowReject(false);
           }}>
-            Send feedback
+            {t("sendFeedback")}
           </Button>
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowReject(false); setRejectNotes(""); }}>
-            Cancel
+            {tC("cancel")}
           </Button>
         </div>
       </div>
@@ -108,21 +111,21 @@ function ChecklistItemActions({
       {(item.status === "pending" || item.status === "needs_revision") && (
         item.itemType === "confirmation" ? (
           <Button size="sm" className="h-7 text-xs" onClick={() => onSubmit(item.id, "true")}>
-            Confirm
+            {tC("confirm")}
           </Button>
         ) : (
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowInput(true)}>
-            {item.status === "needs_revision" ? "Re-submit" : "Submit"}
+            {item.status === "needs_revision" ? t("resubmit") : t("submit")}
           </Button>
         )
       )}
       {item.status === "submitted" && (
         <>
           <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => onApprove(item.id)}>
-            Approve
+            {t("approve")}
           </Button>
           <Button size="sm" variant="outline" className="h-7 text-xs text-orange-600" onClick={() => setShowReject(true)}>
-            Request revision
+            {t("requestRevision")}
           </Button>
         </>
       )}
@@ -144,12 +147,12 @@ type ChecklistItem = {
   fieldKey: string | null;
 };
 
-const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  pending: { icon: Circle, color: "text-stone-300", label: "Pending" },
-  submitted: { icon: Clock, color: "text-sky-500", label: "Submitted" },
-  approved: { icon: CheckCircle2, color: "text-emerald-500", label: "Approved" },
-  needs_revision: { icon: AlertCircle, color: "text-orange-500", label: "Needs revision" },
-  archived: { icon: Circle, color: "text-stone-200", label: "Archived" },
+const statusConfig: Record<string, { icon: React.ElementType; color: string; key: string }> = {
+  pending: { icon: Circle, color: "text-stone-300", key: "statusPending" },
+  submitted: { icon: Clock, color: "text-sky-500", key: "statusSubmitted" },
+  approved: { icon: CheckCircle2, color: "text-emerald-500", key: "statusApproved" },
+  needs_revision: { icon: AlertCircle, color: "text-orange-500", key: "statusNeedsRevision" },
+  archived: { icon: Circle, color: "text-stone-200", key: "statusArchived" },
 };
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -167,6 +170,7 @@ export function ChecklistPanel({
   entityType: string;
   entityId: string;
 }) {
+  const t = useTranslations("Checklist");
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -229,7 +233,7 @@ export function ChecklistPanel({
     return (
       <div className="p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          No checklist items yet. Checklist items are automatically created when the entity is confirmed.
+          {t("noItems")}
         </p>
       </div>
     );
@@ -240,7 +244,7 @@ export function ChecklistPanel({
       {/* Progress header */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="font-medium">{completed}/{total} completed</span>
+          <span className="font-medium">{t("completed", { completed, total })}</span>
           <span className="text-muted-foreground">{percentage}%</span>
         </div>
         <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
@@ -270,7 +274,7 @@ export function ChecklistPanel({
                   <TypeIcon className="h-3.5 w-3.5 text-stone-400 shrink-0" />
                   {item.required && (
                     <Badge variant="outline" className="text-[9px] px-1 py-0">
-                      Required
+                      {t("required")}
                     </Badge>
                   )}
                 </div>
@@ -281,7 +285,7 @@ export function ChecklistPanel({
                   <p className="text-xs text-sky-600 mt-1 truncate">{item.value}</p>
                 )}
                 {item.notes && item.status === "needs_revision" && (
-                  <p className="text-xs text-orange-600 mt-1">Feedback: {item.notes}</p>
+                  <p className="text-xs text-orange-600 mt-1">{t("feedback", { notes: item.notes })}</p>
                 )}
 
                 {/* Inline actions — no system alerts */}
@@ -307,6 +311,7 @@ export function ChecklistProgress({
 }: {
   entityType: string;
 }) {
+  const t = useTranslations("Checklist");
   const [progress, setProgress] = useState<{
     templateProgress: Record<string, { total: number; done: number }>;
     totalEntities: number;
@@ -332,7 +337,7 @@ export function ChecklistProgress({
   return (
     <div className="rounded-lg border p-4 mb-4">
       <h3 className="text-sm font-medium mb-3">
-        Checklist Progress ({progress.totalEntities} confirmed)
+        {t("progress", { count: progress.totalEntities })}
       </h3>
       <div className="space-y-2">
         {entries.map(([name, { total, done }]) => {
@@ -353,7 +358,7 @@ export function ChecklistProgress({
       </div>
       {progress.zeroProgressCount > 0 && (
         <p className="text-xs text-orange-600 mt-2">
-          {progress.zeroProgressCount} {entityType}(s) have 0 items completed
+          {t("zeroProgress", { count: progress.zeroProgressCount, entityType })}
         </p>
       )}
     </div>

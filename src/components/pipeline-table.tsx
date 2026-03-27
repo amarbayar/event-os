@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/confirm-dialog";
 import { NotesButton, NotesPanel } from "@/components/notes-panel";
 import { Trash2, MoreHorizontal, CheckCircle2, ListChecks, Pencil } from "lucide-react";
+import { stageKeys, sourceKeys } from "@/components/pipeline-view";
 
 type OrgUser = { id: string; name: string | null; email: string };
 type ChecklistCount = { done: number; total: number };
@@ -96,7 +98,7 @@ function InlineEdit({
         value ? "" : "text-stone-300 italic"
       }`}
     >
-      {value || placeholder || "Click to edit"}
+      {value || placeholder || ""}
       <Pencil className="h-3 w-3 text-stone-300 opacity-0 transition-opacity duration-100 group-hover/edit:opacity-100 shrink-0" />
     </span>
   );
@@ -111,6 +113,7 @@ function StageDropdown({
   stage: string;
   onChange: (newStage: string) => void;
 }) {
+  const t = useTranslations("Pipeline");
   const [open, setOpen] = useState(false);
 
   return (
@@ -121,7 +124,7 @@ function StageDropdown({
           stageColors[stage] || stageColors.lead
         }`}
       >
-        {stage}
+        {t(stageKeys[stage] || "stageLead")}
       </button>
       {open && (
         <>
@@ -134,11 +137,11 @@ function StageDropdown({
                   onChange(s);
                   setOpen(false);
                 }}
-                className={`block w-full px-3 py-1 text-left text-xs capitalize transition-colors hover:bg-stone-50 ${
+                className={`block w-full px-3 py-1 text-left text-xs transition-colors hover:bg-stone-50 ${
                   s === stage ? "font-medium text-yellow-700 bg-yellow-50" : ""
                 }`}
               >
-                {s}
+                {t(stageKeys[s])}
               </button>
             ))}
           </div>
@@ -159,6 +162,7 @@ function UserDropdown({
   users: OrgUser[];
   onSelect: (name: string, userId: string | null) => void;
 }) {
+  const t = useTranslations("Pipeline");
   const [open, setOpen] = useState(false);
 
   const initials = (name: string) =>
@@ -185,7 +189,7 @@ function UserDropdown({
             <span>{value}</span>
           </>
         ) : (
-          "Assign..."
+          t("assign")
         )}
       </button>
       {open && (
@@ -219,12 +223,12 @@ function UserDropdown({
                   }}
                   className="block w-full px-3 py-1.5 text-left text-xs text-stone-400 hover:bg-stone-50"
                 >
-                  Unassign
+                  {t("unassign")}
                 </button>
               </>
             )}
             {users.length === 0 && (
-              <p className="px-3 py-2 text-xs text-stone-400 italic">No team members</p>
+              <p className="px-3 py-2 text-xs text-stone-400 italic">{t("noTeamMembers")}</p>
             )}
           </div>
         </>
@@ -239,6 +243,8 @@ export function PipelineTable<
   T extends { id: string; stage: string; source: string; assignedTo: string | null }
 >({ items, columns, entityName, apiEndpoint, idEndpoint, onUpdate, onRowClick }: PipelineTableProps<T>) {
   const patchEndpoint = idEndpoint || apiEndpoint;
+  const t = useTranslations("Pipeline");
+  const tC = useTranslations("Common");
   const { confirm } = useConfirm();
   const [notesOpenFor, setNotesOpenFor] = useState<string | null>(null);
   const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
@@ -285,9 +291,9 @@ export function PipelineTable<
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
-      title: `Delete ${entityName}`,
-      message: `Are you sure you want to remove this ${entityName}? This action cannot be undone.`,
-      confirmLabel: "Delete",
+      title: t("deleteTitle", { entity: entityName }),
+      message: t("deleteMessage", { entity: entityName }),
+      confirmLabel: tC("delete"),
       variant: "danger",
     });
     if (!confirmed) return;
@@ -314,19 +320,19 @@ export function PipelineTable<
               </th>
             ))}
             <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[80px]">
-              Source
+              {t("source")}
             </th>
             <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[90px]">
-              Stage
+              {t("stage")}
             </th>
             <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[120px]">
-              Assigned To
+              {t("assignedTo")}
             </th>
             <th className="px-3 py-2 text-center text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[60px]">
-              Checklist
+              {t("checklist")}
             </th>
             <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[50px]">
-              Notes
+              {t("notes")}
             </th>
             <th className="px-3 py-2 w-[40px]" />
           </tr>
@@ -348,7 +354,7 @@ export function PipelineTable<
               ))}
               <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                 <Badge className={`text-[10px] ${sourceColors[item.source] || sourceColors.intake}`}>
-                  {item.source}
+                  {t(sourceKeys[item.source] || "sourceIntake")}
                 </Badge>
               </td>
               <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>

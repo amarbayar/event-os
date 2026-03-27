@@ -19,22 +19,38 @@ import { Plus, Calendar, User, X, Pencil, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 import { validateRequired, getApiError } from "@/lib/validation";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate } from "@/lib/i18n/date";
 
 type TaskStatus = "todo" | "in_progress" | "done" | "blocked";
 type Priority = "low" | "medium" | "high" | "urgent";
 
-const statusConfig: Record<TaskStatus, { label: string; color: string; bg: string }> = {
-  todo: { label: "To Do", color: "bg-stone-100 text-stone-600", bg: "bg-stone-50" },
-  in_progress: { label: "In Progress", color: "bg-sky-50 text-sky-700", bg: "bg-sky-50/30" },
-  done: { label: "Done", color: "bg-emerald-50 text-emerald-700", bg: "bg-emerald-50/30" },
-  blocked: { label: "Blocked", color: "bg-red-50 text-red-600", bg: "bg-red-50/30" },
+const statusStyles: Record<TaskStatus, { color: string; bg: string }> = {
+  todo: { color: "bg-stone-100 text-stone-600", bg: "bg-stone-50" },
+  in_progress: { color: "bg-sky-50 text-sky-700", bg: "bg-sky-50/30" },
+  done: { color: "bg-emerald-50 text-emerald-700", bg: "bg-emerald-50/30" },
+  blocked: { color: "bg-red-50 text-red-600", bg: "bg-red-50/30" },
 };
 
-const priorityConfig: Record<Priority, { label: string; color: string; dot: string }> = {
-  urgent: { label: "Urgent", color: "bg-red-100 text-red-700", dot: "bg-red-500" },
-  high: { label: "High", color: "bg-yellow-100 text-yellow-700", dot: "bg-yellow-500" },
-  medium: { label: "Medium", color: "bg-stone-100 text-stone-600", dot: "bg-stone-400" },
-  low: { label: "Low", color: "bg-stone-50 text-stone-400", dot: "bg-stone-300" },
+const STATUS_LABEL_KEYS: Record<TaskStatus, string> = {
+  todo: "statusTodo",
+  in_progress: "statusInProgress",
+  done: "statusDone",
+  blocked: "statusBlocked",
+};
+
+const priorityStyles: Record<Priority, { color: string; dot: string }> = {
+  urgent: { color: "bg-red-100 text-red-700", dot: "bg-red-500" },
+  high: { color: "bg-yellow-100 text-yellow-700", dot: "bg-yellow-500" },
+  medium: { color: "bg-stone-100 text-stone-600", dot: "bg-stone-400" },
+  low: { color: "bg-stone-50 text-stone-400", dot: "bg-stone-300" },
+};
+
+const PRIORITY_LABEL_KEYS: Record<Priority, string> = {
+  urgent: "priorityUrgent",
+  high: "priorityHigh",
+  medium: "priorityMedium",
+  low: "priorityLow",
 };
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "blocked", "done"];
@@ -55,6 +71,9 @@ type Task = {
 };
 
 export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task[]; initialTeams: Team[] }) {
+  const t = useTranslations("Tasks");
+  const tC = useTranslations("Common");
+  const locale = useLocale();
   const [tasks, setTasks] = useState(initialTasks);
   const [teamFilter, setTeamFilter] = useState<string | "all">("all");
   const [view, setView] = useState<"board">("board");
@@ -116,7 +135,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
       body: JSON.stringify(data),
     });
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to create task"));
+      toast.error(await getApiError(res, tC("failedTo", { action: tC("create") })));
       return;
     }
     setShowCreate(false);
@@ -132,7 +151,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
       body: JSON.stringify(updates),
     });
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to save changes"));
+      toast.error(await getApiError(res, tC("failedTo", { action: tC("save") })));
     }
     refreshTasks();
   };
@@ -142,11 +161,11 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
       {/* Header */}
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Tasks</h1>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">{tasks.length} tasks across {teams.length} teams</p>
         </div>
         <Button size="sm" onClick={() => setShowCreate(true)}>
-          <Plus className="mr-2 h-3 w-3" /> Add Task
+          <Plus className="mr-2 h-3 w-3" /> {t("addTask")}
         </Button>
       </div>
 
@@ -158,7 +177,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
             teamFilter === "all" ? "bg-yellow-500 text-stone-900" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
           }`}
         >
-          All Teams ({tasks.length})
+          {t("allTeams")} ({tasks.length})
         </button>
         {teams.map((team) => (
           <TeamPill
@@ -188,7 +207,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
               autoFocus
               value={newTeamName}
               onChange={(e) => setNewTeamName(e.target.value)}
-              placeholder="Team name"
+              placeholder={t("teamName")}
               className="h-8 w-32 text-xs"
               onKeyDown={async (e) => {
                 if (e.key === "Enter" && newTeamName.trim()) {
@@ -216,7 +235,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
             onClick={() => setShowNewTeam(true)}
             className="px-3 py-1.5 rounded-md text-xs font-medium text-yellow-700 border border-dashed border-yellow-300 hover:bg-yellow-50 transition-colors"
           >
-            + New Team
+            + {t("newTeam")}
           </button>
         )}
       </div>
@@ -232,12 +251,12 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
               onDrop={(e) => handleDrop(e, status)}
               className={`rounded-lg p-2 min-h-[200px] transition-colors ${
                 dragging ? "ring-2 ring-dashed ring-yellow-400/50" : ""
-              } ${statusConfig[status].bg}`}
+              } ${statusStyles[status].bg}`}
             >
               {/* Column header */}
               <div className="flex items-center justify-between mb-3 px-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-medium">{statusConfig[status].label}</h3>
+                  <h3 className="text-sm font-medium">{t(STATUS_LABEL_KEYS[status])}</h3>
                   <span className="text-xs text-muted-foreground tabular-nums">{columnTasks.length}</span>
                 </div>
               </div>
@@ -247,7 +266,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
                 {columnTasks.map((task) => {
                   const team = teams.find((t) => t.id === task.teamId);
                   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
-                  const pCfg = priorityConfig[task.priority as Priority] || priorityConfig.medium;
+                  const pCfg = priorityStyles[task.priority as Priority] || priorityStyles.medium;
 
                   return (
                     <div
@@ -283,7 +302,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
                         {task.dueDate && (
                           <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
                             <Calendar className="h-2.5 w-2.5" />
-                            {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            {formatDate(task.dueDate, locale, { month: "short", day: "numeric" })}
                           </span>
                         )}
                       </div>
@@ -293,7 +312,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
 
                 {columnTasks.length === 0 && (
                   <div className="rounded-md border border-dashed p-4 text-center">
-                    <p className="text-xs text-muted-foreground">Drop tasks here</p>
+                    <p className="text-xs text-muted-foreground">{t("dropHere")}</p>
                   </div>
                 )}
               </div>
@@ -341,6 +360,8 @@ function TeamPill({
   onRename: (name: string) => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations("Tasks");
+  const tC = useTranslations("Common");
   const { confirm: confirmDialog } = useConfirm();
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -393,22 +414,22 @@ function TeamPill({
               onClick={() => { setMenuOpen(false); setRenaming(true); }}
               className="block w-full px-3 py-1.5 text-left text-xs hover:bg-stone-50"
             >
-              Rename
+              {t("rename")}
             </button>
             <button
               onClick={async () => {
                 setMenuOpen(false);
                 const confirmed = await confirmDialog({
-                  title: `Delete "${team.name}"`,
-                  message: "Tasks assigned to this team will keep their data but lose their team association.",
-                  confirmLabel: "Delete Team",
+                  title: t("deleteTeamTitle", { name: team.name }),
+                  message: t("deleteTeamMessage"),
+                  confirmLabel: t("deleteTeam"),
                   variant: "danger",
                 });
                 if (confirmed) onDelete();
               }}
               className="block w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50"
             >
-              Delete
+              {tC("delete")}
             </button>
           </div>
         </>
@@ -428,6 +449,8 @@ function CreateTaskDialog({
   onClose: () => void;
   onCreate: (data: Record<string, string>) => void;
 }) {
+  const t = useTranslations("Tasks");
+  const tC = useTranslations("Common");
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -443,7 +466,7 @@ function CreateTaskDialog({
       <div className="fixed inset-0 z-50 bg-black/50 backdrop-active" onClick={onClose} />
       <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg dialog-active">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">New Task</h3>
+          <h3 className="text-lg font-semibold">{t("newTask")}</h3>
           <button onClick={onClose} className="rounded p-1 hover:bg-stone-100">
             <X className="h-4 w-4" />
           </button>
@@ -451,49 +474,49 @@ function CreateTaskDialog({
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Title *</Label>
+            <Label>{t("titleLabel")}</Label>
             <Input
               autoFocus
               value={form.title}
               onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((prev) => { const { title: _, ...rest } = prev; return rest; }); }}
-              placeholder="What needs to be done?"
+              placeholder={t("taskDescription")}
               aria-invalid={!!errors.title}
             />
             {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
           </div>
 
           <div className="space-y-1.5">
-            <Label>Description</Label>
+            <Label>{t("description")}</Label>
             <Textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Add details, context, or links..."
+              placeholder={t("taskDetails")}
               rows={4}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Priority</Label>
+              <Label>{t("priority")}</Label>
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value })}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+                <option value="low">{t("priorityLow")}</option>
+                <option value="medium">{t("priorityMedium")}</option>
+                <option value="high">{t("priorityHigh")}</option>
+                <option value="urgent">{t("priorityUrgent")}</option>
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Team</Label>
+              <Label>{t("team")}</Label>
               <select
                 value={form.teamId}
                 onChange={(e) => setForm({ ...form, teamId: e.target.value })}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="">No team</option>
+                <option value="">{t("noTeam")}</option>
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
@@ -503,14 +526,14 @@ function CreateTaskDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Assignee</Label>
+              <Label>{t("assignee")}</Label>
               <AssignedToSelect
                 value={form.assigneeName}
                 onChange={(val) => setForm({ ...form, assigneeName: val })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Due Date</Label>
+              <Label>{t("dueDate")}</Label>
               <Input
                 type="date"
                 value={form.dueDate}
@@ -520,7 +543,7 @@ function CreateTaskDialog({
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button variant="outline" onClick={onClose}>{tC("cancel")}</Button>
             <Button
               onClick={() => {
                 const newErrors = validateRequired(form, ["title"]);
@@ -529,7 +552,7 @@ function CreateTaskDialog({
                 onCreate(form);
               }}
             >
-              Create Task
+              {t("createTask")}
             </Button>
           </div>
         </div>
@@ -551,6 +574,9 @@ function TaskDetailDrawer({
   onClose: () => void;
   onUpdate: (updates: Record<string, unknown>) => void;
 }) {
+  const t = useTranslations("Tasks");
+  const tC = useTranslations("Common");
+  const locale = useLocale();
   const [notes, setNotes] = useState<{ id: string; content: string; authorName: string; authorEmail: string | null; createdAt: string }[]>([]);
   const [newNote, setNewNote] = useState("");
   const [postingNote, setPostingNote] = useState(false);
@@ -603,9 +629,9 @@ function TaskDetailDrawer({
 
   const handleDeleteNote = async (noteId: string) => {
     const confirmed = await confirmDialog({
-      title: "Delete comment",
-      message: "Are you sure you want to delete this comment? This cannot be undone.",
-      confirmLabel: "Delete",
+      title: t("deleteComment"),
+      message: t("deleteCommentMessage"),
+      confirmLabel: tC("delete"),
       variant: "danger",
     });
     if (!confirmed) return;
@@ -653,8 +679,8 @@ function TaskDetailDrawer({
         {/* Header */}
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
-            <Badge className={statusConfig[form.status as TaskStatus]?.color}>
-              {statusConfig[form.status as TaskStatus]?.label}
+            <Badge className={statusStyles[form.status as TaskStatus]?.color}>
+              {t(STATUS_LABEL_KEYS[form.status as TaskStatus])}
             </Badge>
             {team && (
               <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -676,17 +702,17 @@ function TaskDetailDrawer({
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               className="text-lg font-medium border-0 px-0 focus-visible:ring-0 shadow-none"
-              placeholder="Task title"
+              placeholder={t("taskTitle")}
             />
           </div>
 
           {/* Description */}
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Description</Label>
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider">{t("description")}</Label>
             <Textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Add details, context, or links..."
+              placeholder={t("taskDetails")}
               rows={5}
               className="resize-none"
             />
@@ -696,48 +722,48 @@ function TaskDetailDrawer({
           <div className="space-y-3 pt-2 border-t">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Status</Label>
+                <Label className="text-xs text-muted-foreground">{t("status")}</Label>
                 <select
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value })}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
                   {STATUSES.map((s) => (
-                    <option key={s} value={s}>{statusConfig[s].label}</option>
+                    <option key={s} value={s}>{t(STATUS_LABEL_KEYS[s])}</option>
                   ))}
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Priority</Label>
+                <Label className="text-xs text-muted-foreground">{t("priority")}</Label>
                 <select
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value })}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
+                  <option value="low">{t("priorityLow")}</option>
+                  <option value="medium">{t("priorityMedium")}</option>
+                  <option value="high">{t("priorityHigh")}</option>
+                  <option value="urgent">{t("priorityUrgent")}</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Team</Label>
+                <Label className="text-xs text-muted-foreground">{t("team")}</Label>
                 <select
                   value={form.teamId}
                   onChange={(e) => setForm({ ...form, teamId: e.target.value })}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="">No team</option>
+                  <option value="">{t("noTeam")}</option>
                   {teams.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Assignee</Label>
+                <Label className="text-xs text-muted-foreground">{t("assignee")}</Label>
                 <AssignedToSelect
                   value={form.assigneeName}
                   onChange={(val) => setForm({ ...form, assigneeName: val })}
@@ -746,7 +772,7 @@ function TaskDetailDrawer({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Due Date</Label>
+              <Label className="text-xs text-muted-foreground">{t("dueDate")}</Label>
               <Input
                 type="date"
                 value={form.dueDate}
@@ -758,7 +784,7 @@ function TaskDetailDrawer({
           {/* Notes / Comments */}
           <div className="space-y-3 pt-4 border-t">
             <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-              Comments ({notes.length})
+              {t("comments", { count: notes.length })}
             </Label>
 
             {notes.length > 0 && (
@@ -777,8 +803,8 @@ function TaskDetailDrawer({
                           onKeyDown={(e) => { if (e.key === "Enter") handleEditNote(note.id); if (e.key === "Escape") setEditingNoteId(null); }}
                         />
                         <div className="flex gap-1">
-                          <Button size="sm" className="h-6 text-[10px]" onClick={() => handleEditNote(note.id)}>Save</Button>
-                          <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setEditingNoteId(null)}>Cancel</Button>
+                          <Button size="sm" className="h-6 text-[10px]" onClick={() => handleEditNote(note.id)}>{tC("save")}</Button>
+                          <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setEditingNoteId(null)}>{tC("cancel")}</Button>
                         </div>
                       </div>
                     );
@@ -806,7 +832,7 @@ function TaskDetailDrawer({
                             </span>
                           )}
                           <span className="text-[10px] text-muted-foreground">
-                            {new Date(note.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                            {formatDate(note.createdAt, locale, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                           </span>
                         </div>
                       </div>
@@ -821,7 +847,7 @@ function TaskDetailDrawer({
               <Input
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Add a comment..."
+                placeholder={t("addComment")}
                 className="text-xs"
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePostNote(); } }}
               />
@@ -831,7 +857,7 @@ function TaskDetailDrawer({
                 disabled={!newNote.trim() || postingNote}
                 onClick={handlePostNote}
               >
-                {postingNote ? "..." : "Post"}
+                {postingNote ? "..." : t("post")}
               </Button>
             </div>
           </div>
@@ -839,7 +865,7 @@ function TaskDetailDrawer({
 
         {/* Footer */}
         <div className="border-t px-4 py-3">
-          <Button className="w-full" onClick={handleSave}>Save Changes</Button>
+          <Button className="w-full" onClick={handleSave}>{t("saveChanges")}</Button>
         </div>
       </aside>
     </>

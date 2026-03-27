@@ -22,8 +22,10 @@ import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { PortalInviteSection } from "@/components/portal-invite-section";
 import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock } from "lucide-react";
+import { useTranslations, useLocale } from "next-intl";
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
+import { formatTime } from "@/lib/i18n/date";
 
 type Speaker = {
   id: string;
@@ -63,10 +65,10 @@ type SessionSlot = {
   trackName: string | null;
 };
 
-const REQUIREMENT_OPTIONS = [
-  "Podium", "Projector", "Demo setup", "Wireless mic", "Lapel mic",
-  "Hand-held mic", "USB-C adapter", "HDMI adapter", "Whiteboard",
-  "Internet access", "Clicker/pointer", "Audio playback",
+const REQUIREMENT_KEYS = [
+  "reqPodium", "reqProjector", "reqDemoSetup", "reqWirelessMic", "reqLapelMic",
+  "reqHandheldMic", "reqUsbcAdapter", "reqHdmiAdapter", "reqWhiteboard",
+  "reqInternet", "reqClicker", "reqAudioPlayback",
 ];
 
 export function SpeakersClient({
@@ -78,6 +80,11 @@ export function SpeakersClient({
   tracks: Track[];
   sessions: SessionSlot[];
 }) {
+  const t = useTranslations("Speakers");
+  const tP = useTranslations("Pipeline");
+  const tE = useTranslations("Entity");
+  const tC = useTranslations("Common");
+  const locale = useLocale();
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [speakers, setSpeakers] = useState(initialSpeakers);
   const [copied, setCopied] = useState(false);
@@ -147,7 +154,7 @@ export function SpeakersClient({
       body: JSON.stringify(drawerForm),
     });
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to save changes"));
+      toast.error(await getApiError(res, tC("failedTo", { action: tC("save").toLowerCase() })));
       setDrawerSaving(false);
       return;
     }
@@ -173,7 +180,7 @@ export function SpeakersClient({
     });
 
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to add speaker"));
+      toast.error(await getApiError(res, tC("failedTo", { action: t("addSpeaker").toLowerCase() })));
       return;
     }
 
@@ -188,18 +195,18 @@ export function SpeakersClient({
   const columns = [
     {
       key: "name",
-      label: "Speaker",
+      label: t("speaker"),
       width: "200px",
       render: (s: Speaker) => (
         <div>
           <p className="font-medium text-sm">{s.name}</p>
-          <p className="text-xs text-muted-foreground">{s.email || "No email"}</p>
+          <p className="text-xs text-muted-foreground">{s.email || t("noEmail")}</p>
         </div>
       ),
     },
     {
       key: "company",
-      label: "Company",
+      label: tE("company"),
       width: "140px",
       render: (s: Speaker) => (
         <span className="text-xs text-muted-foreground">{s.company || "—"}</span>
@@ -207,10 +214,10 @@ export function SpeakersClient({
     },
     {
       key: "talk",
-      label: "Talk",
+      label: t("talk"),
       render: (s: Speaker) => (
         <div>
-          <p className="text-xs">{s.talkTitle || "TBD"}</p>
+          <p className="text-xs">{s.talkTitle || t("tbd")}</p>
           {s.trackPreference && (
             <p className="text-[10px] text-muted-foreground">{s.trackPreference}</p>
           )}
@@ -219,7 +226,7 @@ export function SpeakersClient({
     },
     {
       key: "score",
-      label: "Score",
+      label: t("score"),
       width: "60px",
       render: (s: Speaker) => (
         <span className="text-xs tabular-nums font-medium">
@@ -235,7 +242,7 @@ export function SpeakersClient({
   const drawerSections = selectedSpeaker
     ? [
         {
-          label: "Profile",
+          label: tE("tabProfile"),
           content: (
             <div className="space-y-4">
               {/* Photo + Name header — profile card style */}
@@ -245,35 +252,35 @@ export function SpeakersClient({
                     value={(drawerForm.headshotUrl as string) || ""}
                     onChange={(url) => updateField("headshotUrl", url)}
                     folder="headshots"
-                    label="Photo"
+                    label={tE("photo")}
                   />
                 </div>
                 <div className="flex-1 space-y-2">
                   <div className="space-y-1">
-                    <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} className="text-lg font-medium h-9" placeholder="Full name" />
+                    <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} className="text-lg font-medium h-9" placeholder={t("fullName")} />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input value={(drawerForm.title as string) || ""} onChange={(e) => updateField("title", e.target.value)} placeholder="Job title" className="text-xs h-8" />
-                    <Input value={(drawerForm.company as string) || ""} onChange={(e) => updateField("company", e.target.value)} placeholder="Company" className="text-xs h-8" />
+                    <Input value={(drawerForm.title as string) || ""} onChange={(e) => updateField("title", e.target.value)} placeholder={t("jobTitle")} className="text-xs h-8" />
+                    <Input value={(drawerForm.company as string) || ""} onChange={(e) => updateField("company", e.target.value)} placeholder={tE("company")} className="text-xs h-8" />
                   </div>
                 </div>
               </div>
 
               {/* Contact info */}
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Contact</Label>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">{tC("contact")}</Label>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <Input value={(drawerForm.email as string) || ""} onChange={(e) => updateField("email", e.target.value)} placeholder="Email" />
-                  <Input value={(drawerForm.phone as string) || ""} onChange={(e) => updateField("phone", e.target.value)} placeholder="Phone" />
-                  <Input value={(drawerForm.linkedin as string) || ""} onChange={(e) => updateField("linkedin", e.target.value)} placeholder="LinkedIn URL" />
-                  <Input value={(drawerForm.website as string) || ""} onChange={(e) => updateField("website", e.target.value)} placeholder="Website URL" />
+                  <Input value={(drawerForm.email as string) || ""} onChange={(e) => updateField("email", e.target.value)} placeholder={tE("email")} />
+                  <Input value={(drawerForm.phone as string) || ""} onChange={(e) => updateField("phone", e.target.value)} placeholder={tE("phone")} />
+                  <Input value={(drawerForm.linkedin as string) || ""} onChange={(e) => updateField("linkedin", e.target.value)} placeholder={tE("linkedinUrl")} />
+                  <Input value={(drawerForm.website as string) || ""} onChange={(e) => updateField("website", e.target.value)} placeholder={tE("website")} />
                 </div>
               </div>
 
               {/* Bio */}
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Bio</Label>
-                <Textarea rows={4} placeholder="Speaker bio for the event website..." value={(drawerForm.bio as string) || ""} onChange={(e) => updateField("bio", e.target.value)} />
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">{tE("bio")}</Label>
+                <Textarea rows={4} placeholder={t("bioPlaceholder")} value={(drawerForm.bio as string) || ""} onChange={(e) => updateField("bio", e.target.value)} />
               </div>
 
               {/* Portal Invite — only for confirmed speakers with email */}
@@ -284,64 +291,64 @@ export function SpeakersClient({
           ),
         },
         {
-          label: "Talk",
+          label: t("talk"),
           content: (
             <div className="space-y-3">
               {/* Track + Type first */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Track</Label>
+                  <Label>{t("track")}</Label>
                   <Select value={String(drawerForm.trackPreference || "")} onValueChange={(v) => updateField("trackPreference", v)}>
-                    <SelectTrigger><SelectValue className="capitalize" placeholder="Select track" /></SelectTrigger>
+                    <SelectTrigger><SelectValue className="capitalize" placeholder={t("selectTrack")} /></SelectTrigger>
                     <SelectContent>
-                      {tracks.map((t) => (
-                        <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                      {tracks.map((tr) => (
+                        <SelectItem key={tr.id} value={tr.name}>{tr.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Type</Label>
+                  <Label>{t("talkType")}</Label>
                   <Select value={String(drawerForm.talkType || "talk")} onValueChange={(v) => updateField("talkType", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="talk">Talk</SelectItem>
-                      <SelectItem value="keynote">Keynote</SelectItem>
-                      <SelectItem value="workshop">Workshop</SelectItem>
-                      <SelectItem value="panel">Panel</SelectItem>
+                      <SelectItem value="talk">{t("typeTalk")}</SelectItem>
+                      <SelectItem value="keynote">{t("typeKeynote")}</SelectItem>
+                      <SelectItem value="workshop">{t("typeWorkshop")}</SelectItem>
+                      <SelectItem value="panel">{t("typePanel")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               {/* Topic */}
               <div className="space-y-1.5">
-                <Label>Topic / Title</Label>
+                <Label>{t("talkTitle")}</Label>
                 <Input value={(drawerForm.talkTitle as string) || ""} onChange={(e) => updateField("talkTitle", e.target.value)} />
               </div>
               {/* Abstract */}
               <div className="space-y-1.5">
-                <Label>Abstract</Label>
-                <Textarea rows={5} placeholder="Talk abstract..." value={(drawerForm.talkAbstract as string) || ""} onChange={(e) => updateField("talkAbstract", e.target.value)} />
+                <Label>{t("abstract")}</Label>
+                <Textarea rows={5} placeholder={t("talkAbstract")} value={(drawerForm.talkAbstract as string) || ""} onChange={(e) => updateField("talkAbstract", e.target.value)} />
               </div>
               {/* Slides */}
               <div className="space-y-1.5">
-                <Label>Slide Link</Label>
+                <Label>{t("slideLink")}</Label>
                 <Input value={(drawerForm.slideUrl as string) || ""} onChange={(e) => updateField("slideUrl", e.target.value)} placeholder="https://docs.google.com/presentation/..." />
               </div>
 
               {/* Assigned session */}
               {speakerSession ? (
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
-                  <p className="text-xs font-medium text-emerald-700 mb-1">Assigned Session</p>
+                  <p className="text-xs font-medium text-emerald-700 mb-1">{t("assignedSession")}</p>
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Day {speakerSession.day}</span>
+                    <span>{t("day", { day: speakerSession.day })}</span>
                     {speakerSession.startTime && (
                       <>
                         <Clock className="h-3.5 w-3.5 text-emerald-600" />
                         <span>
-                          {new Date(speakerSession.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
-                          {speakerSession.endTime && ` — ${new Date(speakerSession.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}`}
+                          {formatTime(speakerSession.startTime, locale)}
+                          {speakerSession.endTime && ` — ${formatTime(speakerSession.endTime, locale)}`}
                         </span>
                       </>
                     )}
@@ -351,72 +358,72 @@ export function SpeakersClient({
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground italic">No session assigned yet. Assign in the Agenda page.</p>
+                <p className="text-xs text-muted-foreground italic">{t("noSessionAssigned")}</p>
               )}
             </div>
           ),
         },
         {
-          label: "Requirements",
+          label: tE("tabRequirements"),
           content: (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">AV and logistics requirements for this speaker.</p>
+              <p className="text-sm text-muted-foreground">{t("requirementsDescription")}</p>
               <div className="grid grid-cols-2 gap-2">
-                {REQUIREMENT_OPTIONS.map((req) => (
-                  <label key={req} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-stone-50 rounded px-2 py-1">
+                {REQUIREMENT_KEYS.map((reqKey) => (
+                  <label key={reqKey} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-stone-50 rounded px-2 py-1">
                     <input
                       type="checkbox"
                       className="rounded border-stone-300"
-                      checked={((drawerForm.requirements as string[]) || []).includes(req)}
-                      onChange={() => toggleRequirement(req)}
+                      checked={((drawerForm.requirements as string[]) || []).includes(reqKey)}
+                      onChange={() => toggleRequirement(reqKey)}
                     />
-                    <span>{req}</span>
+                    <span>{t(reqKey)}</span>
                   </label>
                 ))}
               </div>
               <div className="space-y-1.5">
-                <Label>Other Requirements</Label>
-                <Textarea rows={3} placeholder="Anything not covered above — special setup, dietary needs, accessibility requirements..." value={(drawerForm.requirementsNotes as string) || ""} onChange={(e) => updateField("requirementsNotes", e.target.value)} />
+                <Label>{t("otherRequirements")}</Label>
+                <Textarea rows={3} placeholder={t("otherRequirementsPlaceholder")} value={(drawerForm.requirementsNotes as string) || ""} onChange={(e) => updateField("requirementsNotes", e.target.value)} />
               </div>
             </div>
           ),
         },
         {
-          label: "Pipeline",
+          label: tE("tabPipeline"),
           content: (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
+                  <Label>{tP("source")}</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
-                      <SelectItem value="sponsored">Sponsored</SelectItem>
+                      <SelectItem value="intake">{tP("sourceIntake")}</SelectItem>
+                      <SelectItem value="outreach">{tP("sourceOutreach")}</SelectItem>
+                      <SelectItem value="sponsored">{tP("sourceSponsored")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Stage</Label>
+                  <Label>{tP("stage")}</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="engaged">Engaged</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="declined">Declined</SelectItem>
+                      <SelectItem value="lead">{tP("stageLead")}</SelectItem>
+                      <SelectItem value="engaged">{tP("stageEngaged")}</SelectItem>
+                      <SelectItem value="confirmed">{tP("stageConfirmed")}</SelectItem>
+                      <SelectItem value="declined">{tP("stageDeclined")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Assigned To</Label>
+                <Label>{tP("assignedTo")}</Label>
                 <AssignedToSelect value={(drawerForm.assignedTo as string) || ""} onChange={(val) => updateField("assignedTo", val)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Review Notes</Label>
-                <Textarea rows={4} placeholder="Internal notes..." value={(drawerForm.reviewNotes as string) || ""} onChange={(e) => updateField("reviewNotes", e.target.value)} />
+                <Label>{tC("reviewNotes")}</Label>
+                <Textarea rows={4} placeholder={tC("internalNotes")} value={(drawerForm.reviewNotes as string) || ""} onChange={(e) => updateField("reviewNotes", e.target.value)} />
               </div>
             </div>
           ),
@@ -425,7 +432,7 @@ export function SpeakersClient({
         ...(selectedSpeaker?.stage === "confirmed"
           ? [
               {
-                label: "Checklist",
+                label: tE("tabChecklist"),
                 content: (
                   <ChecklistPanel entityType="speaker" entityId={selectedSpeaker.id} />
                 ),
@@ -439,15 +446,15 @@ export function SpeakersClient({
     <div>
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Speakers</h1>
-          <p className="text-sm text-muted-foreground">{speakers.length} total</p>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground">{tC("total", { count: speakers.length })}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleCopyCfp}>
-            {copied ? <><Check className="mr-2 h-3 w-3" /> Copied</> : <><ExternalLink className="mr-2 h-3 w-3" /> CFP Link</>}
+            {copied ? <><Check className="mr-2 h-3 w-3" /> {tC("copied")}</> : <><ExternalLink className="mr-2 h-3 w-3" /> {t("cfpLink")}</>}
           </Button>
           <Button size="sm" onClick={() => setShowForm(!showForm)}>
-            {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Add Speaker</>}
+            {showForm ? <><X className="mr-2 h-3 w-3" /> {tC("cancel")}</> : <><Plus className="mr-2 h-3 w-3" /> {t("addSpeaker")}</>}
           </Button>
         </div>
       </div>
@@ -458,42 +465,42 @@ export function SpeakersClient({
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label>Name *</Label>
+                  <Label>{t("nameLabel")}</Label>
                   <Input name="name" placeholder="e.g., Batbold T." aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
                   {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Email</Label>
+                  <Label>{tE("email")}</Label>
                   <Input name="email" type="email" placeholder="batbold@example.com" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const { email: _, ...rest } = prev; return rest; })} />
                   {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Company</Label>
+                  <Label>{tE("company")}</Label>
                   <Input name="company" placeholder="DataMN" />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label>Talk Title</Label>
+                  <Label>{t("talkTitleLabel")}</Label>
                   <Input name="talkTitle" placeholder="TBD" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
+                  <Label>{tP("source")}</Label>
                   <Select name="source" defaultValue="outreach">
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake (CFP)</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
-                      <SelectItem value="sponsored">Sponsored</SelectItem>
+                      <SelectItem value="intake">{t("intakeCfp")}</SelectItem>
+                      <SelectItem value="outreach">{tP("sourceOutreach")}</SelectItem>
+                      <SelectItem value="sponsored">{tP("sourceSponsored")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Assigned To</Label>
+                  <Label>{tP("assignedTo")}</Label>
                   <AssignedToSelect name="assignedTo" />
                 </div>
               </div>
-              <Button type="submit" className="w-full sm:w-auto">Add Speaker</Button>
+              <Button type="submit" className="w-full sm:w-auto">{t("addSpeaker")}</Button>
             </form>
           </CardContent>
         </Card>
@@ -512,9 +519,9 @@ export function SpeakersClient({
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Mic2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <h3 className="text-lg font-medium mb-1">No speakers yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">Share your CFP link or add speakers via the agent chat.</p>
-            <Button onClick={handleCopyCfp}><Copy className="mr-2 h-4 w-4" /> Copy CFP Link</Button>
+            <h3 className="text-lg font-medium mb-1">{tC("noYet", { entity: t("title").toLowerCase() })}</h3>
+            <p className="text-sm text-muted-foreground mb-4">{t("emptyDescription")}</p>
+            <Button onClick={handleCopyCfp}><Copy className="mr-2 h-4 w-4" /> {t("copyCfpLink")}</Button>
           </CardContent>
         </Card>
       ) : (
@@ -529,7 +536,7 @@ export function SpeakersClient({
       )}
 
       {filtered.length === 0 && speakers.length > 0 && (
-        <p className="text-center text-sm text-muted-foreground py-8">No speakers match the current filters.</p>
+        <p className="text-center text-sm text-muted-foreground py-8">{tC("noMatch", { entity: t("title").toLowerCase() })}</p>
       )}
 
       <EntityDrawer

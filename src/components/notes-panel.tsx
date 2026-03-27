@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate, formatTime } from "@/lib/i18n/date";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquare, X, Send, Trash2, Pencil, Loader2 } from "lucide-react";
@@ -28,6 +30,9 @@ export function NotesPanel({
   onClose,
   currentUser = "Organizer",
 }: NotesPanelProps) {
+  const t = useTranslations("Notes");
+  const tC = useTranslations("Common");
+  const locale = useLocale();
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState("");
   const [loading, setLoading] = useState(false);
@@ -116,7 +121,7 @@ export function NotesPanel({
         <div className="flex h-12 items-center justify-between border-b border-stone-200 px-4 shrink-0">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-yellow-600" />
-            <span className="text-sm font-medium">Notes ({notes.length})</span>
+            <span className="text-sm font-medium">{t("title", { count: notes.length })}</span>
           </div>
           <button onClick={onClose} className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600">
             <X className="h-4 w-4" />
@@ -130,7 +135,7 @@ export function NotesPanel({
               <Loader2 className="h-5 w-5 animate-spin text-stone-400" />
             </div>
           ) : notes.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No notes yet. Add the first one.</p>
+            <p className="text-sm text-muted-foreground text-center py-8">{t("empty")}</p>
           ) : (
             notes.map((note) => (
               <div key={note.id} className="group rounded-lg border border-stone-100 bg-stone-50 p-3">
@@ -139,10 +144,10 @@ export function NotesPanel({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium">{note.authorName}</span>
                       <span className="text-[10px] text-muted-foreground">
-                        {new Date(note.createdAt).toLocaleDateString()} {new Date(note.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {formatDate(note.createdAt, locale)} {formatTime(note.createdAt, locale)}
                       </span>
                       {note.updatedAt !== note.createdAt && (
-                        <span className="text-[10px] text-muted-foreground italic">(edited)</span>
+                        <span className="text-[10px] text-muted-foreground italic">{t("edited")}</span>
                       )}
                     </div>
 
@@ -156,8 +161,8 @@ export function NotesPanel({
                           autoFocus
                         />
                         <div className="flex gap-1">
-                          <Button size="sm" className="h-6 text-[10px]" onClick={() => handleEdit(note.id)}>Save</Button>
-                          <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditingId(null)}>Cancel</Button>
+                          <Button size="sm" className="h-6 text-[10px]" onClick={() => handleEdit(note.id)}>{tC("save")}</Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditingId(null)}>{tC("cancel")}</Button>
                         </div>
                       </div>
                     ) : (
@@ -195,7 +200,7 @@ export function NotesPanel({
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Add a note... (Shift+Enter for new line)"
+              placeholder={t("placeholder")}
               rows={2}
               className="text-xs resize-none flex-1"
             />
