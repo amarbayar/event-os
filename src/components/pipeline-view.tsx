@@ -10,7 +10,7 @@ import { ArrowRight } from "lucide-react";
 type Source = "all" | "intake" | "outreach" | "sponsored";
 type Stage = "all" | "lead" | "engaged" | "confirmed" | "declined";
 
-const sourceKeys: Record<Source, string> = {
+export const sourceKeys: Record<Source, string> = {
   all: "sourceAll",
   intake: "sourceIntake",
   outreach: "sourceOutreach",
@@ -24,7 +24,7 @@ const stageColors: Record<Exclude<Stage, "all">, string> = {
   declined: "bg-red-50 text-red-600",
 };
 
-const stageKeys: Record<Exclude<Stage, "all">, string> = {
+export const stageKeys: Record<Exclude<Stage, "all">, string> = {
   lead: "stageLead",
   engaged: "stageEngaged",
   confirmed: "stageConfirmed",

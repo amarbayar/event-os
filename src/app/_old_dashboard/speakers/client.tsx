@@ -22,9 +22,10 @@ import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { PortalInviteSection } from "@/components/portal-invite-section";
 import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
+import { formatTime } from "@/lib/i18n/date";
 
 type Speaker = {
   id: string;
@@ -83,6 +84,7 @@ export function SpeakersClient({
   const tP = useTranslations("Pipeline");
   const tE = useTranslations("Entity");
   const tC = useTranslations("Common");
+  const locale = useLocale();
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [speakers, setSpeakers] = useState(initialSpeakers);
   const [copied, setCopied] = useState(false);
@@ -345,8 +347,8 @@ export function SpeakersClient({
                       <>
                         <Clock className="h-3.5 w-3.5 text-emerald-600" />
                         <span>
-                          {new Date(speakerSession.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
-                          {speakerSession.endTime && ` — ${new Date(speakerSession.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}`}
+                          {formatTime(speakerSession.startTime, locale)}
+                          {speakerSession.endTime && ` — ${formatTime(speakerSession.endTime, locale)}`}
                         </span>
                       </>
                     )}

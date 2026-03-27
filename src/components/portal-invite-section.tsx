@@ -79,7 +79,9 @@ export function PortalInviteSection({
 
       {showConfirm && (
         <div className="rounded-md border p-3 space-y-2">
-          <p className="text-xs text-stone-600" dangerouslySetInnerHTML={{ __html: t("inviteExplainer", { email: entityEmail }) }} />
+          <p className="text-xs text-stone-600">
+            {t.rich("inviteExplainer", { email: entityEmail, strong: (chunks) => <strong>{chunks}</strong> })}
+          </p>
           <div className="flex gap-2">
             <Button size="sm" className="h-7 text-xs" onClick={handleInvite} disabled={status === "loading"}>
               {status === "loading" ? t("inviting") : t("confirmInvite")}

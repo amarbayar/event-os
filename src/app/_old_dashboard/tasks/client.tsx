@@ -19,7 +19,8 @@ import { Plus, Calendar, User, X, Pencil, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 import { validateRequired, getApiError } from "@/lib/validation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate } from "@/lib/i18n/date";
 
 type TaskStatus = "todo" | "in_progress" | "done" | "blocked";
 type Priority = "low" | "medium" | "high" | "urgent";
@@ -72,6 +73,7 @@ type Task = {
 export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task[]; initialTeams: Team[] }) {
   const t = useTranslations("Tasks");
   const tC = useTranslations("Common");
+  const locale = useLocale();
   const [tasks, setTasks] = useState(initialTasks);
   const [teamFilter, setTeamFilter] = useState<string | "all">("all");
   const [view, setView] = useState<"board">("board");
@@ -300,7 +302,7 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
                         {task.dueDate && (
                           <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
                             <Calendar className="h-2.5 w-2.5" />
-                            {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            {formatDate(task.dueDate, locale, { month: "short", day: "numeric" })}
                           </span>
                         )}
                       </div>
@@ -574,6 +576,7 @@ function TaskDetailDrawer({
 }) {
   const t = useTranslations("Tasks");
   const tC = useTranslations("Common");
+  const locale = useLocale();
   const [notes, setNotes] = useState<{ id: string; content: string; authorName: string; authorEmail: string | null; createdAt: string }[]>([]);
   const [newNote, setNewNote] = useState("");
   const [postingNote, setPostingNote] = useState(false);
@@ -829,7 +832,7 @@ function TaskDetailDrawer({
                             </span>
                           )}
                           <span className="text-[10px] text-muted-foreground">
-                            {new Date(note.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                            {formatDate(note.createdAt, locale, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                           </span>
                         </div>
                       </div>

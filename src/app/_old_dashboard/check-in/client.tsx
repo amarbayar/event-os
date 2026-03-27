@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatTime } from "@/lib/i18n/date";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,7 @@ type Attendee = {
 
 export function CheckInClient({ initialStats, initialAttendees }: { initialStats: CheckInStats; initialAttendees: Attendee[] }) {
   const t = useTranslations("CheckIn");
+  const locale = useLocale();
   const [mode, setMode] = useState<CheckInMode>("dashboard");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -273,7 +275,7 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
                 <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">
                   <CheckCircle2 className="mr-1 h-3 w-3" />
                   {attendee.checkedInAt
-                    ? new Date(attendee.checkedInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+                    ? formatTime(attendee.checkedInAt, locale)
                     : t("checkedIn")}
                 </Badge>
               ) : (

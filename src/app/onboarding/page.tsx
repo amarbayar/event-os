@@ -255,7 +255,9 @@ export default function OnboardingPage() {
               <h2 className="font-heading text-xl font-bold mb-2">
                 {t("doneTitle")}
               </h2>
-              <p className="text-sm text-muted-foreground text-center mb-6" dangerouslySetInnerHTML={{ __html: t("doneDescription", { eventName }) }} />
+              <p className="text-sm text-muted-foreground text-center mb-6">
+                {t.rich("doneDescription", { eventName, strong: (chunks) => <strong>{chunks}</strong> })}
+              </p>
               <Button className="w-full" onClick={() => window.location.href = "/"}>
                 {t("goToDashboard")}
               </Button>

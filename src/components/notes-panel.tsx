@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate, formatTime } from "@/lib/i18n/date";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquare, X, Send, Trash2, Pencil, Loader2 } from "lucide-react";
@@ -31,6 +32,7 @@ export function NotesPanel({
 }: NotesPanelProps) {
   const t = useTranslations("Notes");
   const tC = useTranslations("Common");
+  const locale = useLocale();
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState("");
   const [loading, setLoading] = useState(false);
@@ -142,7 +144,7 @@ export function NotesPanel({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium">{note.authorName}</span>
                       <span className="text-[10px] text-muted-foreground">
-                        {new Date(note.createdAt).toLocaleDateString()} {new Date(note.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {formatDate(note.createdAt, locale)} {formatTime(note.createdAt, locale)}
                       </span>
                       {note.updatedAt !== note.createdAt && (
                         <span className="text-[10px] text-muted-foreground italic">{t("edited")}</span>

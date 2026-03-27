@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/confirm-dialog";
 import { NotesButton, NotesPanel } from "@/components/notes-panel";
 import { Trash2, MoreHorizontal, CheckCircle2, ListChecks, Pencil } from "lucide-react";
+import { stageKeys, sourceKeys } from "@/components/pipeline-view";
 
 type OrgUser = { id: string; name: string | null; email: string };
 type ChecklistCount = { done: number; total: number };
@@ -104,19 +105,6 @@ function InlineEdit({
 }
 
 // ─── Stage dropdown ──────────────────────────────────────
-
-const stageKeys: Record<string, string> = {
-  lead: "stageLead",
-  engaged: "stageEngaged",
-  confirmed: "stageConfirmed",
-  declined: "stageDeclined",
-};
-
-const sourceKeys: Record<string, string> = {
-  intake: "sourceIntake",
-  outreach: "sourceOutreach",
-  sponsored: "sourceSponsored",
-};
 
 function StageDropdown({
   stage,

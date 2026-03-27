@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatTime } from "@/lib/i18n/date";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ export function AttendeesClient({
 }) {
   const t = useTranslations("Attendees");
   const tC = useTranslations("Common");
+  const locale = useLocale();
   const [attendees, setAttendees] = useState(initialAttendees);
   const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
@@ -199,7 +201,7 @@ export function AttendeesClient({
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
                   <p className="text-sm text-emerald-700 font-medium">
                     {selectedAttendee.checkedInAt
-                      ? t("checkedInAt", { time: new Date(selectedAttendee.checkedInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })
+                      ? t("checkedInAt", { time: formatTime(selectedAttendee.checkedInAt, locale) })
                       : t("checkedInNoTime")}
                   </p>
                 </div>
@@ -314,7 +316,7 @@ export function AttendeesClient({
                     {a.checkedIn ? (
                       <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">
                         <CheckCircle2 className="mr-1 h-3 w-3" />
-                        {a.checkedInAt ? new Date(a.checkedInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : t("yes")}
+                        {a.checkedInAt ? formatTime(a.checkedInAt, locale) : t("yes")}
                       </Badge>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>

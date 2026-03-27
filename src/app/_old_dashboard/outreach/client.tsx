@@ -18,7 +18,8 @@ import { AssignedToSelect } from "@/components/assigned-to-select";
 import { Plus, ArrowRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate } from "@/lib/i18n/date";
 
 type OutreachStatus = "identified" | "contacted" | "interested" | "negotiating" | "confirmed" | "declined" | "converted";
 type TargetType = "speaker" | "sponsor" | "booth" | "volunteer" | "media";
@@ -76,6 +77,7 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
   const t = useTranslations("Outreach");
   const tC = useTranslations("Common");
   const tP = useTranslations("Pipeline");
+  const locale = useLocale();
   const [typeFilter, setTypeFilter] = useState<TargetType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<OutreachStatus | "all">("all");
   const [showForm, setShowForm] = useState(false);
@@ -227,9 +229,9 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
                   <p className="text-xs text-muted-foreground mt-0.5">{lead.notes}</p>
                   <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                     <span>{t("assigned", { name: lead.assignedTo ?? "" })}</span>
-                    {lead.lastContactDate && <span>{t("lastContact", { date: new Date(lead.lastContactDate).toLocaleDateString() })}</span>}
+                    {lead.lastContactDate && <span>{t("lastContact", { date: formatDate(lead.lastContactDate, locale) })}</span>}
                     {lead.nextFollowUp && (
-                      <span className="text-yellow-600 font-medium">{t("followUp", { date: new Date(lead.nextFollowUp).toLocaleDateString() })}</span>
+                      <span className="text-yellow-600 font-medium">{t("followUp", { date: formatDate(lead.nextFollowUp, locale) })}</span>
                     )}
                   </div>
                 </div>
