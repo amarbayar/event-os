@@ -23,6 +23,7 @@ import { Copy, Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 import { PortalInviteSection } from "@/components/portal-invite-section";
+import { useTranslations } from "next-intl";
 
 type Volunteer = {
   id: string;
@@ -43,6 +44,10 @@ type Volunteer = {
 };
 
 export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Volunteer[] }) {
+  const t = useTranslations("Volunteers");
+  const tP = useTranslations("Pipeline");
+  const tE = useTranslations("Entity");
+  const tC = useTranslations("Common");
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
   const [volunteers, setVolunteers] = useState(initialVolunteers);
   const [copied, setCopied] = useState(false);
@@ -57,7 +62,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
   const columns = [
     {
       key: "name",
-      label: "Name",
+      label: tE("name"),
       width: "160px",
       render: (v: Volunteer) => (
         <p className="font-medium text-sm">{v.name}</p>
@@ -65,7 +70,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
     },
     {
       key: "email",
-      label: "Email",
+      label: tE("email"),
       width: "180px",
       render: (v: Volunteer) => (
         <span className="text-xs text-muted-foreground">{v.email || "—"}</span>
@@ -73,7 +78,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
     },
     {
       key: "role",
-      label: "Role",
+      label: t("role"),
       width: "140px",
       render: (v: Volunteer) => (
         <span className="text-xs">{v.role || "—"}</span>
@@ -81,7 +86,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
     },
     {
       key: "availability",
-      label: "Availability",
+      label: t("availability"),
       width: "140px",
       render: (v: Volunteer) => (
         <span className="text-xs text-muted-foreground">{v.availability || "—"}</span>
@@ -89,7 +94,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
     },
     {
       key: "tshirtSize",
-      label: "T-Shirt",
+      label: t("tshirt"),
       width: "70px",
       render: (v: Volunteer) => (
         <span className="text-xs font-medium">{v.tshirtSize || "—"}</span>
@@ -146,7 +151,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
       body: JSON.stringify(drawerForm),
     });
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to save changes"));
+      toast.error(await getApiError(res, tC("failedTo", { action: tC("save").toLowerCase() })));
       setDrawerSaving(false);
       return;
     }
@@ -174,7 +179,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
     });
 
     if (!res.ok) {
-      toast.error(await getApiError(res, "Failed to create volunteer"));
+      toast.error(await getApiError(res, tC("failedTo", { action: t("addVolunteer").toLowerCase() })));
       return;
     }
 
@@ -186,51 +191,51 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
   const drawerSections = selectedVolunteer
     ? [
         {
-          label: "Profile",
+          label: tE("tabProfile"),
           content: (
             <div className="space-y-3">
               <FileUpload
                 value={(drawerForm.headshotUrl as string) || ""}
                 onChange={(url) => updateField("headshotUrl", url)}
                 folder="volunteer-photos"
-                label="Photo"
+                label={tE("photo")}
               />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Name</Label>
+                  <Label>{tE("name")}</Label>
                   <Input value={(drawerForm.name as string) || ""} onChange={(e) => updateField("name", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Email</Label>
+                  <Label>{tE("email")}</Label>
                   <Input value={(drawerForm.email as string) || ""} onChange={(e) => updateField("email", e.target.value)} />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Phone</Label>
+                  <Label>{tE("phone")}</Label>
                   <Input value={(drawerForm.phone as string) || ""} onChange={(e) => updateField("phone", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Role</Label>
+                  <Label>{t("role")}</Label>
                   <Select value={String(drawerForm.role || "General")} onValueChange={(v) => updateField("role", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Registration">Registration</SelectItem>
-                      <SelectItem value="Stage">Stage</SelectItem>
-                      <SelectItem value="Logistics">Logistics</SelectItem>
-                      <SelectItem value="Tech Support">Tech Support</SelectItem>
-                      <SelectItem value="General">General</SelectItem>
+                      <SelectItem value="Registration">{t("roleRegistration")}</SelectItem>
+                      <SelectItem value="Stage">{t("roleStage")}</SelectItem>
+                      <SelectItem value="Logistics">{t("roleLogistics")}</SelectItem>
+                      <SelectItem value="Tech Support">{t("roleTechSupport")}</SelectItem>
+                      <SelectItem value="General">{t("roleGeneral")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Availability</Label>
+                  <Label>{t("availability")}</Label>
                   <Input value={(drawerForm.availability as string) || ""} onChange={(e) => updateField("availability", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>T-Shirt Size</Label>
+                  <Label>{t("tshirtSize")}</Label>
                   <Select value={String(drawerForm.tshirtSize || "L")} onValueChange={(v) => updateField("tshirtSize", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
@@ -253,54 +258,54 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
           ),
         },
         {
-          label: "Assignment",
+          label: t("assignment"),
           content: (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Assigned Shift</Label>
+                <Label>{t("assignedShift")}</Label>
                 <Input value={(drawerForm.assignedShift as string) || ""} onChange={(e) => updateField("assignedShift", e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Experience</Label>
-                <Textarea rows={4} placeholder="Previous volunteer experience..." value={(drawerForm.experience as string) || ""} onChange={(e) => updateField("experience", e.target.value)} />
+                <Label>{t("experience")}</Label>
+                <Textarea rows={4} placeholder={t("experiencePlaceholder")} value={(drawerForm.experience as string) || ""} onChange={(e) => updateField("experience", e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Notes</Label>
-                <Textarea rows={4} placeholder="Additional notes..." value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
+                <Label>{tE("notes")}</Label>
+                <Textarea rows={4} placeholder={tC("internalNotes")} value={(drawerForm.notes as string) || ""} onChange={(e) => updateField("notes", e.target.value)} />
               </div>
             </div>
           ),
         },
         {
-          label: "Pipeline",
+          label: tE("tabPipeline"),
           content: (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
+                  <Label>{tP("source")}</Label>
                   <Select value={String(drawerForm.source || "intake")} onValueChange={(v) => updateField("source", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
+                      <SelectItem value="intake">{tP("sourceIntake")}</SelectItem>
+                      <SelectItem value="outreach">{tP("sourceOutreach")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Stage</Label>
+                  <Label>{tP("stage")}</Label>
                   <Select value={String(drawerForm.stage || "lead")} onValueChange={(v) => updateField("stage", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="engaged">Engaged</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="declined">Declined</SelectItem>
+                      <SelectItem value="lead">{tP("stageLead")}</SelectItem>
+                      <SelectItem value="engaged">{tP("stageEngaged")}</SelectItem>
+                      <SelectItem value="confirmed">{tP("stageConfirmed")}</SelectItem>
+                      <SelectItem value="declined">{tP("stageDeclined")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Assigned To</Label>
+                <Label>{tP("assignedTo")}</Label>
                 <AssignedToSelect value={(drawerForm.assignedTo as string) || ""} onChange={(val) => updateField("assignedTo", val)} />
               </div>
             </div>
@@ -310,7 +315,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
         ...(selectedVolunteer?.stage === "confirmed"
           ? [
               {
-                label: "Checklist",
+                label: tE("tabChecklist"),
                 content: (
                   <ChecklistPanel entityType="volunteer" entityId={selectedVolunteer.id} />
                 ),
@@ -324,15 +329,15 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
     <div>
       <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Volunteers</h1>
-          <p className="text-sm text-muted-foreground">{volunteers.length} total</p>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground">{tC("total", { count: volunteers.length })}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleCopyLink}>
-            {copied ? <><Check className="mr-2 h-3 w-3" /> Copied</> : <><Copy className="mr-2 h-3 w-3" /> Signup Link</>}
+            {copied ? <><Check className="mr-2 h-3 w-3" /> {tC("copied")}</> : <><Copy className="mr-2 h-3 w-3" /> {t("signupLink")}</>}
           </Button>
           <Button size="sm" onClick={() => setShowForm(!showForm)}>
-            {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Add Volunteer</>}
+            {showForm ? <><X className="mr-2 h-3 w-3" /> {tC("cancel")}</> : <><Plus className="mr-2 h-3 w-3" /> {t("addVolunteer")}</>}
           </Button>
         </div>
       </div>
@@ -344,31 +349,31 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label>Name *</Label>
+                  <Label>{t("nameLabel")}</Label>
                   <Input name="name" placeholder="e.g., Temuulen B." aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
                   {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Email *</Label>
+                  <Label>{t("emailLabel")}</Label>
                   <Input name="email" type="email" placeholder="volunteer@email.mn" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const { email: _, ...rest } = prev; return rest; })} />
                   {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Phone</Label>
+                  <Label>{tE("phone")}</Label>
                   <Input name="phone" placeholder="+976 ..." />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label>Role</Label>
+                  <Label>{t("role")}</Label>
                   <Input name="role" placeholder="e.g., Registration Desk" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Availability</Label>
+                  <Label>{t("availability")}</Label>
                   <Input name="availability" placeholder="e.g., Both days, mornings only" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>T-Shirt Size</Label>
+                  <Label>{t("tshirtSize")}</Label>
                   <Select name="tshirtSize" defaultValue="L">
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
@@ -384,21 +389,21 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Source</Label>
+                  <Label>{tP("source")}</Label>
                   <Select name="source" defaultValue="outreach">
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Intake</SelectItem>
-                      <SelectItem value="outreach">Outreach</SelectItem>
+                      <SelectItem value="intake">{tP("sourceIntake")}</SelectItem>
+                      <SelectItem value="outreach">{tP("sourceOutreach")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Assigned To</Label>
+                  <Label>{tP("assignedTo")}</Label>
                   <AssignedToSelect name="assignedTo" />
                 </div>
               </div>
-              <Button type="submit" className="w-full sm:w-auto">Add Volunteer</Button>
+              <Button type="submit" className="w-full sm:w-auto">{t("addVolunteer")}</Button>
             </form>
           </CardContent>
         </Card>
@@ -425,7 +430,7 @@ export function VolunteersClient({ initialVolunteers }: { initialVolunteers: Vol
       />
 
       {filtered.length === 0 && volunteers.length > 0 && (
-        <p className="text-center text-sm text-muted-foreground py-8">No volunteers match the current filters.</p>
+        <p className="text-center text-sm text-muted-foreground py-8">{tC("noMatch", { entity: t("title").toLowerCase() })}</p>
       )}
 
       <EntityDrawer
