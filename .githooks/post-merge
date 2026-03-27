@@ -1,0 +1,44 @@
+#!/bin/bash
+# Post-merge hook: auto-run setup tasks after git pull
+# Detects what changed and only runs what's needed
+
+YELLOW='\033[0;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# What files changed in this merge?
+CHANGED=$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD 2>/dev/null)
+
+# 1. Dependencies — if package.json or package-lock.json changed
+if echo "$CHANGED" | grep -qE "package(-lock)?\.json$"; then
+  echo -e "${YELLOW}[post-merge] package.json changed — running npm install...${NC}"
+  npm install --silent 2>&1 | tail -3
+  echo -e "${GREEN}[post-merge] Dependencies updated.${NC}"
+fi
+
+# 2. DB schema — if schema files changed
+if echo "$CHANGED" | grep -qE "src/db/schema\.(pg|sqlite)\.ts$"; then
+  echo -e "${YELLOW}[post-merge] Schema changed — running drizzle-kit push...${NC}"
+  if [ "$DB_DIALECT" = "sqlite" ]; then
+    DB_DIALECT=sqlite npx drizzle-kit push 2>&1 | tail -2
+  else
+    # Try to read DATABASE_URL from .env.local
+    DB_URL=$(grep -s "^DATABASE_URL=" .env.local | cut -d= -f2- | tr -d '"' | tr -d "'")
+    if [ -n "$DB_URL" ]; then
+      DATABASE_URL="$DB_URL" npx drizzle-kit push 2>&1 | tail -2
+    else
+      echo -e "${YELLOW}[post-merge] No DATABASE_URL found — run 'npx drizzle-kit push' manually.${NC}"
+    fi
+  fi
+  echo -e "${GREEN}[post-merge] Schema pushed.${NC}"
+fi
+
+# 3. Translation files — just notify (no action needed, next-intl picks them up)
+if echo "$CHANGED" | grep -qE "messages/(en|mn)\.json$"; then
+  echo -e "${GREEN}[post-merge] Translation files updated — refresh browser to see changes.${NC}"
+fi
+
+# 4. Seed data — notify if changed (don't auto-run, it's destructive)
+if echo "$CHANGED" | grep -qE "src/db/seed\.ts$"; then
+  echo -e "${YELLOW}[post-merge] Seed data changed — run 'npx tsx src/db/seed.ts' if you need fresh data.${NC}"
+fi
