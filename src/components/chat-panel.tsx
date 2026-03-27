@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { useAnimatedMount } from "@/lib/use-animated-mount";
 import { Button } from "@/components/ui/button";
@@ -56,9 +57,10 @@ function detectInputType(text: string): "csv" | "text" {
 }
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
-  if (confidence >= 0.9) return <Badge className="bg-emerald-50 text-emerald-700 text-[10px]">High</Badge>;
-  if (confidence >= 0.7) return <Badge className="bg-yellow-50 text-yellow-700 text-[10px]">Medium</Badge>;
-  return <Badge className="bg-red-50 text-red-600 text-[10px]">Low</Badge>;
+  const t = useTranslations("Chat");
+  if (confidence >= 0.9) return <Badge className="bg-emerald-50 text-emerald-700 text-[10px]">{t("confidenceHigh")}</Badge>;
+  if (confidence >= 0.7) return <Badge className="bg-yellow-50 text-yellow-700 text-[10px]">{t("confidenceMedium")}</Badge>;
+  return <Badge className="bg-red-50 text-red-600 text-[10px]">{t("confidenceLow")}</Badge>;
 }
 
 export function ChatPanel({
@@ -68,13 +70,13 @@ export function ChatPanel({
   isOpen: boolean;
   onClose: () => void;
 }) {
+  const t = useTranslations("Chat");
   const [size, setSize] = useState<PanelSize>("expanded");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      content:
-        "Paste a spreadsheet, drop a CSV, type a note from a phone call, or ask me anything about your event. I'll figure out the rest.",
+      content: t("welcome"),
       timestamp: new Date(),
     },
   ]);
@@ -136,7 +138,7 @@ export function ChatPanel({
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.message || "I couldn't process that. Try a different format.",
+        content: data.message || t("processFailed"),
         entities: data.entities,
         actions: data.actions,
         questions: data.questions,
@@ -150,7 +152,7 @@ export function ChatPanel({
         {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: "Agent unavailable. Check your API key configuration or try again.",
+          content: t("agentUnavailable"),
           timestamp: new Date(),
         },
       ]);
@@ -183,7 +185,7 @@ export function ChatPanel({
           {
             id: Date.now().toString(),
             role: "assistant",
-            content: `Done! ${action.label} completed.${name ? ` Created: ${name}` : ""}\n\nRefresh the page to see the new record in the list.`,
+            content: t("actionCompleted", { label: action.label, detail: name ? t("actionCreated", { name }) : "" }),
             timestamp: new Date(),
           },
         ]);
@@ -193,7 +195,7 @@ export function ChatPanel({
           {
             id: Date.now().toString(),
             role: "assistant",
-            content: `Error: ${json.error || "Something went wrong"}. The record was not created.`,
+            content: t("actionError", { error: json.error || "Unknown" }),
             timestamp: new Date(),
           },
         ]);
@@ -204,7 +206,7 @@ export function ChatPanel({
         {
           id: Date.now().toString(),
           role: "assistant",
-          content: `Network error — couldn't reach the server. Try again.`,
+          content: t("networkError"),
           timestamp: new Date(),
         },
       ]);
@@ -230,7 +232,7 @@ export function ChatPanel({
           <>
             <div className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-yellow-600" />
-              <span className="font-medium text-sm">Event Agent</span>
+              <span className="font-medium text-sm">{t("title")}</span>
               <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-stone-200 bg-stone-50 px-1.5 py-0.5 text-[10px] text-stone-500">
                 <span className="text-xs">⌘</span>K
               </kbd>
@@ -300,7 +302,7 @@ export function ChatPanel({
                               {(entity.data.name as string) ||
                                 (entity.data.companyName as string) ||
                                 (entity.data.title as string) ||
-                                "Unknown"}
+                                t("unknown")}
                             </span>
                             <ConfidenceBadge confidence={entity.confidence} />
                             {entity.warnings.length > 0 && (
@@ -310,7 +312,7 @@ export function ChatPanel({
                         ))}
                         {msg.entities.length > 5 && (
                           <p className="text-[10px] text-stone-400">
-                            + {msg.entities.length - 5} more
+                            {t("moreEntities", { count: msg.entities.length - 5 })}
                           </p>
                         )}
                       </div>
@@ -330,7 +332,7 @@ export function ChatPanel({
                             }}
                           >
                             <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Import All ({msg.actions.length})
+                            {t("importAll", { count: msg.actions.length })}
                           </Button>
                         )}
                         {msg.actions.map((action, i) => (
@@ -389,7 +391,7 @@ export function ChatPanel({
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Paste a spreadsheet, type a note, or ask a question..."
+                  placeholder={t("inputPlaceholder")}
                   className="w-full resize-none rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm placeholder:text-stone-400 focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500 min-h-[40px] max-h-[120px]"
                   rows={1}
                   onInput={(e) => {
@@ -413,7 +415,7 @@ export function ChatPanel({
               </Button>
             </div>
             <p className="text-[10px] text-stone-400 mt-1.5">
-              Shift+Enter for new line. Paste CSV, tables, or chat logs directly.
+              {t("inputHint")}
             </p>
           </div>
         </>
