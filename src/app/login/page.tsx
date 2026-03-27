@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { signIn } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import Link from "next/link";
 import { isValidEmail } from "@/lib/validation";
 
 export default function LoginPage() {
+  const t = useTranslations("Auth");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -24,9 +26,9 @@ export default function LoginPage() {
     const password = form.get("password") as string;
 
     const newErrors: Record<string, string> = {};
-    if (!email) newErrors.email = "Email is required";
-    else if (!isValidEmail(email)) newErrors.email = "Enter a valid email address";
-    if (!password) newErrors.password = "Password is required";
+    if (!email) newErrors.email = t("emailRequired");
+    else if (!isValidEmail(email)) newErrors.email = t("invalidCredentials");
+    if (!password) newErrors.password = t("passwordRequired");
 
     if (Object.keys(newErrors).length > 0) {
       setFieldErrors(newErrors);
@@ -42,7 +44,7 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      setError("Invalid email or password");
+      setError(t("invalidCredentials"));
       setLoading(false);
       return;
     }
@@ -58,7 +60,7 @@ export default function LoginPage() {
             Event OS
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Sign in to your event workspace
+            {t("signInToWorkspace")}
           </p>
         </div>
 
@@ -66,7 +68,7 @@ export default function LoginPage() {
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("email")}</Label>
                 <Input
                   id="email"
                   name="email"
@@ -78,12 +80,12 @@ export default function LoginPage() {
                 {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("password")}</Label>
                 <Input
                   id="password"
                   name="password"
                   type="password"
-                  placeholder="Enter your password"
+                  placeholder={t("enterPassword")}
                   aria-invalid={!!fieldErrors.password}
                   onChange={() => setFieldErrors((prev) => { const { password: _, ...rest } = prev; return rest; })}
                 />
@@ -95,16 +97,16 @@ export default function LoginPage() {
                 </div>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign in"}
+                {loading ? t("signingIn") : t("signIn")}
               </Button>
             </form>
           </CardContent>
         </Card>
 
         <p className="text-center text-sm text-muted-foreground mt-4">
-          Don&apos;t have a workspace?{" "}
+          {t("noWorkspace")}{" "}
           <Link href="/onboarding" className="text-yellow-600 hover:underline">
-            Create one
+            {t("createOne")}
           </Link>
         </p>
       </div>
