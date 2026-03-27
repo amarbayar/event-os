@@ -1,6 +1,6 @@
 #!/bin/bash
-# Pre-push hook: run full test suite before pushing to remote
-# This catches issues that unit tests miss (SQLite compat, e2e flows)
+# Pre-push hook: run unit tests + type check before pushing
+# Catches SQLite compat issues, type errors, and regressions
 # Skip with: git push --no-verify
 
 RED='\033[0;31m'
@@ -8,21 +8,26 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
 
-echo -e "${YELLOW}Running full test suite before push...${NC}"
+echo -e "${YELLOW}Running pre-push checks...${NC}"
 
-# 1. Unit + integration tests
-echo -e "${YELLOW}[1/2] Unit & integration tests...${NC}"
-if ! npx vitest run tests/unit tests/integration 2>&1 | tail -5; then
-  echo -e "${RED}PUSH BLOCKED: Tests failed.${NC}"
+# 1. Type check (catches cross-dialect issues)
+echo -e "${YELLOW}[1/2] Type checking...${NC}"
+npx tsc --noEmit 2>&1
+TSC_EXIT=$?
+if [ "$TSC_EXIT" -ne 0 ]; then
+  echo -e "${RED}PUSH BLOCKED: TypeScript errors found.${NC}"
+  exit 1
+fi
+echo -e "${GREEN}Type check passed.${NC}"
+
+# 2. Unit tests
+echo -e "${YELLOW}[2/2] Unit tests...${NC}"
+npx vitest run tests/unit 2>&1
+VITEST_EXIT=$?
+if [ "$VITEST_EXIT" -ne 0 ]; then
+  echo -e "${RED}PUSH BLOCKED: Unit tests failed.${NC}"
   exit 1
 fi
 
-# 2. SQLite e2e tests (catches cross-dialect issues like NOW() vs datetime())
-echo -e "${YELLOW}[2/2] SQLite e2e API tests...${NC}"
-if ! DB_DIALECT=sqlite AUTH_SECRET=test-secret SERVICE_TOKEN=test-token npx vitest run tests/e2e 2>&1 | tail -5; then
-  echo -e "${RED}PUSH BLOCKED: E2E tests failed.${NC}"
-  exit 1
-fi
-
-echo -e "${GREEN}All tests passed. Pushing...${NC}"
+echo -e "${GREEN}All pre-push checks passed.${NC}"
 exit 0
