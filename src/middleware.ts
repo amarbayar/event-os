@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
 // Routes that don't require authentication
 const publicPaths = [
   "/login",
   "/onboarding",
+  "/claim",
+  "/change-password",
   "/api/auth",
   "/api/onboarding",
   "/apply",
@@ -13,7 +16,7 @@ const publicPaths = [
   "/favicon.ico",
 ];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public paths
@@ -37,6 +40,16 @@ export function middleware(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Check forcePasswordChange flag in JWT
+  try {
+    const token = await getToken({ req: request });
+    if (token?.forcePasswordChange && pathname !== "/change-password") {
+      return NextResponse.redirect(new URL("/change-password", request.url));
+    }
+  } catch {
+    // JWT decode failed — let the request through, auth() will handle it
   }
 
   return NextResponse.next();

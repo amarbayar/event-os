@@ -804,6 +804,8 @@ export const users = sqliteTable("users", {
   emailVerified: ts("email_verified"),
   image: text("image"),
   passwordHash: text("password_hash"),
+  phone: text("phone"),
+  forcePasswordChange: bool("force_password_change").default(false).notNull(),
   contactId: uuidCol("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   preferredLocale: text("preferred_locale").default("en"),
   createdAt: tsNow("created_at"),
@@ -904,6 +906,68 @@ export const accounts = sqliteTable("accounts", {
   idToken: text("id_token"),
   sessionState: text("session_state"),
 });
+
+// ─── Verification Tokens (stub for DrizzleAdapter) ──────
+
+export const verificationTokens = sqliteTable(
+  "verification_tokens",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: ts("expires").notNull(),
+  },
+  (table) => [
+    uniqueIndex("verification_token_uniq").on(table.identifier, table.token),
+  ]
+);
+
+// ─── Org Invites (seat-first invite system) ─────────────
+//
+//  Invite lifecycle (state machine):
+//    admin creates invite
+//        │
+//        ▼
+//    [PENDING] ── expiresAt reached ──► [EXPIRED]
+//        │                                  │
+//        │── admin revokes ──► [REVOKED]    │── admin regenerates ──► [PENDING]
+//        │
+//        ▼ (user enters correct 8-digit code)
+//    [CLAIMING] (transient, via claim token)
+//        │
+//        ▼
+//    [CLAIMED] → claimedAt set, acceptedByUserId set
+//
+
+export const orgInvites = sqliteTable(
+  "org_invites",
+  {
+    id: uuidPk(),
+    organizationId: uuidCol("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    role: text("role").notNull(),
+    codeHash: text("code_hash").notNull(),
+    expiresAt: ts("expires_at").notNull(),
+    claimedAt: ts("claimed_at"),
+    revokedAt: ts("revoked_at"),
+    attemptCount: integer("attempt_count").default(0).notNull(),
+    invitedByUserId: uuidCol("invited_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    acceptedByUserId: uuidCol("accepted_by_user_id")
+      .references(() => users.id, { onDelete: "set null" }),
+    createdAt: tsNow("created_at"),
+    updatedAt: tsNow("updated_at"),
+    version: integer("version").default(1).notNull(),
+  },
+  (table) => [
+    index("org_invite_email_org_idx").on(table.email, table.organizationId),
+    index("org_invite_org_idx").on(table.organizationId),
+  ]
+);
 
 // ─── Job Queue ──────────────────────────────────────────
 //
@@ -1055,6 +1119,23 @@ export const userOrganizationsRelations = relations(userOrganizations, ({ one })
   organization: one(organizations, {
     fields: [userOrganizations.organizationId],
     references: [organizations.id],
+  }),
+}));
+
+export const orgInvitesRelations = relations(orgInvites, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [orgInvites.organizationId],
+    references: [organizations.id],
+  }),
+  invitedBy: one(users, {
+    fields: [orgInvites.invitedByUserId],
+    references: [users.id],
+    relationName: "invitedBy",
+  }),
+  acceptedBy: one(users, {
+    fields: [orgInvites.acceptedByUserId],
+    references: [users.id],
+    relationName: "acceptedBy",
   }),
 }));
 

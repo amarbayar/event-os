@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { DatabaseDriver } from "@/lib/queue/drivers/database";
 import { Worker } from "@/lib/queue/worker";
 import type { JobDefinition, ClaimedJob } from "@/lib/queue/types";
+import { randomUUID } from "crypto";
 
 // ════════════════════════════════════════════════════════
 // JOB QUEUE TESTS
@@ -131,12 +132,13 @@ describe("dispatch (push)", () => {
   // ─── T3: dispatch — organizationId ──────────────────
 
   it("T3: stores organizationId when provided", async () => {
+    const testOrgId = randomUUID();
     const id = await driver.push({
       name: "test-success",
       queue: "default",
       payload: {},
       maxAttempts: 3,
-      organizationId: "org-123",
+      organizationId: testOrgId,
     });
 
     const [row] = await testDb
@@ -144,7 +146,7 @@ describe("dispatch (push)", () => {
       .from(schema.jobs)
       .where(eq(schema.jobs.id, id));
 
-    expect(row.organizationId).toBe("org-123");
+    expect(row.organizationId).toBe(testOrgId);
   });
 });
 
@@ -294,12 +296,13 @@ describe("fail", () => {
 
 describe("bury", () => {
   it("T11: moves job to failed_jobs and deletes from jobs (atomic)", async () => {
+    const buryOrgId = randomUUID();
     const id = await driver.push({
       name: "test-success",
       queue: "default",
       payload: { value: "doomed" },
       maxAttempts: 3,
-      organizationId: "org-456",
+      organizationId: buryOrgId,
     });
 
     await driver.bury(id, "Permanently broken");
@@ -318,12 +321,12 @@ describe("bury", () => {
     expect(failedRows[0].queue).toBe("default");
     expect(failedRows[0].payload).toEqual({ value: "doomed" });
     expect(failedRows[0].error).toBe("Permanently broken");
-    expect(failedRows[0].organizationId).toBe("org-456");
+    expect(failedRows[0].organizationId).toBe(buryOrgId);
   });
 
   it("handles bury of nonexistent job gracefully", async () => {
-    // Should not throw
-    await driver.bury("nonexistent-id", "gone");
+    // Should not throw — use a valid UUID that doesn't exist
+    await driver.bury(randomUUID(), "gone");
   });
 });
 
@@ -525,15 +528,18 @@ describe("notify integration", () => {
     await initializeJobs();
     setDriver(driver);
 
+    const testUserId = randomUUID();
+    const testOrgId = randomUUID();
+
     const id = await dispatch(
       sendNotificationJob,
       {
-        userId: "user-1",
-        orgId: "org-1",
+        userId: testUserId,
+        orgId: testOrgId,
         type: "test",
         title: "Test notification",
       },
-      { organizationId: "org-1" }
+      { organizationId: testOrgId }
     );
 
     expect(id).toBeTruthy();
@@ -545,8 +551,8 @@ describe("notify integration", () => {
 
     expect(row.name).toBe("send-notification");
     expect(row.payload).toEqual({
-      userId: "user-1",
-      orgId: "org-1",
+      userId: testUserId,
+      orgId: testOrgId,
       type: "test",
       title: "Test notification",
     });
@@ -559,24 +565,28 @@ describe("notify integration", () => {
     await initializeJobs();
     setDriver(driver);
 
+    const testOrgId = randomUUID();
+    const testUserId1 = randomUUID();
+    const testUserId2 = randomUUID();
+
     const ids = await dispatchMany(sendNotificationJob, [
       {
         payload: {
-          userId: "user-1",
-          orgId: "org-1",
+          userId: testUserId1,
+          orgId: testOrgId,
           type: "test",
           title: "Notif 1",
         },
-        organizationId: "org-1",
+        organizationId: testOrgId,
       },
       {
         payload: {
-          userId: "user-2",
-          orgId: "org-1",
+          userId: testUserId2,
+          orgId: testOrgId,
           type: "test",
           title: "Notif 2",
         },
-        organizationId: "org-1",
+        organizationId: testOrgId,
       },
     ]);
 

@@ -55,6 +55,8 @@ export const userPlatformLinks = s.userPlatformLinks as typeof pg.userPlatformLi
 export const messagingChannels = s.messagingChannels as typeof pg.messagingChannels;
 export const authSessions = s.authSessions as typeof pg.authSessions;
 export const accounts = s.accounts as typeof pg.accounts;
+export const verificationTokens = s.verificationTokens as typeof pg.verificationTokens;
+export const orgInvites = s.orgInvites as typeof pg.orgInvites;
 export const jobs = s.jobs as typeof pg.jobs;
 export const failedJobs = s.failedJobs as typeof pg.failedJobs;
 
@@ -67,4 +69,5 @@ export const speakerApplicationsRelations = s.speakerApplicationsRelations;
 export const usersRelations = s.usersRelations;
 export const userPlatformLinksRelations = s.userPlatformLinksRelations;
 export const userOrganizationsRelations = s.userOrganizationsRelations;
+export const orgInvitesRelations = s.orgInvitesRelations;
 export const contactsRelations = s.contactsRelations;

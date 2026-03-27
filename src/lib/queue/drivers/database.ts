@@ -93,17 +93,18 @@ export class DatabaseDriver implements QueueDriver {
     now: Date
   ): Promise<ClaimedJob | null> {
     const queueList = queues.map((q) => `'${q.replace(/'/g, "''")}'`).join(",");
+    const nowIso = now.toISOString();
 
     const result = await this.db.execute(sql`
       UPDATE jobs
       SET status = 'processing',
-          reserved_at = ${now},
+          reserved_at = ${nowIso}::timestamp,
           attempts = attempts + 1
       WHERE id = (
         SELECT id FROM jobs
         WHERE queue IN (${sql.raw(queueList)})
           AND status = 'pending'
-          AND available_at <= ${now}
+          AND available_at <= ${nowIso}::timestamp
         ORDER BY
           array_position(ARRAY[${sql.raw(queueList)}], queue),
           created_at ASC

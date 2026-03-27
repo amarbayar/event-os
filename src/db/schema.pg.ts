@@ -867,6 +867,8 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified"),
   image: text("image"),
   passwordHash: text("password_hash"),
+  phone: varchar("phone", { length: 50 }),
+  forcePasswordChange: boolean("force_password_change").default(false).notNull(),
   contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   preferredLocale: varchar("preferred_locale", { length: 5 }).default("en"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -967,6 +969,68 @@ export const accounts = pgTable("accounts", {
   idToken: text("id_token"),
   sessionState: varchar("session_state", { length: 255 }),
 });
+
+// ─── Verification Tokens (stub for DrizzleAdapter) ──────
+
+export const verificationTokens = pgTable(
+  "verification_tokens",
+  {
+    identifier: varchar("identifier", { length: 255 }).notNull(),
+    token: varchar("token", { length: 255 }).notNull(),
+    expires: timestamp("expires").notNull(),
+  },
+  (table) => [
+    uniqueIndex("verification_token_uniq").on(table.identifier, table.token),
+  ]
+);
+
+// ─── Org Invites (seat-first invite system) ─────────────
+//
+//  Invite lifecycle (state machine):
+//    admin creates invite
+//        │
+//        ▼
+//    [PENDING] ── expiresAt reached ──► [EXPIRED]
+//        │                                  │
+//        │── admin revokes ──► [REVOKED]    │── admin regenerates ──► [PENDING]
+//        │
+//        ▼ (user enters correct 8-digit code)
+//    [CLAIMING] (transient, via claim token)
+//        │
+//        ▼
+//    [CLAIMED] → claimedAt set, acceptedByUserId set
+//
+
+export const orgInvites = pgTable(
+  "org_invites",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: varchar("email", { length: 255 }).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    phone: varchar("phone", { length: 50 }),
+    role: varchar("role", { length: 50 }).notNull(), // admin|organizer|coordinator|viewer
+    codeHash: text("code_hash").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    claimedAt: timestamp("claimed_at"),
+    revokedAt: timestamp("revoked_at"),
+    attemptCount: integer("attempt_count").default(0).notNull(),
+    invitedByUserId: uuid("invited_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    acceptedByUserId: uuid("accepted_by_user_id")
+      .references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    version: integer("version").default(1).notNull(),
+  },
+  (table) => [
+    index("org_invite_email_org_idx").on(table.email, table.organizationId),
+    index("org_invite_org_idx").on(table.organizationId),
+  ]
+);
 
 // ─── Job Queue ──────────────────────────────────────────
 //
@@ -1120,6 +1184,23 @@ export const userPlatformLinksRelations = relations(userPlatformLinks, ({ one })
   organization: one(organizations, {
     fields: [userPlatformLinks.organizationId],
     references: [organizations.id],
+  }),
+}));
+
+export const orgInvitesRelations = relations(orgInvites, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [orgInvites.organizationId],
+    references: [organizations.id],
+  }),
+  invitedBy: one(users, {
+    fields: [orgInvites.invitedByUserId],
+    references: [users.id],
+    relationName: "invitedBy",
+  }),
+  acceptedBy: one(users, {
+    fields: [orgInvites.acceptedByUserId],
+    references: [users.id],
+    relationName: "acceptedBy",
   }),
 }));
 
