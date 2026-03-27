@@ -49,6 +49,19 @@ export function OrganizationTab({ userRole }: { userRole: string }) {
   const [brandColor, setBrandColor] = useState("#eab308");
   const [logoUrl, setLogoUrl] = useState("");
 
+  // Live-preview brand color as user picks
+  useEffect(() => {
+    if (!brandColor) return;
+    const root = document.documentElement;
+    root.style.setProperty("--primary", brandColor);
+    root.style.setProperty("--ring", brandColor);
+    root.style.setProperty("--chart-1", brandColor);
+    root.style.setProperty("--sidebar-primary", brandColor);
+    root.style.setProperty("--sidebar-accent", `${brandColor}26`);
+    root.style.setProperty("--sidebar-accent-foreground", brandColor);
+    root.style.setProperty("--sidebar-ring", brandColor);
+  }, [brandColor]);
+
   // Danger zone state
   const [members, setMembers] = useState<OrgUser[]>([]);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
