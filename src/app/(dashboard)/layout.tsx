@@ -6,12 +6,13 @@ import { Sidebar } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat-panel";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 
-function DynamicFavicon() {
+function OrgBranding() {
   useEffect(() => {
     fetch("/api/organizations")
       .then((r) => r.json())
       .then((d) => {
-        const logoUrl = d.data?.logoUrl;
+        const { logoUrl, brandColor } = d.data || {};
+        // Dynamic favicon
         if (logoUrl) {
           let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement | null;
           if (!link) {
@@ -20,6 +21,17 @@ function DynamicFavicon() {
             document.head.appendChild(link);
           }
           link.href = logoUrl;
+        }
+        // Dynamic brand color — override CSS custom properties
+        if (brandColor) {
+          const root = document.documentElement;
+          root.style.setProperty("--primary", brandColor);
+          root.style.setProperty("--ring", brandColor);
+          root.style.setProperty("--chart-1", brandColor);
+          root.style.setProperty("--sidebar-primary", brandColor);
+          root.style.setProperty("--sidebar-accent", `${brandColor}26`);
+          root.style.setProperty("--sidebar-accent-foreground", brandColor);
+          root.style.setProperty("--sidebar-ring", brandColor);
         }
       })
       .catch(() => {});
@@ -85,7 +97,7 @@ export default function DashboardLayout({
 
   return (
     <ConfirmProvider>
-    <DynamicFavicon />
+    <OrgBranding />
     <div className="min-h-screen bg-background">
       <Sidebar onToggleChat={toggleChat} chatOpen={chatOpen} />
       <main

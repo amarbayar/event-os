@@ -150,7 +150,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
         "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors",
         indent && "pl-9",
         isActive(item.href)
-          ? "bg-yellow-500/15 font-medium text-yellow-500"
+          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
           : "text-stone-400 hover:bg-white/5 hover:text-white"
       )}
     >
@@ -170,7 +170,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
           <div className="relative mt-1">
             <button
               onClick={() => setShowEditionPicker(!showEditionPicker)}
-              className="flex w-full items-center justify-between rounded-md text-sm font-medium text-white hover:text-yellow-400 transition-colors"
+              className="flex w-full items-center justify-between rounded-md text-sm font-medium text-white hover:text-sidebar-accent-foreground transition-colors"
             >
               <span className="truncate">{activeEdition || tc("selectEvent")}</span>
               <ChevronDown className={cn("h-3 w-3 ml-1 shrink-0 transition-transform", showEditionPicker && "rotate-180")} />
@@ -193,7 +193,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
                     className={cn(
                       "block w-full px-3 py-1.5 text-left text-sm transition-colors",
                       ed.name === activeEdition
-                        ? "text-yellow-400 bg-yellow-500/10"
+                        ? "text-sidebar-accent-foreground bg-sidebar-accent"
                         : "text-stone-300 hover:bg-stone-700 hover:text-white"
                     )}
                   >
@@ -208,7 +208,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
                         value={newEventName}
                         onChange={(e) => setNewEventName(e.target.value)}
                         placeholder="e.g., Dev Summit 2027"
-                        className="w-full rounded bg-stone-700 border-stone-600 px-2 py-1 text-xs text-white placeholder:text-stone-400 outline-none focus:ring-1 focus:ring-yellow-500"
+                        className="w-full rounded bg-stone-700 border-stone-600 px-2 py-1 text-xs text-white placeholder:text-stone-400 outline-none focus:ring-1 focus:ring-ring"
                         onKeyDown={async (e) => {
                           if (e.key === "Enter" && newEventName.trim()) {
                             const res = await fetch("/api/editions/create", {
@@ -237,7 +237,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
                   ) : (
                     <button
                       onClick={() => setShowNewEvent(true)}
-                      className="block w-full px-3 py-1.5 text-left text-xs text-yellow-400 hover:bg-stone-700 transition-colors"
+                      className="block w-full px-3 py-1.5 text-left text-xs text-sidebar-accent-foreground hover:bg-stone-700 transition-colors"
                     >
                       {tc("newEvent")}
                     </button>
@@ -261,7 +261,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
             className={cn(
               "flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors",
               chatOpen
-                ? "text-yellow-500 bg-yellow-500/15 font-medium"
+                ? "text-sidebar-accent-foreground bg-sidebar-accent font-medium"
                 : "text-stone-400 hover:bg-white/5 hover:text-white"
             )}
           >
@@ -312,7 +312,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
           className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors relative",
             isActive("/notifications")
-              ? "bg-yellow-500/15 font-medium text-yellow-500"
+              ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
               : "text-stone-400 hover:bg-white/5 hover:text-white"
           )}
         >
@@ -329,7 +329,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
           className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors",
             isActive("/settings")
-              ? "bg-yellow-500/15 font-medium text-yellow-500"
+              ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
               : "text-stone-400 hover:bg-white/5 hover:text-white"
           )}
         >
@@ -350,7 +350,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
           {onToggleChat && (
             <button
               onClick={onToggleChat}
-              className="rounded-md p-2 text-yellow-600 hover:bg-yellow-50"
+              className="rounded-md p-2 text-primary hover:bg-primary/10"
               aria-label="Open agent"
             >
               <MessageSquare className="h-5 w-5" />
@@ -401,7 +401,7 @@ export function Sidebar({ onToggleChat, chatOpen }: { onToggleChat?: () => void;
             className={cn(
               "flex flex-col items-center gap-0.5 px-3 py-1 text-[10px]",
               isActive(item.href)
-                ? "text-yellow-600 font-medium"
+                ? "text-primary font-medium"
                 : "text-stone-400"
             )}
           >

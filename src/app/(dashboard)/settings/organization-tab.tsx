@@ -44,7 +44,6 @@ export function OrganizationTab({ userRole }: { userRole: string }) {
 
   // Form state
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [website, setWebsite] = useState("");
   const [brandColor, setBrandColor] = useState("#eab308");
@@ -68,7 +67,6 @@ export function OrganizationTab({ userRole }: { userRole: string }) {
           const o = d.data as Org;
           setOrg(o);
           setName(o.name);
-          setSlug(o.slug);
           setContactEmail(o.contactEmail || "");
           setWebsite(o.website || "");
           setBrandColor(o.brandColor || "#eab308");
@@ -91,7 +89,7 @@ export function OrganizationTab({ userRole }: { userRole: string }) {
     const res = await fetch("/api/organizations", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, slug, contactEmail: contactEmail || null, website: website || null, brandColor, logoUrl: logoUrl || null }),
+      body: JSON.stringify({ name, contactEmail: contactEmail || null, website: website || null, brandColor, logoUrl: logoUrl || null }),
     });
     if (res.ok) {
       const d = await res.json();
@@ -257,22 +255,6 @@ export function OrganizationTab({ userRole }: { userRole: string }) {
             <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!isAdmin} />
           </div>
 
-          <div className="space-y-1.5">
-            <Label>{t("slug")}</Label>
-            <div className="flex items-center border rounded-lg overflow-hidden focus-within:ring-3 focus-within:ring-ring/50 focus-within:border-ring">
-              <span className="px-3 text-xs text-muted-foreground bg-stone-100 h-8 flex items-center border-r border-stone-200 whitespace-nowrap">
-                eventos.app/
-              </span>
-              <Input
-                value={slug}
-                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                className="border-0 rounded-none focus-visible:ring-0 shadow-none h-8"
-                disabled={!isAdmin}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">{t("slugHint")}</p>
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>{t("contactEmail")}</Label>
@@ -304,7 +286,6 @@ export function OrganizationTab({ userRole }: { userRole: string }) {
           <Button variant="outline" onClick={() => {
             if (org) {
               setName(org.name);
-              setSlug(org.slug);
               setContactEmail(org.contactEmail || "");
               setWebsite(org.website || "");
               setBrandColor(org.brandColor || "#eab308");
