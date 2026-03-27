@@ -1,6 +1,6 @@
 #!/bin/bash
-# Pre-push hook: run unit tests + type check before pushing
-# Catches SQLite compat issues, type errors, and regressions
+# Pre-push hook: run type check + unit + integration tests before pushing
+# Catches SQLite compat, type errors, RBAC regressions, and agent bugs
 # Skip with: git push --no-verify
 
 RED='\033[0;31m'
@@ -10,22 +10,28 @@ NC='\033[0m'
 
 echo -e "${YELLOW}Running pre-push checks...${NC}"
 
-# 1. Type check (catches cross-dialect issues)
-echo -e "${YELLOW}[1/2] Type checking...${NC}"
+# 1. Type check
+echo -e "${YELLOW}[1/3] Type checking...${NC}"
 npx tsc --noEmit 2>&1
-TSC_EXIT=$?
-if [ "$TSC_EXIT" -ne 0 ]; then
+if [ $? -ne 0 ]; then
   echo -e "${RED}PUSH BLOCKED: TypeScript errors found.${NC}"
   exit 1
 fi
 echo -e "${GREEN}Type check passed.${NC}"
 
 # 2. Unit tests
-echo -e "${YELLOW}[2/2] Unit tests...${NC}"
+echo -e "${YELLOW}[2/3] Unit tests...${NC}"
 npx vitest run tests/unit 2>&1
-VITEST_EXIT=$?
-if [ "$VITEST_EXIT" -ne 0 ]; then
+if [ $? -ne 0 ]; then
   echo -e "${RED}PUSH BLOCKED: Unit tests failed.${NC}"
+  exit 1
+fi
+
+# 3. Integration tests on SQLite (same as CI — catches cross-dialect issues)
+echo -e "${YELLOW}[3/3] Integration tests (SQLite)...${NC}"
+DB_DIALECT=sqlite npx vitest run tests/integration 2>&1
+if [ $? -ne 0 ]; then
+  echo -e "${RED}PUSH BLOCKED: Integration tests failed.${NC}"
   exit 1
 fi
 

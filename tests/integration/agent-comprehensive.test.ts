@@ -748,7 +748,7 @@ describe("Agent RBAC enforcement", () => {
       const result = await dispatch(
         intent({
           intent: "manage", action: "delete", entityType: entityType as any,
-          searchValue: "AgentTest OrgDel", confirmation: true,
+          searchValue: "AgentTest OrgDel",
         }),
         ctx("organizer", organizerUserId),
         "Delete " + entityType + " AgentTest OrgDel"
