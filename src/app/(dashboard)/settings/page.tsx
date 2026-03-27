@@ -9,8 +9,10 @@ import { cn } from "@/lib/utils";
 import { UserPlus, Trash2, Loader2, Plus, GripVertical } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirm } from "@/components/confirm-dialog";
+import { OrganizationTab } from "./organization-tab";
+import { useTranslations } from "next-intl";
 
-type Tab = "event" | "team" | "checklists" | "ai" | "telegram";
+type Tab = "organization" | "event" | "team" | "checklists" | "ai" | "telegram";
 type User = {
   id: string;
   name: string | null;
@@ -250,7 +252,16 @@ function ChecklistTemplatesTab() {
 }
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<Tab>("team");
+  const [tab, setTab] = useState<Tab>("organization");
+  const t = useTranslations("OrgSettings");
+  const [userRole, setUserRole] = useState("viewer");
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => { if (d.data?.role) setUserRole(d.data.role); })
+      .catch(() => {});
+  }, []);
   const [members, setMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -339,6 +350,7 @@ export default function SettingsPage() {
       .slice(0, 2);
 
   const tabs: { key: Tab; label: string }[] = [
+    { key: "organization", label: t("tab") },
     { key: "event", label: "Event" },
     { key: "team", label: "Team" },
     { key: "checklists", label: "Checklists" },
@@ -374,6 +386,9 @@ export default function SettingsPage() {
           </button>
         ))}
       </div>
+
+      {/* Organization tab */}
+      {tab === "organization" && <OrganizationTab userRole={userRole} />}
 
       {/* Event tab */}
       {tab === "event" && (

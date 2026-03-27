@@ -6,6 +6,27 @@ import { Sidebar } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat-panel";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 
+function DynamicFavicon() {
+  useEffect(() => {
+    fetch("/api/organizations")
+      .then((r) => r.json())
+      .then((d) => {
+        const logoUrl = d.data?.logoUrl;
+        if (logoUrl) {
+          let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement | null;
+          if (!link) {
+            link = document.createElement("link");
+            link.rel = "icon";
+            document.head.appendChild(link);
+          }
+          link.href = logoUrl;
+        }
+      })
+      .catch(() => {});
+  }, []);
+  return null;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -64,6 +85,7 @@ export default function DashboardLayout({
 
   return (
     <ConfirmProvider>
+    <DynamicFavicon />
     <div className="min-h-screen bg-background">
       <Sidebar onToggleChat={toggleChat} chatOpen={chatOpen} />
       <main
