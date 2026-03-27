@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,33 +10,44 @@ import { ArrowRight } from "lucide-react";
 type Source = "all" | "intake" | "outreach" | "sponsored";
 type Stage = "all" | "lead" | "engaged" | "confirmed" | "declined";
 
-const sourceLabels: Record<Source, string> = {
-  all: "All",
-  intake: "Intake",
-  outreach: "Outreach",
-  sponsored: "Sponsored",
+const sourceKeys: Record<Source, string> = {
+  all: "sourceAll",
+  intake: "sourceIntake",
+  outreach: "sourceOutreach",
+  sponsored: "sourceSponsored",
 };
 
-const stageConfig: Record<Exclude<Stage, "all">, { label: string; color: string }> = {
-  lead: { label: "Lead", color: "bg-stone-100 text-stone-600" },
-  engaged: { label: "Engaged", color: "bg-sky-50 text-sky-700" },
-  confirmed: { label: "Confirmed", color: "bg-emerald-50 text-emerald-700" },
-  declined: { label: "Declined", color: "bg-red-50 text-red-600" },
+const stageColors: Record<Exclude<Stage, "all">, string> = {
+  lead: "bg-stone-100 text-stone-600",
+  engaged: "bg-sky-50 text-sky-700",
+  confirmed: "bg-emerald-50 text-emerald-700",
+  declined: "bg-red-50 text-red-600",
+};
+
+const stageKeys: Record<Exclude<Stage, "all">, string> = {
+  lead: "stageLead",
+  engaged: "stageEngaged",
+  confirmed: "stageConfirmed",
+  declined: "stageDeclined",
 };
 
 export function StageBadge({ stage }: { stage: string }) {
-  const config = stageConfig[stage as Exclude<Stage, "all">];
-  if (!config) return <Badge variant="secondary">{stage}</Badge>;
-  return <Badge className={config.color}>{config.label}</Badge>;
+  const t = useTranslations("Pipeline");
+  const color = stageColors[stage as Exclude<Stage, "all">];
+  const key = stageKeys[stage as Exclude<Stage, "all">];
+  if (!color || !key) return <Badge variant="secondary">{stage}</Badge>;
+  return <Badge className={color}>{t(key)}</Badge>;
 }
 
 export function SourceBadge({ source }: { source: string }) {
+  const t = useTranslations("Pipeline");
   const colors: Record<string, string> = {
     intake: "bg-violet-50 text-violet-700",
     outreach: "bg-sky-50 text-sky-700",
     sponsored: "bg-yellow-50 text-yellow-700",
   };
-  return <Badge className={colors[source] || "bg-stone-100 text-stone-600"}>{source}</Badge>;
+  const key = sourceKeys[source as Source];
+  return <Badge className={colors[source] || "bg-stone-100 text-stone-600"}>{key ? t(key) : source}</Badge>;
 }
 
 export function PipelineFilters({
@@ -64,6 +76,8 @@ export function PipelineFilters({
     declined: items.filter((i) => i.stage === "declined").length,
   };
 
+  const t = useTranslations("Pipeline");
+
   return (
     <div className="space-y-3 mb-4">
       {/* Source tabs */}
@@ -74,9 +88,8 @@ export function PipelineFilters({
             variant={activeSource === src ? "default" : "outline"}
             size="sm"
             onClick={() => onSourceChange(src)}
-            className="capitalize"
           >
-            {sourceLabels[src]}
+            {t(sourceKeys[src])}
             {src !== "all" && (
               <span className="ml-1 tabular-nums">
                 ({items.filter((i) => i.source === src).length})
@@ -133,7 +146,7 @@ export function PipelineFilters({
                 !mounted ? "text-stone-400" :
                 isActive ? countColors : isAll && count > 0 ? "text-stone-500" : "text-stone-300"
               )}>
-                {stage}
+                {t(stageKeys[stage])}
               </p>
               {i < 3 && (
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 text-stone-200">
