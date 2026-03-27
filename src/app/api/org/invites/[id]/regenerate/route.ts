@@ -4,7 +4,7 @@ import { orgInvites } from "@/db/schema";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { eq, and } from "drizzle-orm";
 import { hash } from "@/lib/password";
-import crypto from "crypto";
+import { randomInt } from "crypto";
 
 // ─── POST /api/org/invites/[id]/regenerate — New code ───
 
@@ -35,7 +35,7 @@ export async function POST(
   }
 
   // Generate new 8-digit code
-  const code = String(crypto.randomInt(10000000, 99999999));
+  const code = String(randomInt(10000000, 99999999));
   const codeHash = await hash(code);
 
   await db

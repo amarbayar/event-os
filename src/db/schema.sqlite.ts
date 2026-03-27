@@ -955,8 +955,7 @@ export const orgInvites = sqliteTable(
     revokedAt: ts("revoked_at"),
     attemptCount: integer("attempt_count").default(0).notNull(),
     invitedByUserId: uuidCol("invited_by_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "set null" }),
     acceptedByUserId: uuidCol("accepted_by_user_id")
       .references(() => users.id, { onDelete: "set null" }),
     createdAt: tsNow("created_at"),

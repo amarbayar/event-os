@@ -4,7 +4,7 @@ import { users, userOrganizations } from "@/db/schema";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { eq, and } from "drizzle-orm";
 import { hash } from "@/lib/password";
-import crypto from "crypto";
+import { randomBytes } from "crypto";
 
 // ─── POST /api/users/[userId]/reset-password ────────────
 // Admin generates a temp password for a user in their org.
@@ -46,7 +46,7 @@ export async function POST(
   }
 
   // Generate temp password
-  const tempPassword = crypto.randomBytes(8).toString("base64url");
+  const tempPassword = randomBytes(8).toString("base64url");
   const passwordHash = await hash(tempPassword);
 
   await db

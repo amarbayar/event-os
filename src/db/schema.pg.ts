@@ -1018,8 +1018,7 @@ export const orgInvites = pgTable(
     revokedAt: timestamp("revoked_at"),
     attemptCount: integer("attempt_count").default(0).notNull(),
     invitedByUserId: uuid("invited_by_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "set null" }),
     acceptedByUserId: uuid("accepted_by_user_id")
       .references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),

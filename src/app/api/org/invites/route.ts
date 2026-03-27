@@ -4,7 +4,7 @@ import { orgInvites, userOrganizations, users } from "@/db/schema";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { hash } from "@/lib/password";
-import crypto from "crypto";
+import { randomInt } from "crypto";
 
 const VALID_INVITE_ROLES = ["admin", "organizer", "coordinator", "viewer"];
 
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Generate 8-digit code
-  const code = String(crypto.randomInt(10000000, 99999999));
+  const code = String(randomInt(10000000, 99999999));
   const codeHash = await hash(code);
 
   const [invite] = await db
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       role,
       codeHash,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
-      invitedByUserId: ctx.user.id,
+      invitedByUserId: ctx.user.id === "service" ? null : ctx.user.id,
     })
     .returning();
 
