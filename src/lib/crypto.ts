@@ -19,9 +19,12 @@ function getEncryptionKey(): Buffer {
     return Buffer.from(envKey, "hex");
   }
   // Derive from AUTH_SECRET
+  if (!process.env.AUTH_SECRET) {
+    throw new Error("AUTH_SECRET is required for encryption. Set it in your .env file.");
+  }
   return crypto
     .createHash("sha256")
-    .update(process.env.AUTH_SECRET || "fallback")
+    .update(process.env.AUTH_SECRET)
     .digest();
 }
 

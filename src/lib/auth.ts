@@ -93,6 +93,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   }),
   session: {
     strategy: "jwt", // CRITICAL: must be explicit — DrizzleAdapter defaults to "database"
+    maxAge: 8 * 60 * 60, // 8 hours (not the default 30 days)
   },
   callbacks: {
     async signIn({ user, account }) {

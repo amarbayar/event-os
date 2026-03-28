@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { checklistItems, users, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { notify } from "@/lib/notify";
 
@@ -69,7 +69,7 @@ export async function PATCH(
       version: sql`${checklistItems.version} + 1`,
       updatedAt: new Date(),
     })
-    .where(eq(checklistItems.id, id))
+    .where(and(eq(checklistItems.id, id), eq(checklistItems.organizationId, ctx.orgId)))
     .returning();
 
   // Notification trigger: when status changes to "submitted", notify the entity's assignee

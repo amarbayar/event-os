@@ -89,6 +89,9 @@ async function handleRequest(
     mode?: "classify" | "extract";
   };
 
+  // Sanitize context to prevent injection via conversation history
+  const sanitizedContext = context ? sanitizeInput(context).sanitized : undefined;
+
   if (!input) {
     return NextResponse.json({ error: "input is required" }, { status: 400 });
   }
@@ -150,11 +153,11 @@ async function handleRequest(
 
     if (useClassify) {
       // Smart agent: classify intent → dispatch
-      const intent = await provider.classify(sanitized.sanitized, context);
+      const intent = await provider.classify(sanitized.sanitized, sanitizedContext);
 
       // If the classifier says "extract", fall through to extraction
       if (intent.intent === "extract") {
-        return handleExtract(provider, input, inputType || "text", context, resolvedOrgId, resolvedEditionId);
+        return handleExtract(provider, input, inputType || "text", sanitizedContext, resolvedOrgId, resolvedEditionId);
       }
 
       // Dispatch the intent
@@ -185,7 +188,7 @@ async function handleRequest(
     }
 
     // Bulk extraction mode (CSV, file, or explicit mode=extract)
-    return handleExtract(provider, input, inputType || "text", context, resolvedOrgId, resolvedEditionId);
+    return handleExtract(provider, input, inputType || "text", sanitizedContext, resolvedOrgId, resolvedEditionId);
 
   } catch (error) {
     const message = error instanceof Error ? error.message : "Agent processing failed";
