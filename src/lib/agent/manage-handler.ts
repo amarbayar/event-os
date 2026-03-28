@@ -289,6 +289,9 @@ async function handleCreate(
       values[resolved] = value;
     } else if (userFields.includes(key) && value) {
       values[key] = value;
+    } else if (key === "name" && nameField !== "name" && value) {
+      // Map generic "name" to the entity's actual name field (e.g. companyName, title)
+      values[nameField] = value;
     }
   }
 
