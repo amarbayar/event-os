@@ -24,9 +24,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow API routes with service token
+  // Allow API routes with Bearer token — downstream requirePermission() validates the actual token.
+  // Only allow Bearer on known service token routes to limit the bypass surface.
   if (pathname.startsWith("/api/") && request.headers.get("authorization")?.startsWith("Bearer ")) {
-    return NextResponse.next();
+    // Service token routes get through; all others must have a session too
+    const serviceRoutes = ["/api/speakers", "/api/sessions", "/api/check-in", "/api/event-queue", "/api/org/invites", "/api/users", "/api/agent"];
+    if (serviceRoutes.some((r) => pathname.startsWith(r))) {
+      return NextResponse.next();
+    }
+    // For non-service routes, fall through to session check below
   }
 
   // Check for session token (NextAuth stores it as a cookie)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiContext } from "@/lib/api-utils";
+import { requirePermission, isRbacError } from "@/lib/rbac";
 import { detectConflicts } from "@/lib/conflicts";
 
 export async function GET(
@@ -7,8 +7,8 @@ export async function GET(
   { params }: { params: Promise<{ editionId: string }> }
 ) {
   const { editionId } = await params;
-  const ctx = await getApiContext(req);
-  if (ctx instanceof NextResponse) return ctx;
+  const ctx = await requirePermission(req, "session", "read");
+  if (isRbacError(ctx)) return ctx;
 
   const conflicts = await detectConflicts(editionId);
 

@@ -157,7 +157,7 @@ export function validateSql(query: string): { valid: boolean; error?: string } {
   }
 
   // Check table references against allowlist
-  // Extract table names from FROM and JOIN clauses
+  // Extract table names from FROM, JOIN, and subqueries
   const tablePattern = /\b(?:FROM|JOIN)\s+(\w+)/gi;
   let match;
   while ((match = tablePattern.exec(trimmed)) !== null) {
@@ -168,6 +168,18 @@ export function validateSql(query: string): { valid: boolean; error?: string } {
     if (!ALLOWED_TABLES.has(tableName) && tableName !== "lateral" && tableName !== "unnest") {
       return { valid: false, error: `Unknown table '${tableName}'.` };
     }
+  }
+
+  // Block subqueries — these can reference tables outside the FROM/JOIN allowlist check
+  // Nested SELECTs in column expressions can exfiltrate data from blocked tables
+  const subqueryCount = (upper.match(/\bSELECT\b/g) || []).length;
+  if (subqueryCount > 1) {
+    return { valid: false, error: "Subqueries are not allowed. Use a single SELECT statement." };
+  }
+
+  // Block information_schema and pg_catalog access (system table exfiltration)
+  if (/\b(?:information_schema|pg_catalog|pg_tables|pg_columns)\b/i.test(trimmed)) {
+    return { valid: false, error: "Access to system catalogs is not allowed." };
   }
 
   // Must contain org scoping — reject queries missing organization_id filter
