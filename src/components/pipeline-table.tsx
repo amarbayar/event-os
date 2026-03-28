@@ -124,7 +124,7 @@ function StageDropdown({
           stageColors[stage] || stageColors.lead
         }`}
       >
-        {t(stageKeys[stage] || "stageLead")}
+        {t((stageKeys as Record<string, string>)[stage] || "stageLead")}
       </button>
       {open && (
         <>
@@ -354,7 +354,7 @@ export function PipelineTable<
               ))}
               <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                 <Badge className={`text-[10px] ${sourceColors[item.source] || sourceColors.intake}`}>
-                  {t(sourceKeys[item.source] || "sourceIntake")}
+                  {t((sourceKeys as Record<string, string>)[item.source] || "sourceIntake")}
                 </Badge>
               </td>
               <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>

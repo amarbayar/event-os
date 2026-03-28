@@ -443,7 +443,7 @@ export function VenueClient({ initialVenues }: { initialVenues: Venue[] }) {
                 </div>
                 <p className="text-sm text-emerald-700 mt-0.5">{finalized.address}</p>
                 <p className="text-sm text-emerald-700">{t("capacity")}: {finalized.capacity} &middot; {finalized.priceQuote}</p>
-                <p className="text-xs text-emerald-600 mt-1">{t("contact", { name: finalized.contactName })} &middot; {t("managedBy", { name: finalized.assignedTo })}</p>
+                <p className="text-xs text-emerald-600 mt-1">{t("contact", { name: finalized.contactName || "" })} &middot; {t("managedBy", { name: finalized.assignedTo || "" })}</p>
               </div>
             </div>
           </CardContent>
