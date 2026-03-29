@@ -61,6 +61,27 @@ export class ZAIProvider implements LLMProvider {
     }
   }
 
+  async generate(prompt: string): Promise<string> {
+    const response = await fetch("https://api.z.ai/api/paas/v4/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.1,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Z.AI API error (${response.status}): ${error}`);
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "";
+  }
+
   async classify(input: string, context?: string): Promise<AgentIntent> {
     const text = await this.call(CLASSIFY_PROMPT, buildClassifyPrompt(input, context));
 

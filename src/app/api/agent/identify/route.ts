@@ -7,7 +7,7 @@ import { validateServiceToken } from "@/lib/service-token";
 // POST /api/agent/identify
 //
 // Resolves a platform user (Telegram, Discord, etc.) to their Event OS
-// identity + role + team memberships. Called by OpenClaw before any operation.
+// identity + role + team memberships. Called by bot relay before any operation.
 //
 // Requires service token auth + x-organization-id header.
 

@@ -487,7 +487,7 @@ export async function handleDelete(
   }
 
   // When confirmation flag is set, execute directly.
-  // The two-step prompt doesn't work via API/Telegram (OpenClaw LLM can't relay confirmations).
+  // The two-step prompt doesn't work via API/Telegram (bot relay can't relay confirmations).
   if (intent.confirmation) {
     const [deleted] = await db.delete(table).where(
       and(eq(table.id, entity.id), eq(table.organizationId, ctx.orgId))

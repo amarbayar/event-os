@@ -11,7 +11,7 @@ export type ApiContext = {
 export async function getApiContext(
   req: NextRequest
 ): Promise<ApiContext | NextResponse> {
-  // Check service token first (for OpenClaw/Telegram agent)
+  // Check service token first (for bot relay / external agents)
   if (validateServiceToken(req)) {
     const orgId = req.headers.get("x-organization-id");
     if (!orgId) {

@@ -15,8 +15,18 @@ let users: Record<string, { id: string; role: string }>;
 let teams: Record<string, string>; // teamName → teamId
 
 beforeAll(async () => {
-  const org = await testDb.query.organizations.findFirst();
-  if (!org) throw new Error("No organization found — run seed first");
+  // Use the org with the most members (the seeded org, not manually created ones)
+  const orgs = await testDb.query.organizations.findMany();
+  if (orgs.length === 0) throw new Error("No organization found — run seed first");
+  const memberCounts = await Promise.all(
+    orgs.map(async (o) => {
+      const members = await testDb.query.userOrganizations.findMany({
+        where: eq(schema.userOrganizations.organizationId, o.id),
+      });
+      return { org: o, count: members.length };
+    })
+  );
+  const org = memberCounts.sort((a, b) => b.count - a.count)[0].org;
   orgId = org.id;
 
   // Load all users via user_organizations

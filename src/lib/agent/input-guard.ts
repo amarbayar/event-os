@@ -4,13 +4,14 @@
 //
 //  Layers:
 //  1. @mention gating — only classify when explicitly addressed
-//  2. Input sanitization — strip known injection patterns
-//  3. Scope enforcement — reject off-topic requests at output
+//  2. Input sanitization — block technical injection tokens
+//  3. Off-topic / schema probing / security — handled by LLM prompt
+//     (works across ALL languages, see CLASSIFY_PROMPT security section)
 //
-//  References:
-//  - OWASP LLM Prompt Injection Prevention Cheat Sheet
-//  - Microsoft indirect prompt injection defense
-//  - EU AI Act compliance (Aug 2026)
+//  Design principle: regex only catches language-agnostic technical
+//  patterns (token delimiters, code injection). All semantic filtering
+//  (off-topic, prompt override, schema probing) is done by the LLM
+//  because regex can't generalize across languages.
 
 // ─── Layer 1: @mention gating ─────────────────────────
 //
@@ -18,10 +19,6 @@
 //  should only respond when explicitly mentioned with @.
 //  In the web UI chat panel, every message is directed at
 //  the agent, so gating is skipped.
-//
-//  Returns:
-//  - { shouldProcess: true, cleanedInput } — process this message
-//  - { shouldProcess: false } — ignore (not addressed to agent)
 
 export type GateResult =
   | { shouldProcess: true; cleanedInput: string }
@@ -29,7 +26,6 @@ export type GateResult =
 
 const AGENT_MENTIONS = [
   "@agent", "@bot", "@assistant", "@eventbot", "@eventos",
-  "@openclaw", "@claw",
 ];
 
 export function gateMention(
@@ -45,97 +41,63 @@ export function gateMention(
   const lower = input.toLowerCase().trim();
   for (const mention of AGENT_MENTIONS) {
     if (lower.startsWith(mention)) {
-      // Strip the mention prefix and process
       const cleaned = input.slice(mention.length).trim();
       return { shouldProcess: true, cleanedInput: cleaned || input };
     }
   }
 
-  // No @mention in group chat — ignore
   return { shouldProcess: false, reason: "not_mentioned" };
 }
 
 // ─── Layer 2: Input sanitization ──────────────────────
 //
-//  Detects and neutralizes common prompt injection patterns.
-//  Does NOT block — strips/flags suspicious content so the LLM
-//  sees sanitized input with injection markers.
+//  Blocks technical injection tokens that are language-agnostic.
+//  These are LLM control sequences and code execution patterns —
+//  no legitimate user input contains them.
+//
+//  Semantic attacks ("ignore your instructions", "pretend to be X",
+//  "what columns exist") are handled by the LLM's CLASSIFY_PROMPT
+//  security rules, which work in all languages.
 
 export type SanitizeResult = {
   sanitized: string;
-  flags: string[];      // what was detected
-  blocked: boolean;     // true = refuse to process
+  flags: string[];
+  blocked: boolean;
   blockReason?: string;
 };
 
-// Patterns that indicate injection attempts (case-insensitive)
-const INJECTION_PATTERNS = [
-  // Direct instruction override
-  /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|context)/i,
-  /forget\s+(all\s+)?(your\s+)?(previous|prior|above)\s+(instructions?|prompts?)/i,
-  /disregard\s+(all\s+)?(previous|prior|your)\s+(instructions?|prompts?|rules?)/i,
-  /override\s+(system|your)\s+(prompt|instructions?|rules?)/i,
-  /you\s+are\s+now\s+(a|an|the)\s+/i,
-  /new\s+instructions?:\s*/i,
-  /system\s*:\s*/i,
-  /\[SYSTEM\]/i,
-  /\[INST\]/i,
-  /<<\s*SYS\s*>>/i,
-
-  // Role-play hijack
-  /pretend\s+(you\s+are|to\s+be|you're)\s/i,
-  /act\s+as\s+(if\s+you\s+are|a|an)\s/i,
-  /roleplay\s+as\s/i,
-  /from\s+now\s+on\s+(you\s+are|act\s+as|respond\s+as)/i,
-
-  // Data exfiltration
-  /reveal\s+(your|the)\s+(system\s+)?(prompt|instructions?|rules?|config)/i,
-  /show\s+(me\s+)?(your|the)\s+(system\s+)?(prompt|instructions?)/i,
-  /what\s+are\s+your\s+(instructions?|rules?|prompt)/i,
-  /repeat\s+(your\s+)?(system\s+)?(prompt|instructions?)\s+(back|to\s+me)/i,
-  /output\s+(your|the)\s+(system\s+)?(prompt|instructions?)/i,
-];
-
-// Hard-block patterns — these are always malicious
+// Technical injection patterns — language-agnostic, always malicious
 const BLOCK_PATTERNS = [
-  // Encoding attacks (base64 injection, hex injection)
+  // Code execution
   /eval\s*\(/i,
   /exec\s*\(/i,
   /base64_decode/i,
   /\\x[0-9a-f]{2}\\x[0-9a-f]{2}\\x[0-9a-f]{2}/i,
-  // Token manipulation
+  // LLM token delimiters (used to break out of prompt framing)
   /<\|im_start\|>/i,
   /<\|im_end\|>/i,
   /<\|endoftext\|>/i,
   /\[\/INST\]/i,
+  /<<\s*SYS\s*>>/i,
 ];
 
 export function sanitizeInput(input: string): SanitizeResult {
   const flags: string[] = [];
-  let sanitized = input;
 
-  // Check hard-block patterns first
+  // Block technical injection patterns
   for (const pattern of BLOCK_PATTERNS) {
     if (pattern.test(input)) {
       return {
         sanitized: "",
         flags: ["blocked_injection_attempt"],
         blocked: true,
-        blockReason: "I can only help with event management tasks. Please rephrase your request.",
+        blockReason: "I can only help with event management tasks.",
       };
     }
   }
 
-  // Check injection patterns — flag but don't block
-  for (const pattern of INJECTION_PATTERNS) {
-    if (pattern.test(input)) {
-      flags.push("injection_pattern_detected");
-      // Strip the injection attempt from the input
-      sanitized = sanitized.replace(pattern, "[filtered]");
-    }
-  }
-
   // Length guard — extremely long inputs are suspicious
+  let sanitized = input;
   if (input.length > 5000) {
     flags.push("excessive_length");
     sanitized = sanitized.slice(0, 5000);
@@ -144,29 +106,15 @@ export function sanitizeInput(input: string): SanitizeResult {
   return { sanitized, flags, blocked: false };
 }
 
-// ─── Layer 3: Output scope enforcement ────────────────
+// ─── Layer 3: Off-topic detection ─────────────────────
 //
-//  After the LLM classifies, verify the intent is within
-//  the agent's domain. Off-topic chitchat is fine (handled
-//  gracefully), but requests to do non-event things are rejected.
+//  Handled entirely by the LLM via CLASSIFY_PROMPT security rules.
+//  The LLM understands intent in all languages and responds with
+//  intent="chitchat" + polite refusal for off-topic requests.
+//
+//  This function is kept as a no-op for backward compatibility
+//  with callers that still invoke it.
 
-const OFF_TOPIC_INDICATORS = [
-  /write\s+(me\s+)?(a|an)\s+(poem|story|essay|song|code|script)/i,
-  /translate\s+.{20,}\s+(to|into)\s/i,
-  /generate\s+(an?\s+)?(image|picture|photo|video)/i,
-  /what\s+is\s+the\s+meaning\s+of\s+life/i,
-  /help\s+me\s+(hack|break\s+into|crack)/i,
-  /how\s+to\s+(make\s+a\s+bomb|build\s+a\s+weapon)/i,
-];
-
-export function isOffTopic(input: string): { offTopic: boolean; message?: string } {
-  for (const pattern of OFF_TOPIC_INDICATORS) {
-    if (pattern.test(input)) {
-      return {
-        offTopic: true,
-        message: "I'm Event OS — I help manage events (speakers, sponsors, venues, tasks, etc.). I can't help with that, but feel free to ask about your event!",
-      };
-    }
-  }
+export function isOffTopic(_input: string): { offTopic: boolean; message?: string } {
   return { offTopic: false };
 }

@@ -835,7 +835,7 @@ export const userOrganizations = sqliteTable(
   ]
 );
 
-// ─── User ↔ Platform Links (OpenClaw identity mapping) ──
+// ─── User ↔ Platform Links (bot identity mapping) ──
 
 export const userPlatformLinks = sqliteTable(
   "user_platform_links",

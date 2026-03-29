@@ -84,4 +84,6 @@ export interface LLMProvider {
     input: string,
     context?: string
   ): Promise<AgentIntent>;
+  /** Raw text generation — no entity extraction wrapping. Used for SQL generation etc. */
+  generate(prompt: string): Promise<string>;
 }

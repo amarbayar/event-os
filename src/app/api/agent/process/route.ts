@@ -30,9 +30,9 @@ export async function POST(req: NextRequest) {
   let role: string;
   let userName: string | null;
 
-  // Auth: service token (OpenClaw) or session (web UI)
+  // Auth: service token (bot relay) or session (web UI)
   if (validateServiceToken(req)) {
-    // Service token path — OpenClaw passes the REAL user's identity
+    // Service token path — bot relay passes the user's identity
     orgId = req.headers.get("x-organization-id") || "";
     if (!orgId) {
       return NextResponse.json({ error: "x-organization-id header required" }, { status: 400 });
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Rate limited. Please wait a moment." }, { status: 429 });
     }
 
-    // Service token calls come from OpenClaw which already handled user routing.
+    // Service token calls come from bot relay which already handled user routing.
     // Override source to "api" so @mention gating is skipped.
     body.source = "api";
 

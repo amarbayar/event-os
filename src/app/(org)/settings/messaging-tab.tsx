@@ -297,10 +297,9 @@ function TelegramSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) =>
   const [groups, setGroups] = useState<{ chatId: string; title: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [config, setConfig] = useState<{ botUsername?: string; groupChatId?: string; groupTitle?: string; enabled?: boolean } | null>(null);
-  const [openclaw, setOpenclaw] = useState<{ installed?: boolean; gatewayRunning?: boolean; telegramConnected?: boolean } | null>(null);
+  const [config, setConfig] = useState<{ botUsername?: string; groupChatId?: string; groupTitle?: string; enabled?: boolean; botRunning?: boolean } | null>(null);
 
-  // Load existing config + OpenClaw status
+  // Load existing config
   useEffect(() => {
     fetch("/api/messaging/telegram").then(async (res) => {
       const json = await res.json();
@@ -310,7 +309,6 @@ function TelegramSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) =>
       } else {
         setStep("idle");
       }
-      if (json.openclaw) setOpenclaw(json.openclaw);
     }).catch(() => setStep("idle"));
   }, []);
 
@@ -493,8 +491,7 @@ function DiscordSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [botInfo, setBotInfo] = useState<{ username: string; id: string } | null>(null);
-  const [config, setConfig] = useState<{ botUsername?: string; serverId?: string; serverName?: string; enabled?: boolean } | null>(null);
-  const [openclaw, setOpenclaw] = useState<{ installed?: boolean; gatewayRunning?: boolean } | null>(null);
+  const [config, setConfig] = useState<{ botUsername?: string; serverId?: string; serverName?: string; enabled?: boolean; botRunning?: boolean } | null>(null);
 
   useEffect(() => {
     fetch("/api/messaging/discord").then(async (res) => {
@@ -505,7 +502,6 @@ function DiscordSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => 
       } else {
         setStep("idle");
       }
-      if (json.openclaw) setOpenclaw(json.openclaw);
     }).catch(() => setStep("idle"));
   }, []);
 
@@ -577,9 +573,27 @@ function DiscordSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) => 
             {error && <p className="text-xs text-destructive">{error}</p>}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground pl-7">
-            Bot: <span className="font-medium">{botInfo?.username || config?.botUsername}</span>
-          </p>
+          <div className="flex items-center gap-2 pl-7">
+            <p className="text-xs text-muted-foreground">
+              Bot: <span className="font-medium">{botInfo?.username || config?.botUsername}</span>
+            </p>
+            <button
+              className="text-xs text-muted-foreground underline hover:text-foreground"
+              onClick={async () => {
+                await fetch("/api/messaging/discord", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "reset" }),
+                });
+                setConfig(null);
+                setBotInfo(null);
+                setToken("");
+                setStep("idle");
+              }}
+            >
+              Change
+            </button>
+          </div>
         )}
       </div>
 

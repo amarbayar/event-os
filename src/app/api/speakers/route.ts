@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     })
     .returning();
 
-  // Queue event for OpenClaw agent
+  // Queue event for bot notifications
   await db.insert(eventQueue).values({
     organizationId: ctx.orgId,
     eventType: "speaker_application_submitted",

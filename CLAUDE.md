@@ -183,10 +183,17 @@ When building any capability, implement the full lifecycle:
 
 ## Testing
 - Run: `npx vitest run`
+- Playwright: `npx playwright test`
 - Test files: `tests/` directory
 - Test suites: RBAC, checklist, security (run `npx vitest run` to see full count)
 - Write regression tests for every security fix
 - Write tests for every new CRUD operation
+
+### Zero failing tests policy
+- **NEVER ignore failing tests.** "Pre-existing" is not an excuse — if a test fails, fix it before moving on.
+- Every test run must end with **0 failures**. If you find failures, either fix the code to make the test pass, or fix the test if it's wrong/outdated.
+- After any code change, run the full test suite (`npx vitest run` + `npx playwright test`) and resolve ALL failures.
+- Do not report test failures as "pre-existing" or "unrelated" — they are your responsibility to fix in the current session.
 
 ## Database
 - Never use raw SQL for schema changes — always edit `src/db/schema.ts` + run `npx drizzle-kit push`

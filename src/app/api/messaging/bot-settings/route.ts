@@ -53,14 +53,5 @@ export async function PATCH(req: NextRequest) {
 
   await db.update(organizations).set(updates).where(eq(organizations.id, ctx.orgId));
 
-  // Update OpenClaw SOUL.md with new personality
-  try {
-    const { updateBotPersonality } = await import("@/lib/openclaw");
-    updateBotPersonality(
-      body.language || updates.botLanguage,
-      body.mood || updates.botMood
-    );
-  } catch {} // non-critical if OpenClaw isn't installed
-
   return NextResponse.json({ data: { ...updates } });
 }

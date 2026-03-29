@@ -20,7 +20,7 @@ The agent understands English, Mongolian (Cyrillic), and transliterated Mongolia
 
 Supports **Google Gemini**, **z.ai (GLM)**, **xAI (Grok)**, **Ollama** (local), or add your own by implementing one interface. Admins pick their provider and enter their API key from the Settings UI — no `.env` editing required.
 
-The agent also runs on **Telegram and Discord** via [OpenClaw](https://openclaw.ai). @mention the bot in your team's group chat and it responds with the same intelligence and RBAC as the web agent.
+The agent also runs on **Telegram and Discord** via built-in bot relay. @mention the bot in your team's group chat and it responds with the same intelligence and RBAC as the web agent.
 
 ## What's in the box
 
@@ -43,7 +43,7 @@ The agent also runs on **Telegram and Discord** via [OpenClaw](https://openclaw.
 | **Stakeholder Portal** | Confirmed speakers/sponsors get a login to self-service their checklist items — upload photos, submit bios, confirm travel. Organizers see submissions and approve/reject. |
 | **RBAC & Team Management** | 6 roles (owner → admin → organizer → coordinator → viewer → stakeholder). Team-scoped permissions — teams own entity types. Confirmed entities protected from non-admin deletion. Same rules enforced in web UI and agent. |
 | **Notifications** | In-app notifications for assignments, stage changes, checklist submissions, comments. Bell icon with unread badge. Mark read, bulk delete. |
-| **Telegram & Discord Bot** | Connect your team's chat via OpenClaw. @mention the bot to query data, create records, manage your event. Thread-based replies, configurable bot personality (language + mood). |
+| **Telegram & Discord Bot** | Connect your team's chat from Settings. @mention the bot to query data, create records, manage your event. Configurable bot personality (language + mood). |
 | **AI Model Settings** | Pick your LLM provider (Gemini, z.ai, xAI, Ollama) and enter API key from the UI. Changes apply to both web chat and messaging bots. API keys encrypted at rest. |
 | **Localization** | English and Mongolian UI via next-intl. Locale switcher in sidebar. Agent responds in user's language. |
 | **Settings** | Tabbed: Event details, Team management (invite/roles), Checklist templates, AI Model, Messaging (Telegram/Discord connection + bot personality). |
@@ -62,7 +62,7 @@ The agent also runs on **Telegram and Discord** via [OpenClaw](https://openclaw.
 | Auth | NextAuth.js (v5) | Credentials + JWT + service token for API |
 | Passwords | bcrypt (12 rounds) | Proper key stretching. Legacy SHA-256 auto-detected for migration. |
 | Agent LLM | Gemini, z.ai (GLM), xAI (Grok), Ollama | Configurable from Settings UI. Abstracted — add providers with one interface |
-| Messaging | OpenClaw | Telegram + Discord bot integration with thread-based replies |
+| Messaging | Built-in bot relay | Telegram + Discord bot integration, in-process adapter lifecycle |
 | i18n | next-intl | English + Mongolian, cookie-based locale switching |
 | Icons | Lucide React | Consistent, tree-shakeable |
 
@@ -353,7 +353,11 @@ src/
       drivers/database.ts # PG (FOR UPDATE SKIP LOCKED) + SQLite driver
       worker.ts           # Poll loop, retry, timeout, graceful shutdown
       jobs.ts             # send-email, send-notification
-    openclaw.ts           # OpenClaw config bridge (Telegram/Discord setup, LLM config sync)
+    bots/                 # Multi-platform bot relay (Discord, Telegram)
+      relay.ts            # Shared core: identify → process → response
+      discord.ts          # Discord.js adapter
+      telegram.ts         # Telegram Bot API adapter (zero deps)
+      manager.ts          # In-process lifecycle manager (auto-start from DB)
     crypto.ts             # AES-256-GCM encryption for API keys at rest
     password.ts           # bcrypt hash + compare (legacy SHA-256 compat)
     contacts.ts           # Cross-org person identity
@@ -479,7 +483,7 @@ Never commit `.env.local`. The `.env.example` file has safe placeholders only.
 - [x] Agent intelligence — natural language CRUD, query, bulk import across all entity types
 - [x] Agent security — RBAC enforcement, prompt injection defense, bulk operation blocking, stage protection
 - [x] LLM-generated SQL — complex join/aggregation queries validated and sandboxed
-- [x] OpenClaw integration — Telegram + Discord bots with @mention gating, thread-based replies
+- [x] Telegram + Discord bots — built-in multi-platform relay with @mention gating, in-process lifecycle
 - [x] LLM settings UI — admins pick provider + model + API key from Settings (encrypted at rest)
 - [x] Bot personality — configurable language + mood from Settings
 - [x] Unified pipeline model (source/stage) across all entity types

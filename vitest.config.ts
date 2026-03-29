@@ -9,6 +9,9 @@ export default defineConfig({
     testTimeout: 60000,
     pool: "forks",
     exclude: ["tests/e2e-browser/**", "node_modules/**", ".claude/**"],
+    // LLM tests (agent-*, pipeline) call Gemini API — running them in parallel
+    // exhausts rate limits. fileParallelism: false runs all files sequentially.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

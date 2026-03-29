@@ -3,9 +3,9 @@ import { db } from "@/db";
 import { messagingChannels } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
-import { configureDiscord, restartGateway, stopGateway, getOpenClawStatus } from "@/lib/openclaw";
+import { botManager } from "@/lib/bots/manager";
 
-// GET — get Discord config + OpenClaw status
+// GET — get Discord config + bot status
 export async function GET(req: NextRequest) {
   const ctx = await requirePermission(req, "settings", "read");
   if (isRbacError(ctx)) return ctx;
@@ -17,22 +17,20 @@ export async function GET(req: NextRequest) {
     ),
   });
 
-  const openclawStatus = getOpenClawStatus();
-
   if (!channel) {
-    return NextResponse.json({ data: null, openclaw: openclawStatus });
+    return NextResponse.json({ data: null });
   }
 
   return NextResponse.json({
     data: {
       id: channel.id,
       botUsername: channel.botUsername,
-      groupChatId: channel.groupChatId, // server ID for Discord
-      groupTitle: channel.groupTitle,    // server name
+      groupChatId: channel.groupChatId,
+      groupTitle: channel.groupTitle,
       enabled: channel.enabled,
       connectedAt: channel.connectedAt,
+      botRunning: botManager.isRunning("discord", ctx.orgId),
     },
-    openclaw: openclawStatus,
   });
 }
 
@@ -55,7 +53,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid bot token. Check the Discord Developer Portal." }, { status: 400 });
       }
 
-      // Save to DB
       await db
         .insert(messagingChannels)
         .values({
@@ -78,7 +75,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Step 2: Connect — save server ID, configure OpenClaw, start gateway
+  // Step 2: Connect — save to DB + start bot adapter
   if (action === "connect" && body.serverId) {
     const channel = await db.query.messagingChannels.findFirst({
       where: and(
@@ -91,7 +88,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Set up bot token first." }, { status: 400 });
     }
 
-    // Try to get server name via Discord API
     let serverName = "Discord server";
     try {
       const res = await fetch(`https://discord.com/api/v10/guilds/${body.serverId}`, {
@@ -111,24 +107,21 @@ export async function POST(req: NextRequest) {
       })
       .where(eq(messagingChannels.id, channel.id));
 
-    // Configure OpenClaw
-    configureDiscord({
-      botToken: channel.botToken,
-      botUsername: channel.botUsername || "event-os",
-      serverId: body.serverId,
-      serviceToken: process.env.SERVICE_TOKEN || "",
-      orgId: ctx.orgId,
-      geminiApiKey: process.env.GEMINI_API_KEY,
-      eventOsUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
-    });
+    // Start the Discord bot adapter in-process
+    try {
+      await botManager.start("discord", ctx.orgId, channel.botToken);
+    } catch (err) {
+      console.error("[discord] Bot start failed:", err);
+    }
 
-    const gwResult = restartGateway();
-    return NextResponse.json({ data: { connected: true, serverName }, gateway: gwResult });
+    return NextResponse.json({
+      data: { connected: true, serverName, botRunning: botManager.isRunning("discord", ctx.orgId) },
+    });
   }
 
-  // Step 3: Disconnect
+  // Step 3: Disconnect — stop bot adapter + update DB
   if (action === "disconnect") {
-    stopGateway();
+    botManager.stop("discord", ctx.orgId);
 
     await db
       .update(messagingChannels)
@@ -139,6 +132,20 @@ export async function POST(req: NextRequest) {
       ));
 
     return NextResponse.json({ data: { connected: false } });
+  }
+
+  // Step 4: Reset — remove bot entirely so user can re-enter token
+  if (action === "reset") {
+    botManager.stop("discord", ctx.orgId);
+
+    await db
+      .delete(messagingChannels)
+      .where(and(
+        eq(messagingChannels.organizationId, ctx.orgId),
+        eq(messagingChannels.platform, "discord")
+      ));
+
+    return NextResponse.json({ data: null });
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });

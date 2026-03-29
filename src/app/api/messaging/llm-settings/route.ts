@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { organizations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
-import { encryptApiKey, decryptApiKey } from "@/lib/crypto";
+import { encryptApiKey } from "@/lib/crypto";
 
 const VALID_PROVIDERS = ["gemini", "zai", "xai", "ollama"];
 
@@ -97,19 +97,6 @@ export async function PATCH(req: NextRequest) {
   }
 
   await db.update(organizations).set(updates).where(eq(organizations.id, ctx.orgId));
-
-  // Update OpenClaw config if provider/model/key changed
-  try {
-    const { updateLlmConfig } = await import("@/lib/openclaw");
-    const org = await db.query.organizations.findFirst({
-      where: eq(organizations.id, ctx.orgId),
-      columns: { llmProvider: true, llmModel: true, llmApiKey: true },
-    });
-    if (org?.llmProvider && org?.llmApiKey) {
-      const plainKey = decryptApiKey(org.llmApiKey);
-      updateLlmConfig(org.llmProvider, org.llmModel || undefined, plainKey);
-    }
-  } catch {} // non-critical if OpenClaw isn't installed
 
   return NextResponse.json({
     data: {

@@ -921,7 +921,7 @@ export const messagingChannels = pgTable(
   ]
 );
 
-// ─── User ↔ Platform Links (OpenClaw identity mapping) ──
+// ─── User ↔ Platform Links (bot identity mapping) ──
 
 export const userPlatformLinks = pgTable(
   "user_platform_links",

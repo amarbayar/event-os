@@ -205,9 +205,7 @@ export async function executeSqlQuery(
     const provider = await getProvider(ctx.orgId);
 
     const prompt = buildSqlPrompt(question, ctx);
-    // Use the provider's extract method to get raw SQL from any LLM
-    const result = await provider.extract(prompt, "text");
-    let generatedSql = result.message?.trim() || "";
+    let generatedSql = (await provider.generate(prompt)).trim();
 
     // Clean up — remove markdown fences if present
     generatedSql = generatedSql.replace(/^```\w*\n?/m, "").replace(/\n?```$/m, "").trim();
@@ -292,15 +290,18 @@ export async function executeSqlQuery(
 
     // Multiple rows — pick the most relevant columns (not all)
     const formatted = cleanRows.map((row: Record<string, unknown>, i: number) => {
-      const name = row.name || row.title || row.company_name || row.contact_name || "";
-      // Show at most 3 key detail columns
-      const skip = new Set(["name", "title", "company_name", "contact_name"]);
+      const name = row.name || row.title || row.company_name || row.contact_name || row.assignee_name || "";
+      const nameKeys = new Set(["name", "title", "company_name", "contact_name", "assignee_name"]);
       const details = Object.entries(row)
-        .filter(([k, v]) => !skip.has(k) && v !== null && v !== "")
+        .filter(([k, v]) => !nameKeys.has(k) && v !== null && v !== "")
         .slice(0, 3)
         .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
         .join(" | ");
-      return `${i + 1}. **${name}**${details ? ` — ${details}` : ""}`;
+      // If we have a name, bold it. Otherwise just show details.
+      if (name) {
+        return `${i + 1}. **${name}**${details ? ` — ${details}` : ""}`;
+      }
+      return `${i + 1}. ${details}`;
     }).join("\n");
 
     // Pagination info

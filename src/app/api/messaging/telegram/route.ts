@@ -3,9 +3,9 @@ import { db } from "@/db";
 import { messagingChannels } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
-import { configureTelegram, addTelegramGroup, restartGateway, stopGateway, getOpenClawStatus } from "@/lib/openclaw";
+import { botManager } from "@/lib/bots/manager";
 
-// GET — get Telegram config + OpenClaw status
+// GET — get Telegram config + bot status
 export async function GET(req: NextRequest) {
   const ctx = await requirePermission(req, "settings", "read");
   if (isRbacError(ctx)) return ctx;
@@ -17,10 +17,8 @@ export async function GET(req: NextRequest) {
     ),
   });
 
-  const openclawStatus = getOpenClawStatus();
-
   if (!channel) {
-    return NextResponse.json({ data: null, openclaw: openclawStatus });
+    return NextResponse.json({ data: null });
   }
 
   return NextResponse.json({
@@ -31,8 +29,8 @@ export async function GET(req: NextRequest) {
       groupTitle: await refreshGroupTitle(channel),
       enabled: channel.enabled,
       connectedAt: channel.connectedAt,
+      botRunning: botManager.isRunning("telegram", ctx.orgId),
     },
-    openclaw: openclawStatus,
   });
 }
 
@@ -43,7 +41,6 @@ async function refreshGroupTitle(channel: { id: string; botToken: string | null;
     const res = await fetch(`https://api.telegram.org/bot${channel.botToken}/getChat?chat_id=${channel.groupChatId}`);
     const data = await res.json();
     if (data.ok && data.result?.title && data.result.title !== channel.groupTitle) {
-      // Update DB with fresh title (fire-and-forget)
       db.update(messagingChannels)
         .set({ groupTitle: data.result.title })
         .where(eq(messagingChannels.id, channel.id))
@@ -71,7 +68,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid bot token. Check with @BotFather." }, { status: 400 });
       }
 
-      // Save to DB
       await db
         .insert(messagingChannels)
         .values({
@@ -86,16 +82,6 @@ export async function POST(req: NextRequest) {
           set: { botToken, botUsername: data.result.username },
         });
 
-      // Configure OpenClaw with this token
-      configureTelegram({
-        botToken,
-        botUsername: data.result.username,
-        serviceToken: process.env.SERVICE_TOKEN || "",
-        orgId: ctx.orgId,
-        geminiApiKey: process.env.GEMINI_API_KEY,
-        eventOsUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
-      });
-
       return NextResponse.json({
         data: { botUsername: data.result.username, botName: data.result.first_name },
       });
@@ -104,7 +90,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Step 2: Detect group chats
+  // Step 2: Detect group chats via getUpdates
   if (action === "detect-group") {
     const channel = await db.query.messagingChannels.findFirst({
       where: and(
@@ -116,9 +102,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Set up bot token first." }, { status: 400 });
     }
 
-    // Need to stop OpenClaw polling briefly to use getUpdates
-    stopGateway();
-    await new Promise((r) => setTimeout(r, 2000));
+    // Pause the Telegram adapter briefly so getUpdates doesn't conflict with polling
+    const wasRunning = botManager.isRunning("telegram", ctx.orgId);
+    if (wasRunning) {
+      botManager.stop("telegram", ctx.orgId);
+      await new Promise((r) => setTimeout(r, 1000));
+    }
 
     try {
       const res = await fetch(`https://api.telegram.org/bot${channel.botToken}/getUpdates?limit=50`);
@@ -137,6 +126,11 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Resume adapter if it was running
+      if (wasRunning) {
+        await botManager.start("telegram", ctx.orgId, channel.botToken).catch(() => {});
+      }
+
       return NextResponse.json({
         data: { groups },
         message: groups.length === 0
@@ -144,12 +138,23 @@ export async function POST(req: NextRequest) {
           : undefined,
       });
     } catch {
+      // Resume adapter on failure too
+      if (wasRunning) {
+        await botManager.start("telegram", ctx.orgId, channel.botToken).catch(() => {});
+      }
       return NextResponse.json({ error: "Failed to contact Telegram." }, { status: 502 });
     }
   }
 
-  // Step 3: Connect — save group, configure OpenClaw, start gateway
+  // Step 3: Connect — save to DB + start bot adapter
   if (action === "connect" && body.groupChatId) {
+    const channel = await db.query.messagingChannels.findFirst({
+      where: and(
+        eq(messagingChannels.organizationId, ctx.orgId),
+        eq(messagingChannels.platform, "telegram")
+      ),
+    });
+
     await db
       .update(messagingChannels)
       .set({
@@ -163,19 +168,23 @@ export async function POST(req: NextRequest) {
         eq(messagingChannels.platform, "telegram")
       ));
 
-    // Add group to OpenClaw config and start
-    addTelegramGroup(body.groupChatId);
-    const gwResult = restartGateway();
+    // Start the Telegram bot adapter in-process
+    if (channel?.botToken) {
+      try {
+        await botManager.start("telegram", ctx.orgId, channel.botToken);
+      } catch (err) {
+        console.error("[telegram] Bot start failed:", err);
+      }
+    }
 
     return NextResponse.json({
-      data: { connected: true },
-      gateway: gwResult,
+      data: { connected: true, botRunning: botManager.isRunning("telegram", ctx.orgId) },
     });
   }
 
-  // Step 4: Disconnect
+  // Step 4: Disconnect — stop bot adapter + update DB
   if (action === "disconnect") {
-    stopGateway();
+    botManager.stop("telegram", ctx.orgId);
 
     await db
       .update(messagingChannels)

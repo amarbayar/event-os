@@ -97,6 +97,24 @@ export class OllamaProvider implements LLMProvider {
     }
   }
 
+  async generate(prompt: string): Promise<string> {
+    const response = await fetch(`${this.baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
+        options: { temperature: 0.1, num_predict: 2048 },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Ollama error (${response.status}): ${await response.text()}`);
+    }
+    const data = await response.json();
+    return data.message?.content || "";
+  }
+
   async classify(input: string, context?: string): Promise<AgentIntent> {
     const text = await this.call(CLASSIFY_PROMPT, buildClassifyPrompt(input, context));
 

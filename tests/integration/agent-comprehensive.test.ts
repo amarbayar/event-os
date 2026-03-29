@@ -50,9 +50,21 @@ function intent(overrides: Partial<AgentIntent>): AgentIntent {
 // ─── Setup / Teardown ─────────────────────────────────
 
 beforeAll(async () => {
-  const orgs = await db.select({ id: schema.organizations.id }).from(schema.organizations).limit(1);
-  const editions = await db.select({ id: schema.eventEditions.id }).from(schema.eventEditions).limit(1);
-  orgId = orgs[0]?.id;
+  // Use the org with the most members (the seeded org, not manually created ones)
+  const allOrgs = await db.select({ id: schema.organizations.id }).from(schema.organizations);
+  if (allOrgs.length === 0) throw new Error("Need org + edition in DB to run agent tests");
+  if (allOrgs.length === 1) {
+    orgId = allOrgs[0].id;
+  } else {
+    const counts = await Promise.all(
+      allOrgs.map(async (o) => ({
+        id: o.id,
+        count: (await db.select().from(schema.userOrganizations).where(eq(schema.userOrganizations.organizationId, o.id))).length,
+      }))
+    );
+    orgId = counts.sort((a, b) => b.count - a.count)[0].id;
+  }
+  const editions = await db.select({ id: schema.eventEditions.id }).from(schema.eventEditions).where(eq(schema.eventEditions.organizationId, orgId)).limit(1);
   editionId = editions[0]?.id;
   if (!orgId || !editionId) throw new Error("Need org + edition in DB to run agent tests");
 
