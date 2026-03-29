@@ -19,7 +19,7 @@ beforeAll(async () => {
   const orgs = await testDb.query.organizations.findMany();
   if (orgs.length === 0) throw new Error("No organization found — run seed first");
   const memberCounts = await Promise.all(
-    orgs.map(async (o) => {
+    orgs.map(async (o: typeof orgs[number]) => {
       const members = await testDb.query.userOrganizations.findMany({
         where: eq(schema.userOrganizations.organizationId, o.id),
       });

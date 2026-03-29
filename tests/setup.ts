@@ -23,7 +23,7 @@ export async function getTestIds() {
   let org = orgs[0];
   if (orgs.length > 1) {
     const counts = await Promise.all(
-      orgs.map(async (o) => ({
+      orgs.map(async (o: typeof orgs[number]) => ({
         org: o,
         count: (await testDb.query.userOrganizations.findMany({
           where: eq(userOrganizations.organizationId, o.id),

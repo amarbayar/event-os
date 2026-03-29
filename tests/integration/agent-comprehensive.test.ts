@@ -57,7 +57,7 @@ beforeAll(async () => {
     orgId = allOrgs[0].id;
   } else {
     const counts = await Promise.all(
-      allOrgs.map(async (o) => ({
+      allOrgs.map(async (o: typeof allOrgs[number]) => ({
         id: o.id,
         count: (await db.select().from(schema.userOrganizations).where(eq(schema.userOrganizations.organizationId, o.id))).length,
       }))
