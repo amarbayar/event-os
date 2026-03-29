@@ -23,10 +23,10 @@ import {
   MessageSquare,
   Bell,
   Mail,
+  ArrowLeft,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { LocaleSwitcher } from "@/components/locale-switcher";
 
 type NavItem = { href: string; labelKey: string; icon: React.ElementType };
 type NavGroup = { key: string; labelKey: string; items: NavItem[] };
@@ -173,9 +173,13 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
     <>
       {/* Brand + Edition Selector */}
       <div className="border-b border-stone-800 px-4 py-3">
-        <span className="text-xs font-medium uppercase tracking-wider text-stone-500">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-stone-500 hover:text-stone-300 transition-colors"
+        >
+          <ArrowLeft className="h-3 w-3" />
           Event OS
-        </span>
+        </Link>
         {editions.length > 0 && (
           <div className="relative mt-1">
             <button
@@ -358,7 +362,6 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
           <Settings className="h-4 w-4 shrink-0" />
           <span>{t("settings")}</span>
         </Link>
-        <LocaleSwitcher />
       </div>
     </>
   );

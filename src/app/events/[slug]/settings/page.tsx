@@ -9,6 +9,7 @@ import { EventDetailsTab } from "./event-details-tab";
 import { AgendaConfigTab } from "./agenda-config-tab";
 import { ChecklistsTab } from "./checklists-tab";
 import { DangerZoneTab } from "./danger-zone-tab";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 type Tab = "details" | "agenda" | "checklists" | "danger";
 
@@ -55,7 +56,16 @@ export default function EventSettingsPage() {
         ))}
       </div>
 
-      {tab === "details" && <EventDetailsTab />}
+      {tab === "details" && (
+        <>
+          <EventDetailsTab />
+          <div className="mt-8 pt-6 border-t">
+            <h3 className="text-sm font-medium mb-2">Language</h3>
+            <p className="text-xs text-muted-foreground mb-3">Choose your preferred interface language</p>
+            <LocaleSwitcher variant="settings" />
+          </div>
+        </>
+      )}
       {tab === "agenda" && <AgendaConfigTab />}
       {tab === "checklists" && <ChecklistsTab />}
       {tab === "danger" && <DangerZoneTab />}

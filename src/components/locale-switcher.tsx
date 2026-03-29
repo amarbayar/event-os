@@ -10,7 +10,7 @@ const locales = [
   { code: "mn", label: "MN" },
 ] as const;
 
-export function LocaleSwitcher() {
+export function LocaleSwitcher({ variant = "sidebar" }: { variant?: "sidebar" | "settings" }) {
   const currentLocale = useLocale();
   const t = useTranslations("Locale");
   const [switching, setSwitching] = useState(false);
@@ -37,6 +37,28 @@ export function LocaleSwitcher() {
       toast.error(t("changeFailed"));
       setSwitching(false);
     }
+  }
+
+  if (variant === "settings") {
+    return (
+      <div className="flex items-center gap-2">
+        {locales.map((loc) => (
+          <button
+            key={loc.code}
+            onClick={() => switchLocale(loc.code)}
+            disabled={switching}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium border transition-colors",
+              loc.code === currentLocale
+                ? "bg-yellow-50 border-yellow-200 text-yellow-700"
+                : "border-stone-200 text-stone-500 hover:border-stone-300 hover:text-stone-700"
+            )}
+          >
+            {loc.label}
+          </button>
+        ))}
+      </div>
+    );
   }
 
   return (
