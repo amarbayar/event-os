@@ -83,14 +83,21 @@ if (authProvider !== "credentials" && process.env.GOOGLE_CLIENT_ID) {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true, // Required behind reverse proxy (Nginx)
   providers,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  adapter: DrizzleAdapter(db, {
-    usersTable: users as any,
-    accountsTable: accounts as any,
-    sessionsTable: authSessions as any,
-    verificationTokensTable: verificationTokens as any,
-  }),
+  // Only use DrizzleAdapter when Google OAuth is configured — it conflicts
+  // with Credentials provider in some NextAuth v5 versions
+  ...(authProvider !== "credentials"
+    ? {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        adapter: DrizzleAdapter(db, {
+          usersTable: users as any,
+          accountsTable: accounts as any,
+          sessionsTable: authSessions as any,
+          verificationTokensTable: verificationTokens as any,
+        }),
+      }
+    : {}),
   session: {
     strategy: "jwt", // CRITICAL: must be explicit — DrizzleAdapter defaults to "database"
     maxAge: 8 * 60 * 60, // 8 hours (not the default 30 days)
