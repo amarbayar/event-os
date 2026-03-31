@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { organizations, userOrganizations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { OrgShell } from "./org-shell";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 
 export default async function OrgLayout({
   children,
@@ -43,8 +44,15 @@ export default async function OrgLayout({
   };
 
   return (
-    <OrgShell org={orgData} userName={session.user.name || session.user.email || "User"}>
-      {children}
-    </OrgShell>
+    <ConfirmProvider>
+      <OrgShell
+        org={orgData}
+        userName={session.user.name || session.user.email || "User"}
+        userEmail={session.user.email || ""}
+        userRole={membership.role}
+      >
+        {children}
+      </OrgShell>
+    </ConfirmProvider>
   );
 }
