@@ -190,7 +190,7 @@ export async function dispatch(
     // Layer 3: Route to handler
     switch (intent.intent) {
       case "query":
-        return handleQuery(intent, ctx);
+        return handleQuery(intent, ctx, originalInput);
 
       case "manage":
         return handleManage(intent, ctx);

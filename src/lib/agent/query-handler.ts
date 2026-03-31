@@ -77,13 +77,21 @@ const TABLE_MAP: Record<string, { table: DrizzleTable; nameField: string; label:
 
 export async function handleQuery(
   intent: AgentIntent,
-  ctx: AgentContext
+  ctx: AgentContext,
+  originalInput?: string,
 ): Promise<DispatchResult> {
   const entityType = intent.entityType;
 
   // "Tell me about this event" / event info queries
   if ((entityType as string) === "event" || (!entityType && intent.action === "search")) {
     return handleEventInfo(ctx);
+  }
+
+  // LLM-generated SQL for complex queries (joins, aggregations, cross-entity)
+  // Check this BEFORE the entityType guard — SQL queries can have entityType: null
+  if (intent.action === "sql") {
+    const { executeSqlQuery } = await import("./sql-query");
+    return executeSqlQuery(originalInput || intent.message || "", ctx);
   }
 
   if (!entityType || !TABLE_MAP[entityType]) {
@@ -96,12 +104,6 @@ export async function handleQuery(
   // Agenda validation — "any conflicts?", "check schedule", "agenda issues"
   if (intent.action === "validate" && entityType === "session") {
     return handleAgendaValidation(ctx);
-  }
-
-  // LLM-generated SQL for complex queries (joins, aggregations)
-  if (intent.action === "sql") {
-    const { executeSqlQuery } = await import("./sql-query");
-    return executeSqlQuery(intent.message || "", ctx);
   }
 
   const config = TABLE_MAP[entityType];

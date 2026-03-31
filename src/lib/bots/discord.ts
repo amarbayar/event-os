@@ -62,7 +62,7 @@ export class DiscordAdapter {
     }
 
     if (!input) {
-      await message.reply("How can I help? Ask me anything about the event.");
+      await message.reply({ content: "How can I help? Ask me anything about the event.", allowedMentions: { repliedUser: false } });
       return;
     }
 
@@ -81,17 +81,17 @@ export class DiscordAdapter {
 
       const reply = result.text;
       if (reply.length <= 2000) {
-        await message.reply(reply);
+        await message.reply({ content: reply, allowedMentions: { repliedUser: false } });
       } else {
         for (let i = 0; i < reply.length; i += 2000) {
           const chunk = reply.slice(i, i + 2000);
-          if (i === 0) await message.reply(chunk);
-          else await channel.send(chunk);
+          if (i === 0) await message.reply({ content: chunk, allowedMentions: { repliedUser: false } });
+          else await channel.send({ content: chunk });
         }
       }
     } catch (err) {
       console.error("[discord] Error:", err);
-      await message.reply("Something went wrong. Please try again.").catch(() => {});
+      await message.reply({ content: "Something went wrong. Please try again.", allowedMentions: { repliedUser: false } }).catch(() => {});
     }
   }
 }

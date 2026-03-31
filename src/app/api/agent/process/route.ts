@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getProvider } from "@/lib/agent";
-import { InputType, AgentResponse } from "@/lib/agent/types";
+import { InputType, AgentResponse, AgentIntent, LLMProvider } from "@/lib/agent/types";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
 import { getActiveIds } from "@/lib/queries";
 import { gateMention, sanitizeInput, isOffTopic } from "@/lib/agent/input-guard";
@@ -152,15 +152,6 @@ async function handleRequest(
     const useClassify = mode !== "extract" && (inputType === "text" || !inputType);
 
     if (useClassify) {
-      // Smart agent: classify intent → dispatch
-      const intent = await provider.classify(sanitized.sanitized, sanitizedContext);
-
-      // If the classifier says "extract", fall through to extraction
-      if (intent.intent === "extract") {
-        return handleExtract(provider, input, inputType || "text", sanitizedContext, resolvedOrgId, resolvedEditionId);
-      }
-
-      // Dispatch the intent
       const agentCtx: AgentContext = {
         orgId: resolvedOrgId,
         editionId: resolvedEditionId,
@@ -169,16 +160,35 @@ async function handleRequest(
         userName,
       };
 
-      const result = await dispatch(intent, agentCtx, sanitized.sanitized);
+      // Check for multi-intent: split compound requests into separate queries
+      const queries = await splitIntents(provider, sanitized.sanitized);
+
+      if (queries.length <= 1) {
+        // Single intent — normal path
+        const query = queries[0] || sanitized.sanitized;
+        return await classifyAndDispatch(provider, query, sanitizedContext, agentCtx, input, inputType, resolvedOrgId, resolvedEditionId);
+      }
+
+      // Multi-intent — process each query and combine results
+      const results: string[] = [];
+      for (const query of queries) {
+        try {
+          const intent = await provider.classify(query, sanitizedContext);
+          if (intent.intent === "extract") continue;
+          const result = await dispatch(intent, agentCtx, query);
+          if (result.message) results.push(result.message);
+        } catch {
+          // Skip failed sub-queries, don't fail the whole request
+        }
+      }
 
       return NextResponse.json({
         data: {
-          message: result.message,
-          intent: intent.intent,
-          entityType: intent.entityType,
-          action: intent.action,
-          success: result.success,
-          // Include empty arrays for backward compat with chat panel
+          message: results.join("\n\n---\n\n") || "I couldn't process that. Try asking one question at a time.",
+          intent: "multi",
+          entityType: null,
+          action: null,
+          success: results.length > 0,
           entities: [],
           actions: [],
           questions: [],
@@ -202,6 +212,61 @@ async function handleRequest(
       error: message,
     }, { status: 502 });
   }
+}
+
+// Split compound requests into separate queries using the LLM.
+// Only makes an extra call when the input looks like it might have multiple intents.
+async function splitIntents(
+  provider: LLMProvider,
+  input: string,
+): Promise<string[]> {
+  // Quick heuristic: skip the LLM call for short/simple inputs
+  const hasConjunction = /\band\s+(also|then|additionally)\b|\balso\b|;\s*\b(how|what|list|show|create|add|delete|update)\b/i.test(input);
+  if (!hasConjunction || input.length < 30) return [input];
+
+  try {
+    const raw = await provider.generate(
+      `Does this message contain multiple distinct requests? If yes, split into separate queries (one per line). If no, return the original message as-is. Return ONLY the queries, one per line. No numbering, no explanation.\n\nMessage: ${input}`
+    );
+    const lines = raw.trim().split("\n").map((l: string) => l.replace(/^\d+[\.\)]\s*/, "").trim()).filter(Boolean);
+    return lines.length > 0 ? lines : [input];
+  } catch {
+    return [input];
+  }
+}
+
+// Single intent: classify → dispatch → response
+async function classifyAndDispatch(
+  provider: LLMProvider,
+  query: string,
+  context: string | undefined,
+  agentCtx: AgentContext,
+  originalInput: string,
+  inputType: InputType | undefined,
+  orgId: string,
+  editionId: string,
+) {
+  const intent = await provider.classify(query, context);
+
+  if (intent.intent === "extract") {
+    return handleExtract(provider, originalInput, inputType || "text", context, orgId, editionId);
+  }
+
+  const result = await dispatch(intent, agentCtx, query);
+
+  return NextResponse.json({
+    data: {
+      message: result.message,
+      intent: intent.intent,
+      entityType: intent.entityType,
+      action: intent.action,
+      success: result.success,
+      entities: [],
+      actions: [],
+      questions: [],
+    },
+    provider: provider.name,
+  });
 }
 
 // Existing extraction flow (backward compatible)

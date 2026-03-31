@@ -38,7 +38,13 @@ function PipelineBar({ label, stages, href }: {
   );
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const b = `/events/${slug}`; // base path for all links
   const data = await getDashboardData();
 
   if (!data) {
@@ -81,11 +87,11 @@ export default async function DashboardPage() {
       {/* Top stat cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-4">
         {[
-          { label: "Speakers", value: `${speakers.stages.confirmed}/${speakers.total}`, detail: "confirmed", icon: Mic2, href: "/speakers" },
-          { label: "Sponsors", value: `${sponsors.stages.confirmed}/${sponsors.total}`, detail: "confirmed", icon: Store, href: "/sponsors" },
-          { label: "Sessions", value: String(sessions.total), detail: `${sessions.tracks} tracks`, icon: Calendar, href: "/agenda" },
-          { label: "Tickets Sold", value: String(attendees.total), detail: "registered", icon: Ticket, href: "/attendees" },
-          { label: "Tasks Done", value: `${tasks.done}/${tasks.total}`, detail: `${tasks.blocked} blocked`, icon: ClipboardList, href: "/tasks" },
+          { label: "Speakers", value: `${speakers.stages.confirmed}/${speakers.total}`, detail: "confirmed", icon: Mic2, href: `${b}/speakers` },
+          { label: "Sponsors", value: `${sponsors.stages.confirmed}/${sponsors.total}`, detail: "confirmed", icon: Store, href: `${b}/sponsors` },
+          { label: "Sessions", value: String(sessions.total), detail: `${sessions.tracks} tracks`, icon: Calendar, href: `${b}/agenda` },
+          { label: "Tickets Sold", value: String(attendees.total), detail: "registered", icon: Ticket, href: `${b}/attendees` },
+          { label: "Tasks Done", value: `${tasks.done}/${tasks.total}`, detail: `${tasks.blocked} blocked`, icon: ClipboardList, href: `${b}/tasks` },
         ].map((stat) => (
           <Link key={stat.label} href={stat.href}>
             <Card className="hover:border-primary/30 transition-colors cursor-pointer">
@@ -114,10 +120,10 @@ export default async function DashboardPage() {
           <Card>
             <CardContent className="p-5 space-y-5">
               <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-muted-foreground">Pipeline Health</h2>
-              <PipelineBar label="Speakers" stages={speakers.stages} href="/speakers" />
-              <PipelineBar label="Sponsors" stages={sponsors.stages} href="/sponsors" />
+              <PipelineBar label="Speakers" stages={speakers.stages} href={`${b}/speakers`} />
+              <PipelineBar label="Sponsors" stages={sponsors.stages} href={`${b}/sponsors`} />
               {venues.stages.confirmed > 0 ? (
-                <Link href="/venue" className="block group">
+                <Link href={`${b}/venue`} className="block group">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-sm font-medium">Venue</span>
                     <span className="text-xs text-emerald-600 font-medium group-hover:text-primary transition-colors">
@@ -129,16 +135,16 @@ export default async function DashboardPage() {
                   </div>
                 </Link>
               ) : (
-                <PipelineBar label="Venue" stages={venues.stages} href="/venue" />
+                <PipelineBar label="Venue" stages={venues.stages} href={`${b}/venue`} />
               )}
-              <PipelineBar label="Booths" stages={booths.stages} href="/booths" />
+              <PipelineBar label="Booths" stages={booths.stages} href={`${b}/booths`} />
             </CardContent>
           </Card>
 
           {/* Agenda snapshot + Ticket sales side by side */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Agenda */}
-            <Link href="/agenda">
+            <Link href={`${b}/agenda`}>
               <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
                 <CardContent className="p-5">
                   <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Agenda</h2>
@@ -164,7 +170,7 @@ export default async function DashboardPage() {
             </Link>
 
             {/* Ticket Sales */}
-            <Link href="/attendees">
+            <Link href={`${b}/attendees`}>
               <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
                 <CardContent className="p-5">
                   <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Ticket Sales</h2>
@@ -180,7 +186,7 @@ export default async function DashboardPage() {
             {(() => {
               const isEventDay = daysUntil !== null && daysUntil <= 0;
               return (
-                <Link href="/check-in">
+                <Link href={`${b}/check-in`}>
                   <Card className={`hover:border-primary/30 transition-colors cursor-pointer h-full ${!isEventDay ? "opacity-60" : ""}`}>
                     <CardContent className="p-5">
                       <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
@@ -246,7 +252,7 @@ export default async function DashboardPage() {
                 </h2>
                 <div className="space-y-2.5">
                   {tasks.overdue.map((task: any) => (
-                    <Link key={task.id} href="/tasks" className="flex items-start gap-2 text-sm hover:text-primary transition-colors">
+                    <Link key={task.id} href={`${b}/tasks`} className="flex items-start gap-2 text-sm hover:text-primary transition-colors">
                       <Clock className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
                       <div>
                         <p className="font-medium">{task.title}</p>
@@ -258,13 +264,13 @@ export default async function DashboardPage() {
                     </Link>
                   ))}
                   {pendingChecklist > 0 && (
-                    <Link href="/speakers" className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
+                    <Link href={`${b}/speakers`} className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
                       <ClipboardList className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                       <span>{pendingChecklist} checklist items awaiting submission</span>
                     </Link>
                   )}
                   {tasks.blocked > 0 && (
-                    <Link href="/tasks" className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
+                    <Link href={`${b}/tasks`} className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
                       <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" />
                       <span>{tasks.blocked} tasks blocked</span>
                     </Link>
@@ -305,7 +311,7 @@ export default async function DashboardPage() {
           </Card>
 
           {/* Task Summary */}
-          <Link href="/tasks">
+          <Link href={`${b}/tasks`}>
             <Card className="hover:border-primary/30 transition-colors cursor-pointer">
               <CardContent className="p-5">
                 <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Tasks</h2>

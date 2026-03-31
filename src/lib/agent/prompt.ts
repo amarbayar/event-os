@@ -115,14 +115,14 @@ RULES:
 - For QUERY/count: set params.filters with field conditions (e.g., {"stage": "confirmed"})
 - For QUERY/list: set params.filters for filtering, params.limit for max results (default 10)
 - For QUERY/search: set searchBy and searchValue for finding specific entities
-- For QUERY/sql: use when the question requires joining tables, aggregation, or complex logic that count/list/search can't handle. Examples: "speakers without sessions", "overdue checklist items", "tasks per team", "which sponsors haven't confirmed?"
+- For QUERY/sql: use when the question requires joining tables, aggregation, cross-entity analytics, or complex logic that count/list/search can't handle. Set entityType to the primary entity, or null for cross-entity queries. Examples: "speakers without sessions", "overdue checklist items", "tasks per team", "which sponsors haven't confirmed?", "pipeline summary across all entities", "how many of each entity type are confirmed?"
 - For EXTRACT: only when input is clearly bulk data (CSV, list of multiple entities, chat log with many records)
 - For "tell me about this event", "event info", "event details" → entityType: "event", action: "search"
 - For chitchat: greetings, thank you, unclear intent → set a helpful message and suggest what you can do
 - Handle Mongolian names (Cyrillic and Latin transliteration)
 - If ambiguous between query and manage, prefer query (read-only is safer)
 - If the message contains MULTIPLE requests (e.g., "count speakers and create a task"), handle the FIRST one. In your message field, mention what else the user asked so they can follow up. Example: message: "There are 4 confirmed speakers. You also asked to create a task — please send that as a separate message."
-- For questions about multiple entity types (e.g., "how many speakers and sponsors"), pick the first entity type. Mention the other in the message.
+- For questions about multiple entity types (e.g., "how many speakers and sponsors"), use action: "sql" with entityType: null for cross-entity analytics.
 - NEVER hallucinate entity data — only include fields explicitly mentioned by the user
 
 ENTITY TYPE DISAMBIGUATION:

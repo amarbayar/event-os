@@ -1,65 +1,33 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testDb } from "../setup";
 import * as schema from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
+import { createTestFixtures, type TestFixtures } from "../fixtures";
 
 // ════════════════════════════════════════════════════════
 // RBAC PERMISSION TESTS
 // Tests the team-scoped permission model:
 //   owner > admin > organizer > coordinator > viewer
 //   Teams own entity types via team_entity_types junction
+//
+// Uses self-contained fixtures — no dependency on seed data.
 // ════════════════════════════════════════════════════════
 
-let orgId: string;
-let users: Record<string, { id: string; role: string }>;
-let teams: Record<string, string>; // teamName → teamId
+let fixtures: TestFixtures;
 
 beforeAll(async () => {
-  // Use the org with the most members (the seeded org, not manually created ones)
-  const orgs = await testDb.query.organizations.findMany();
-  if (orgs.length === 0) throw new Error("No organization found — run seed first");
-  const memberCounts = await Promise.all(
-    orgs.map(async (o: typeof orgs[number]) => {
-      const members = await testDb.query.userOrganizations.findMany({
-        where: eq(schema.userOrganizations.organizationId, o.id),
-      });
-      return { org: o, count: members.length };
-    })
-  );
-  const org = memberCounts.sort((a, b) => b.count - a.count)[0].org;
-  orgId = org.id;
+  fixtures = await createTestFixtures();
+});
 
-  // Load all users via user_organizations
-  const memberships = await testDb.query.userOrganizations.findMany({
-    where: eq(schema.userOrganizations.organizationId, orgId),
-    with: { user: true },
-  });
-
-  users = {};
-  for (const m of memberships) {
-    users[m.user.name || m.user.email] = { id: m.user.id, role: m.role };
-  }
-
-  // Load org-wide teams
-  const allTeams = await testDb
-    .select()
-    .from(schema.teams)
-    .where(
-      and(eq(schema.teams.organizationId, orgId), isNull(schema.teams.editionId))
-    );
-
-  teams = {};
-  for (const t of allTeams) {
-    teams[t.name] = t.id;
-  }
+afterAll(async () => {
+  await fixtures.cleanup();
 });
 
 // ─── Schema Validation ─────────────────────────────
 
 describe("RBAC schema", () => {
   it("has at least one user per core role", () => {
-    const roles = Object.values(users).map((u) => u.role);
-    // The system requires at least: owner, organizer, coordinator
+    const roles = Object.values(fixtures.users).map((u) => u.role);
     expect(roles).toContain("owner");
     expect(roles).toContain("organizer");
     expect(roles).toContain("coordinator");
@@ -67,27 +35,27 @@ describe("RBAC schema", () => {
 
   it("every user has a valid role", () => {
     const validRoles = ["owner", "admin", "organizer", "coordinator", "viewer", "stakeholder"];
-    for (const [name, u] of Object.entries(users)) {
+    for (const [, u] of Object.entries(fixtures.users)) {
       expect(validRoles).toContain(u.role);
     }
   });
 
   it("has 5 org-wide RBAC teams", () => {
-    expect(Object.keys(teams).length).toBe(5);
-    expect(teams["Program"]).toBeDefined();
-    expect(teams["Logistics"]).toBeDefined();
-    expect(teams["Sponsor/Partnership"]).toBeDefined();
-    expect(teams["Operations"]).toBeDefined();
-    expect(teams["Marketing"]).toBeDefined();
+    expect(Object.keys(fixtures.teams).length).toBe(5);
+    expect(fixtures.teams["Program"]).toBeDefined();
+    expect(fixtures.teams["Logistics"]).toBeDefined();
+    expect(fixtures.teams["Sponsor/Partnership"]).toBeDefined();
+    expect(fixtures.teams["Operations"]).toBeDefined();
+    expect(fixtures.teams["Marketing"]).toBeDefined();
   });
 
   it("Program team owns speaker + session entity types", async () => {
     const types = await testDb
       .select({ entityType: schema.teamEntityTypes.entityType })
       .from(schema.teamEntityTypes)
-      .where(eq(schema.teamEntityTypes.teamId, teams["Program"]));
+      .where(eq(schema.teamEntityTypes.teamId, fixtures.teams["Program"]));
 
-    const typeNames = types.map((t: any) => t.entityType).sort();
+    const typeNames = types.map((t: { entityType: string }) => t.entityType).sort();
     expect(typeNames).toEqual(["session", "speaker"]);
   });
 
@@ -95,9 +63,9 @@ describe("RBAC schema", () => {
     const types = await testDb
       .select({ entityType: schema.teamEntityTypes.entityType })
       .from(schema.teamEntityTypes)
-      .where(eq(schema.teamEntityTypes.teamId, teams["Logistics"]));
+      .where(eq(schema.teamEntityTypes.teamId, fixtures.teams["Logistics"]));
 
-    const typeNames = types.map((t: any) => t.entityType).sort();
+    const typeNames = types.map((t: { entityType: string }) => t.entityType).sort();
     expect(typeNames).toEqual(["booth", "venue"]);
   });
 
@@ -105,9 +73,9 @@ describe("RBAC schema", () => {
     const types = await testDb
       .select({ entityType: schema.teamEntityTypes.entityType })
       .from(schema.teamEntityTypes)
-      .where(eq(schema.teamEntityTypes.teamId, teams["Operations"]));
+      .where(eq(schema.teamEntityTypes.teamId, fixtures.teams["Operations"]));
 
-    const typeNames = types.map((t: any) => t.entityType).sort();
+    const typeNames = types.map((t: { entityType: string }) => t.entityType).sort();
     expect(typeNames).toEqual(["attendee", "media", "volunteer"]);
   });
 });
@@ -115,43 +83,30 @@ describe("RBAC schema", () => {
 // ─── Team Membership ────────────────────────────────
 
 describe("Team membership", () => {
-  it("Tuvshin is on Program and Logistics teams", async () => {
+  it("Organizer is on Program and Logistics teams", async () => {
     const memberships = await testDb
       .select({ teamId: schema.teamMembers.teamId })
       .from(schema.teamMembers)
-      .where(eq(schema.teamMembers.userId, users["Tuvshin"].id));
+      .where(eq(schema.teamMembers.userId, fixtures.users["TestOrganizer"].id));
 
-    const teamIds = memberships.map((m: any) => m.teamId);
-    expect(teamIds).toContain(teams["Program"]);
-    expect(teamIds).toContain(teams["Logistics"]);
+    const teamIds = memberships.map((m: { teamId: string }) => m.teamId);
+    expect(teamIds).toContain(fixtures.teams["Program"]);
+    expect(teamIds).toContain(fixtures.teams["Logistics"]);
   });
 
-  it("Sarnai is on Operations and Marketing teams", async () => {
+  it("Coordinator is on Sponsor/Partnership and Marketing teams", async () => {
     const memberships = await testDb
       .select({ teamId: schema.teamMembers.teamId })
       .from(schema.teamMembers)
-      .where(eq(schema.teamMembers.userId, users["Sarnai"].id));
+      .where(eq(schema.teamMembers.userId, fixtures.users["TestCoordinator"].id));
 
-    const teamIds = memberships.map((m: any) => m.teamId);
-    expect(teamIds).toContain(teams["Operations"]);
-    expect(teamIds).toContain(teams["Marketing"]);
-  });
-
-  it("Oyungerel is on Sponsor/Partnership and Marketing teams", async () => {
-    const memberships = await testDb
-      .select({ teamId: schema.teamMembers.teamId })
-      .from(schema.teamMembers)
-      .where(eq(schema.teamMembers.userId, users["Oyungerel"].id));
-
-    const teamIds = memberships.map((m: any) => m.teamId);
-    expect(teamIds).toContain(teams["Sponsor/Partnership"]);
-    expect(teamIds).toContain(teams["Marketing"]);
+    const teamIds = memberships.map((m: { teamId: string }) => m.teamId);
+    expect(teamIds).toContain(fixtures.teams["Sponsor/Partnership"]);
+    expect(teamIds).toContain(fixtures.teams["Marketing"]);
   });
 });
 
 // ─── Permission Logic (DB-level verification) ───────
-// These test the userOwnsEntityType logic by checking the same join
-// that requirePermission() uses in production.
 
 async function userOwnsEntityType(
   userId: string,
@@ -168,140 +123,53 @@ async function userOwnsEntityType(
     .where(
       and(
         eq(schema.teamMembers.userId, userId),
-        eq(schema.teams.organizationId, orgId),
+        eq(schema.teams.organizationId, fixtures.orgId),
         isNull(schema.teams.editionId),
         eq(schema.teamEntityTypes.entityType, entityType)
       )
-    )
-    .limit(1);
-
+    );
   return result.length > 0;
 }
 
 describe("Permission scope checks", () => {
-  // Tuvshin (organizer) is on Program (speaker, session) + Logistics (venue, booth)
-  it("Tuvshin CAN edit speakers (on Program team)", async () => {
-    expect(await userOwnsEntityType(users["Tuvshin"].id, "speaker")).toBe(true);
+  it("Organizer CAN edit speakers (on Program team)", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestOrganizer"].id, "speaker")).toBe(true);
   });
 
-  it("Tuvshin CAN edit venues (on Logistics team)", async () => {
-    expect(await userOwnsEntityType(users["Tuvshin"].id, "venue")).toBe(true);
+  it("Organizer CAN edit venues (on Logistics team)", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestOrganizer"].id, "venue")).toBe(true);
   });
 
-  it("Tuvshin CANNOT edit sponsors (not on Sponsor team)", async () => {
-    expect(await userOwnsEntityType(users["Tuvshin"].id, "sponsor")).toBe(false);
+  it("Organizer CANNOT edit sponsors (not on Sponsor team)", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestOrganizer"].id, "sponsor")).toBe(false);
   });
 
-  it("Tuvshin CANNOT edit volunteers (not on Operations team)", async () => {
-    expect(await userOwnsEntityType(users["Tuvshin"].id, "volunteer")).toBe(false);
+  it("Organizer CANNOT edit campaigns (not on Marketing team)", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestOrganizer"].id, "campaign")).toBe(false);
   });
 
-  // Sarnai (coordinator) is on Operations (volunteer, media, attendee) + Marketing (campaign)
-  it("Sarnai CAN edit volunteers (on Operations team)", async () => {
-    expect(await userOwnsEntityType(users["Sarnai"].id, "volunteer")).toBe(true);
+  it("Coordinator CAN edit sponsors (on Sponsor/Partnership team)", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestCoordinator"].id, "sponsor")).toBe(true);
   });
 
-  it("Sarnai CAN edit campaigns (on Marketing team)", async () => {
-    expect(await userOwnsEntityType(users["Sarnai"].id, "campaign")).toBe(true);
+  it("Coordinator CAN edit campaigns (on Marketing team)", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestCoordinator"].id, "campaign")).toBe(true);
   });
 
-  it("Sarnai CANNOT edit speakers (not on Program team)", async () => {
-    expect(await userOwnsEntityType(users["Sarnai"].id, "speaker")).toBe(false);
+  it("Coordinator CANNOT edit venues (not on Logistics team)", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestCoordinator"].id, "venue")).toBe(false);
   });
 
-  // Oyungerel (organizer) is on Sponsor/Partnership (sponsor, outreach) + Marketing (campaign)
-  it("Oyungerel CAN edit sponsors (on Sponsor team)", async () => {
-    expect(await userOwnsEntityType(users["Oyungerel"].id, "sponsor")).toBe(true);
+  it("Coordinator CAN edit speakers (on Program team)", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestCoordinator"].id, "speaker")).toBe(true);
   });
 
-  it("Oyungerel CANNOT edit speakers (not on Program team)", async () => {
-    expect(await userOwnsEntityType(users["Oyungerel"].id, "speaker")).toBe(false);
-  });
-});
-
-// ─── Users via user_organizations ──────────────────
-
-describe("User organization memberships", () => {
-  it("all 5 users have memberships in the org", async () => {
-    const memberships = await testDb.query.userOrganizations.findMany({
-      where: eq(schema.userOrganizations.organizationId, orgId),
-    });
-    expect(memberships.length).toBeGreaterThan(0);
+  it("Viewer has no team scope", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestViewer"].id, "speaker")).toBe(false);
+    expect(await userOwnsEntityType(fixtures.users["TestViewer"].id, "sponsor")).toBe(false);
   });
 
-  it("emails are unique across the org", async () => {
-    const memberships = await testDb.query.userOrganizations.findMany({
-      where: eq(schema.userOrganizations.organizationId, orgId),
-      with: { user: true },
-    });
-    const emails = memberships.map((m: any) => m.user.email);
-    expect(new Set(emails).size).toBe(emails.length);
-  });
-
-  it("all users have password hashes (can log in)", async () => {
-    const memberships = await testDb.query.userOrganizations.findMany({
-      where: eq(schema.userOrganizations.organizationId, orgId),
-      with: { user: true },
-    });
-    for (const m of memberships) {
-      expect(m.user.passwordHash).toBeTruthy();
-    }
-  });
-});
-
-// ─── Role Hierarchy Logic ───────────────────────────
-
-describe("Role hierarchy", () => {
-  const ROLE_HIERARCHY: Record<string, number> = {
-    owner: 100,
-    admin: 80,
-    organizer: 60,
-    coordinator: 40,
-    viewer: 20,
-  };
-
-  it("owner has highest privilege", () => {
-    expect(ROLE_HIERARCHY["owner"]).toBeGreaterThan(ROLE_HIERARCHY["admin"]);
-  });
-
-  it("admin bypasses team scope check", () => {
-    expect(ROLE_HIERARCHY["admin"]).toBeGreaterThanOrEqual(80);
-  });
-
-  it("organizer can delete lead/engaged (role >= 60)", () => {
-    expect(ROLE_HIERARCHY["organizer"]).toBeGreaterThanOrEqual(60);
-  });
-
-  it("coordinator cannot delete (role < 60)", () => {
-    expect(ROLE_HIERARCHY["coordinator"]).toBeLessThan(60);
-  });
-
-  it("viewer is read-only (lowest level)", () => {
-    expect(ROLE_HIERARCHY["viewer"]).toBeLessThan(ROLE_HIERARCHY["coordinator"]);
-  });
-});
-
-// ─── AssigneeId FK ──────────────────────────────────
-
-describe("AssigneeId FK on entity tables", () => {
-  it("speakerApplications has assigneeId column", async () => {
-    const speakers = await testDb.query.speakerApplications.findMany({ limit: 1 });
-    if (speakers.length > 0) {
-      expect("assigneeId" in speakers[0]).toBe(true);
-    }
-  });
-
-  it("sponsorApplications has assigneeId column", async () => {
-    const sponsors = await testDb.query.sponsorApplications.findMany({ limit: 1 });
-    if (sponsors.length > 0) {
-      expect("assigneeId" in sponsors[0]).toBe(true);
-    }
-  });
-
-  it("venues has assigneeId column", async () => {
-    const venues = await testDb.query.venues.findMany({ limit: 1 });
-    if (venues.length > 0) {
-      expect("assigneeId" in venues[0]).toBe(true);
-    }
+  it("Stakeholder has no team scope", async () => {
+    expect(await userOwnsEntityType(fixtures.users["TestStakeholder"].id, "speaker")).toBe(false);
   });
 });

@@ -18,14 +18,15 @@ import { eq, and, sql, isNull } from "drizzle-orm";
 import { ilikeFn as ilike } from "@/db/dialect";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
 import { AgentIntent, DispatchResult } from "@/lib/agent/types";
+import { createTestFixtures, type TestFixtures } from "../fixtures";
 
 // ─── Test Helpers ─────────────────────────────────────
 
+let fixtures: TestFixtures;
 let orgId: string;
 let editionId: string;
-// Real user IDs for team-scoped roles (looked up in beforeAll)
 let organizerUserId: string;
-let organizerEntityType: string; // entity type this organizer can manage
+let organizerEntityType: string;
 let coordinatorUserId: string;
 let coordinatorEntityType: string;
 
@@ -50,55 +51,20 @@ function intent(overrides: Partial<AgentIntent>): AgentIntent {
 // ─── Setup / Teardown ─────────────────────────────────
 
 beforeAll(async () => {
-  // Use the org with the most members (the seeded org, not manually created ones)
-  const allOrgs = await db.select({ id: schema.organizations.id }).from(schema.organizations);
-  if (allOrgs.length === 0) throw new Error("Need org + edition in DB to run agent tests");
-  if (allOrgs.length === 1) {
-    orgId = allOrgs[0].id;
-  } else {
-    const counts = await Promise.all(
-      allOrgs.map(async (o: typeof allOrgs[number]) => ({
-        id: o.id,
-        count: (await db.select().from(schema.userOrganizations).where(eq(schema.userOrganizations.organizationId, o.id))).length,
-      }))
-    );
-    orgId = counts.sort((a, b) => b.count - a.count)[0].id;
-  }
-  const editions = await db.select({ id: schema.eventEditions.id }).from(schema.eventEditions).where(eq(schema.eventEditions.organizationId, orgId)).limit(1);
-  editionId = editions[0]?.id;
-  if (!orgId || !editionId) throw new Error("Need org + edition in DB to run agent tests");
+  fixtures = await createTestFixtures();
+  orgId = fixtures.orgId;
+  editionId = fixtures.editionId;
 
-  // Look up real organizer/coordinator with team scope for RBAC tests
-  const teamScoped = await db
-    .select({
-      userId: schema.teamMembers.userId,
-      role: schema.userOrganizations.role,
-      entityType: schema.teamEntityTypes.entityType,
-    })
-    .from(schema.teamMembers)
-    .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
-    .innerJoin(schema.teamEntityTypes, eq(schema.teams.id, schema.teamEntityTypes.teamId))
-    .innerJoin(schema.userOrganizations, and(
-      eq(schema.teamMembers.userId, schema.userOrganizations.userId),
-      eq(schema.userOrganizations.organizationId, orgId)
-    ))
-    .where(and(eq(schema.teams.organizationId, orgId), isNull(schema.teams.editionId)))
-    .limit(20);
-
-  // Prefer non-session entity types for RBAC tests (sessions need extra fields)
-  const crudEntityTypes = new Set(["speaker", "sponsor", "venue", "booth", "volunteer", "media", "task", "campaign"]);
-  const org = teamScoped.find((r: any) => r.role === "organizer" && crudEntityTypes.has(r.entityType))
-    || teamScoped.find((r: any) => r.role === "organizer");
-  const coord = teamScoped.find((r: any) => r.role === "coordinator" && crudEntityTypes.has(r.entityType))
-    || teamScoped.find((r: any) => r.role === "coordinator");
-  organizerUserId = org?.userId || "no-organizer";
-  organizerEntityType = org?.entityType || "speaker";
-  coordinatorUserId = coord?.userId || "no-coordinator";
-  coordinatorEntityType = coord?.entityType || "volunteer";
+  // Organizer is on Program (speaker, session) and Logistics (venue, booth) teams
+  organizerUserId = fixtures.users["TestOrganizer"].id;
+  organizerEntityType = "speaker";
+  // Coordinator is on Sponsor/Partnership (sponsor) and Marketing (campaign) teams
+  coordinatorUserId = fixtures.users["TestCoordinator"].id;
+  coordinatorEntityType = "sponsor";
 });
 
 afterAll(async () => {
-  // Cleanup any test entities created during tests
+  // Cleanup test entities created during tests, then fixtures
   const tables = [
     schema.speakerApplications,
     schema.sponsorApplications,
@@ -111,12 +77,10 @@ afterAll(async () => {
   ];
   for (const table of tables) {
     await db.delete(table).where(
-      and(
-        eq((table as any).organizationId, orgId),
-        ilike((table as any)[("name" in table) ? "name" : ("title" in table) ? "title" : "companyName"], "%AgentTest%")
-      )
-    ).catch(() => {}); // ignore if column doesn't exist
+      eq((table as any).organizationId, orgId),
+    ).catch(() => {});
   }
+  await fixtures.cleanup();
 });
 
 // ─── Helper to clean up a specific entity ─────────────
@@ -660,10 +624,10 @@ describe("Agent RBAC enforcement", () => {
     });
 
     it("CANNOT create entity outside their team scope", async () => {
-      // Use an entity type the coordinator does NOT have scope for
-      const outOfScope = coordinatorEntityType === "speaker" ? "sponsor" : "speaker";
+      // Coordinator is on Program + Sponsor/Partnership + Marketing
+      // They do NOT have venue (Logistics team) — use that
       const result = await dispatch(
-        intent({ intent: "manage", action: "create", entityType: outOfScope as any, params: { name: "AgentTest CoordNoScope" } }),
+        intent({ intent: "manage", action: "create", entityType: "venue", params: { name: "AgentTest CoordNoScope" } }),
         ctx("coordinator", coordinatorUserId)
       );
       expect(result.success).toBe(false);

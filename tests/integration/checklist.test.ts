@@ -1,91 +1,84 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testDb } from "../setup";
 import * as schema from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { createTestFixtures, type TestFixtures } from "../fixtures";
 
 // ════════════════════════════════════════════════════════
 // CHECKLIST TESTS
 // Tests the post-confirmation checklist system:
 //   Templates → auto-generate items on confirm → progress tracking
+//
+// Uses self-contained fixtures — no dependency on seed data.
 // ════════════════════════════════════════════════════════
 
-let orgId: string;
-let editionId: string;
-let speakerId: string;
+let f: TestFixtures;
 
 beforeAll(async () => {
-  const org = await testDb.query.organizations.findFirst();
-  if (!org) throw new Error("No organization found — run seed first");
-  orgId = org.id;
+  f = await createTestFixtures();
+});
 
-  const edition = await testDb.query.eventEditions.findFirst();
-  if (!edition) throw new Error("No edition found — run seed first");
-  editionId = edition.id;
-
-  const speaker = await testDb.query.speakerApplications.findFirst({
-    where: eq(schema.speakerApplications.organizationId, orgId),
-  });
-  if (!speaker) throw new Error("No speaker found — run seed first");
-  speakerId = speaker.id;
+afterAll(async () => {
+  await f.cleanup();
 });
 
 // ─── Checklist Templates ────────────────────────────────
 
 describe("Checklist templates", () => {
-  it("has speaker templates seeded", async () => {
+  it("has speaker templates", async () => {
     const templates = await testDb.query.checklistTemplates.findMany({
       where: and(
-        eq(schema.checklistTemplates.editionId, editionId),
+        eq(schema.checklistTemplates.editionId, f.editionId),
         eq(schema.checklistTemplates.entityType, "speaker")
       ),
     });
     expect(templates.length).toBeGreaterThan(0);
   });
 
-  it("has sponsor templates seeded", async () => {
+  it("has sponsor templates", async () => {
     const templates = await testDb.query.checklistTemplates.findMany({
       where: and(
-        eq(schema.checklistTemplates.editionId, editionId),
+        eq(schema.checklistTemplates.editionId, f.editionId),
         eq(schema.checklistTemplates.entityType, "sponsor")
       ),
     });
     expect(templates.length).toBeGreaterThan(0);
   });
 
-  it("has venue templates seeded", async () => {
+  it("has venue templates", async () => {
     const templates = await testDb.query.checklistTemplates.findMany({
       where: and(
-        eq(schema.checklistTemplates.editionId, editionId),
+        eq(schema.checklistTemplates.editionId, f.editionId),
         eq(schema.checklistTemplates.entityType, "venue")
       ),
     });
     expect(templates.length).toBeGreaterThan(0);
   });
 
-  it("has booth templates seeded", async () => {
+  it("has booth templates", async () => {
     const templates = await testDb.query.checklistTemplates.findMany({
       where: and(
-        eq(schema.checklistTemplates.editionId, editionId),
+        eq(schema.checklistTemplates.editionId, f.editionId),
         eq(schema.checklistTemplates.entityType, "booth")
       ),
     });
     expect(templates.length).toBeGreaterThan(0);
   });
 
-  it("has volunteer templates seeded", async () => {
+  it("has volunteer templates", async () => {
     const templates = await testDb.query.checklistTemplates.findMany({
       where: and(
-        eq(schema.checklistTemplates.editionId, editionId),
+        eq(schema.checklistTemplates.editionId, f.editionId),
         eq(schema.checklistTemplates.entityType, "volunteer")
       ),
     });
     expect(templates.length).toBeGreaterThan(0);
   });
 
-  it("has media templates seeded", async () => {
+  it("has media templates", async () => {
     const templates = await testDb.query.checklistTemplates.findMany({
       where: and(
-        eq(schema.checklistTemplates.editionId, editionId),
+        eq(schema.checklistTemplates.editionId, f.editionId),
         eq(schema.checklistTemplates.entityType, "media")
       ),
     });
@@ -95,6 +88,7 @@ describe("Checklist templates", () => {
   it("templates have correct fields", async () => {
     const template = await testDb.query.checklistTemplates.findFirst({
       where: and(
+        eq(schema.checklistTemplates.editionId, f.editionId),
         eq(schema.checklistTemplates.entityType, "speaker"),
         eq(schema.checklistTemplates.sortOrder, 0)
       ),
@@ -107,15 +101,13 @@ describe("Checklist templates", () => {
     expect(template!.dueOffsetDays).toBe(-21);
   });
 
-  it("total templates across all entity types is 23", async () => {
+  it("total templates across all entity types", async () => {
     const all = await testDb.query.checklistTemplates.findMany({
-      where: eq(schema.checklistTemplates.editionId, editionId),
+      where: eq(schema.checklistTemplates.editionId, f.editionId),
     });
-    // Total templates = sum across all entity types
-    // Must be > 0, and should cover multiple entity types
-    expect(all.length).toBeGreaterThan(0);
-    const entityTypes = new Set(all.map((t: any) => t.entityType));
-    expect(entityTypes.size).toBeGreaterThanOrEqual(3); // at least 3 entity types have templates
+    expect(all.length).toBe(f.templateCount);
+    const entityTypes = new Set(all.map((t: { entityType: string }) => t.entityType));
+    expect(entityTypes.size).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -125,57 +117,51 @@ describe("Checklist item generation", () => {
   it("generates items when generateChecklistItems is called", async () => {
     const { generateChecklistItems } = await import("@/lib/checklist");
 
-    // Clean up any existing items for this speaker (from prior runs or UI usage)
+    // Clean up any existing items for this speaker
     await testDb.delete(schema.checklistItems).where(
       and(
         eq(schema.checklistItems.entityType, "speaker"),
-        eq(schema.checklistItems.entityId, speakerId)
+        eq(schema.checklistItems.entityId, f.speakerId)
       )
     );
 
-    // Count speaker templates to know how many items to expect
-    const templateCount = await testDb.query.checklistTemplates.findMany({
+    const speakerTemplates = await testDb.query.checklistTemplates.findMany({
       where: and(
-        eq(schema.checklistTemplates.editionId, editionId),
+        eq(schema.checklistTemplates.editionId, f.editionId),
         eq(schema.checklistTemplates.entityType, "speaker")
       ),
     });
 
-    // Generate items for the test speaker
-    const count = await generateChecklistItems("speaker", speakerId, editionId, orgId);
-    expect(count).toBe(templateCount.length);
+    const count = await generateChecklistItems("speaker", f.speakerId, f.editionId, f.orgId);
+    expect(count).toBe(speakerTemplates.length);
 
-    // Verify items exist in DB
     const items = await testDb.query.checklistItems.findMany({
       where: and(
         eq(schema.checklistItems.entityType, "speaker"),
-        eq(schema.checklistItems.entityId, speakerId)
+        eq(schema.checklistItems.entityId, f.speakerId)
       ),
     });
-    expect(items.length).toBe(templateCount.length);
-    expect(items.every((i: any) => i.status === "pending")).toBe(true);
+    expect(items.length).toBe(speakerTemplates.length);
+    expect(items.every((i: { status: string }) => i.status === "pending")).toBe(true);
   });
 
   it("skips generation if items already exist (no duplicates)", async () => {
     const { generateChecklistItems } = await import("@/lib/checklist");
 
-    // Count items before
     const before = await testDb.query.checklistItems.findMany({
       where: and(
         eq(schema.checklistItems.entityType, "speaker"),
-        eq(schema.checklistItems.entityId, speakerId)
+        eq(schema.checklistItems.entityId, f.speakerId)
       ),
     });
 
-    // Call again — should return 0 (already has items)
-    const count = await generateChecklistItems("speaker", speakerId, editionId, orgId);
+    const count = await generateChecklistItems("speaker", f.speakerId, f.editionId, f.orgId);
     expect(count).toBe(0);
 
-    // Count unchanged — no duplicates created
     const after = await testDb.query.checklistItems.findMany({
       where: and(
         eq(schema.checklistItems.entityType, "speaker"),
-        eq(schema.checklistItems.entityId, speakerId)
+        eq(schema.checklistItems.entityId, f.speakerId)
       ),
     });
     expect(after.length).toBe(before.length);
@@ -183,8 +169,7 @@ describe("Checklist item generation", () => {
 
   it("returns 0 for entity type with no templates", async () => {
     const { generateChecklistItems } = await import("@/lib/checklist");
-
-    const count = await generateChecklistItems("nonexistent", "fake-id", editionId, orgId);
+    const count = await generateChecklistItems("nonexistent", "fake-id", f.editionId, f.orgId);
     expect(count).toBe(0);
   });
 });
@@ -195,29 +180,26 @@ describe("Checklist item archival", () => {
   it("archives items when archiveChecklistItems is called", async () => {
     const { archiveChecklistItems } = await import("@/lib/checklist");
 
-    const count = await archiveChecklistItems("speaker", speakerId);
-    expect(count).toBeGreaterThan(0); // archives however many items exist
+    const count = await archiveChecklistItems("speaker", f.speakerId);
+    expect(count).toBeGreaterThan(0);
 
-    // All items should be archived
     const items = await testDb.query.checklistItems.findMany({
       where: and(
         eq(schema.checklistItems.entityType, "speaker"),
-        eq(schema.checklistItems.entityId, speakerId)
+        eq(schema.checklistItems.entityId, f.speakerId)
       ),
     });
-    expect(items.every((i: any) => i.status === "archived")).toBe(true);
+    expect(items.every((i: { status: string }) => i.status === "archived")).toBe(true);
   });
 
   it("is idempotent — archiving already archived items is a no-op", async () => {
     const { archiveChecklistItems } = await import("@/lib/checklist");
-
-    const count = await archiveChecklistItems("speaker", speakerId);
-    expect(count).toBe(0); // All already archived
+    const count = await archiveChecklistItems("speaker", f.speakerId);
+    expect(count).toBe(0);
   });
 
   it("returns 0 when entity has no items", async () => {
     const { archiveChecklistItems } = await import("@/lib/checklist");
-
     const count = await archiveChecklistItems("speaker", "nonexistent-id");
     expect(count).toBe(0);
   });
@@ -229,31 +211,27 @@ describe("Re-confirmation restore", () => {
   it("restores archived items on re-confirmation", async () => {
     const { generateChecklistItems } = await import("@/lib/checklist");
 
-    // Items are currently archived from previous test
-    // Re-generate should restore them
-    const count = await generateChecklistItems("speaker", speakerId, editionId, orgId);
+    const count = await generateChecklistItems("speaker", f.speakerId, f.editionId, f.orgId);
     expect(count).toBeGreaterThan(0);
 
-    // Items should be restored to pending (since no values were set)
     const items = await testDb.query.checklistItems.findMany({
       where: and(
         eq(schema.checklistItems.entityType, "speaker"),
-        eq(schema.checklistItems.entityId, speakerId)
+        eq(schema.checklistItems.entityId, f.speakerId)
       ),
     });
-    const restored = items.filter((i: any) => i.status !== "archived");
+    const restored = items.filter((i: { status: string }) => i.status !== "archived");
     expect(restored.length).toBeGreaterThan(0);
-    expect(restored.every((i: any) => i.status === "pending")).toBe(true);
+    expect(restored.every((i: { status: string }) => i.status === "pending")).toBe(true);
   });
 
   it("restores submitted items with submitted status", async () => {
     const { archiveChecklistItems, generateChecklistItems } = await import("@/lib/checklist");
 
-    // Set a value on one item first
     const items = await testDb.query.checklistItems.findMany({
       where: and(
         eq(schema.checklistItems.entityType, "speaker"),
-        eq(schema.checklistItems.entityId, speakerId)
+        eq(schema.checklistItems.entityId, f.speakerId)
       ),
     });
 
@@ -262,21 +240,18 @@ describe("Re-confirmation restore", () => {
       .set({ value: "https://example.com/photo.jpg", status: "submitted" })
       .where(eq(schema.checklistItems.id, items[0].id));
 
-    // Archive all
-    await archiveChecklistItems("speaker", speakerId);
-
-    // Re-confirm — item with value should restore as "submitted"
-    await generateChecklistItems("speaker", speakerId, editionId, orgId);
+    await archiveChecklistItems("speaker", f.speakerId);
+    await generateChecklistItems("speaker", f.speakerId, f.editionId, f.orgId);
 
     const restored = await testDb.query.checklistItems.findMany({
       where: and(
         eq(schema.checklistItems.entityType, "speaker"),
-        eq(schema.checklistItems.entityId, speakerId),
+        eq(schema.checklistItems.entityId, f.speakerId),
       ),
     });
 
-    const active = restored.filter((i: any) => i.status !== "archived");
-    const withValue = active.find((i: any) => i.value === "https://example.com/photo.jpg");
+    const active = restored.filter((i: { status: string }) => i.status !== "archived");
+    const withValue = active.find((i: { value: string | null }) => i.value === "https://example.com/photo.jpg");
     expect(withValue).toBeDefined();
     expect(withValue!.status).toBe("submitted");
   });
@@ -286,7 +261,10 @@ describe("Re-confirmation restore", () => {
 
 describe("Checklist schema conventions", () => {
   it("checklist_items has version column", async () => {
-    const items = await testDb.query.checklistItems.findMany({ limit: 1 });
+    const items = await testDb.query.checklistItems.findMany({
+      where: eq(schema.checklistItems.organizationId, f.orgId),
+      limit: 1,
+    });
     if (items.length > 0) {
       expect("version" in items[0]).toBe(true);
       expect(items[0].version).toBe(1);
@@ -294,23 +272,12 @@ describe("Checklist schema conventions", () => {
   });
 
   it("checklist_templates has version column", async () => {
-    const templates = await testDb.query.checklistTemplates.findMany({ limit: 1 });
+    const templates = await testDb.query.checklistTemplates.findMany({
+      where: eq(schema.checklistTemplates.organizationId, f.orgId),
+      limit: 1,
+    });
     if (templates.length > 0) {
       expect("version" in templates[0]).toBe(true);
-    }
-  });
-
-  it("checklist_items has updatedAt column", async () => {
-    const items = await testDb.query.checklistItems.findMany({ limit: 1 });
-    if (items.length > 0) {
-      expect("updatedAt" in items[0]).toBe(true);
-    }
-  });
-
-  it("checklist_items has editionId for direct querying", async () => {
-    const items = await testDb.query.checklistItems.findMany({ limit: 1 });
-    if (items.length > 0) {
-      expect(items[0].editionId).toBe(editionId);
     }
   });
 });

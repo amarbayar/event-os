@@ -1,34 +1,33 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testDb } from "../setup";
 import * as schema from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { createTestFixtures, type TestFixtures } from "../fixtures";
 
 // ════════════════════════════════════════════════════════
 // SECURITY REGRESSION TESTS
 // Verifies that CSO audit findings are fixed and stay fixed.
 // Each test maps to a specific finding from the 2026-03-25 audit.
+//
+// Uses self-contained fixtures — no dependency on seed data.
 // ════════════════════════════════════════════════════════
 
 const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:3000";
 
+let f: TestFixtures;
 let orgId: string;
 let editionId: string;
 let speakerId: string;
 
 beforeAll(async () => {
-  const org = await testDb.query.organizations.findFirst();
-  if (!org) throw new Error("No organization found — run seed first");
-  orgId = org.id;
+  f = await createTestFixtures();
+  orgId = f.orgId;
+  editionId = f.editionId;
+  speakerId = f.speakerId;
+});
 
-  const edition = await testDb.query.eventEditions.findFirst();
-  if (!edition) throw new Error("No edition found — run seed first");
-  editionId = edition.id;
-
-  const speaker = await testDb.query.speakerApplications.findFirst({
-    where: eq(schema.speakerApplications.organizationId, orgId),
-  });
-  if (!speaker) throw new Error("No speaker found — run seed first");
-  speakerId = speaker.id;
+afterAll(async () => {
+  await f.cleanup();
 });
 
 // ─── Finding 1: Password hashing uses bcrypt ────────────

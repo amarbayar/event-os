@@ -13,30 +13,32 @@ const conn = await createConnection(TEST_DB_URL);
 export const testDb = conn.db;
 export const testClient = conn;
 
-// Helper to get active IDs for testing
+// Helper to get active IDs for testing — uses fixtures if no seed data exists
 export async function getTestIds() {
-  // Use the org with the most members (the seeded org, not manually created ones)
-  const { userOrganizations } = await import("@/db/schema");
-  const { eq, sql } = await import("drizzle-orm");
+  const { createTestFixtures } = await import("./fixtures");
+
+  // Try to find an existing org with data first
   const orgs = await testDb.query.organizations.findMany();
-  if (orgs.length === 0) throw new Error("No organization found — run seed first");
-  let org = orgs[0];
-  if (orgs.length > 1) {
-    const counts = await Promise.all(
-      orgs.map(async (o: typeof orgs[number]) => ({
-        org: o,
-        count: (await testDb.query.userOrganizations.findMany({
-          where: eq(userOrganizations.organizationId, o.id),
-        })).length,
-      }))
-    );
-    org = counts.sort((a, b) => b.count - a.count)[0].org;
+  for (const org of orgs) {
+    const members = await testDb.query.userOrganizations.findMany({
+      where: (uo: any, { eq }: any) => eq(uo.organizationId, org.id),
+    });
+    if (members.length >= 3) {
+      // Has enough users to be a seeded org
+      const edition = await testDb.query.eventEditions.findFirst({
+        where: (ed: any, { eq }: any) => eq(ed.organizationId, org.id),
+      });
+      if (edition) {
+        return { orgId: org.id, editionId: edition.id };
+      }
+    }
   }
 
-  const edition = await testDb.query.eventEditions.findFirst();
-  if (!edition) throw new Error("No edition found — run seed first");
-
-  return { orgId: org.id, editionId: edition.id };
+  // No suitable seed data — create fixtures
+  const fixtures = await createTestFixtures();
+  // Store cleanup for later (best-effort, process exit will also clean up)
+  (globalThis as any).__testFixturesCleanup = fixtures.cleanup;
+  return { orgId: fixtures.orgId, editionId: fixtures.editionId };
 }
 
 // Base URL for API tests
@@ -93,7 +95,6 @@ export async function apiCall(
       json = { error: `Non-JSON response (${res.status}): ${text.slice(0, 200)}` };
     }
 
-    // Retry on transient errors (but not on the last attempt)
     if (RETRYABLE.has(res.status) && attempt < MAX_RETRIES) {
       const delay = RETRY_DELAY_MS * (attempt + 1);
       console.warn(`[test] ${path} returned ${res.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
@@ -104,6 +105,5 @@ export async function apiCall(
     return { status: res.status, json };
   }
 
-  // Unreachable, but TypeScript needs it
   throw new Error("Exhausted retries");
 }
