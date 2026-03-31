@@ -27,12 +27,21 @@ interface TgChat {
   type: "private" | "group" | "supergroup" | "channel";
 }
 
+interface TgDocument {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+}
+
 interface TgMessage {
   message_id: number;
   from?: TgUser;
   chat: TgChat;
   text?: string;
+  caption?: string;
   entities?: { type: string; offset: number; length: number }[];
+  document?: TgDocument;
 }
 
 interface TgUpdate {
@@ -134,13 +143,23 @@ export class TelegramAdapter {
   // ─── Message handler ───────────────────────────
 
   private async onMessage(msg: TgMessage): Promise<void> {
-    if (!msg.from || !msg.text) return;
+    if (!msg.from) return;
+
+    // Extract text from message body or document attachment
+    let textContent = msg.text || msg.caption || "";
+    if (msg.document) {
+      const docText = await this.extractDocument(msg.document);
+      if (docText) {
+        textContent = textContent ? `${textContent}\n\n${docText}` : docText;
+      }
+    }
+    if (!textContent) return;
 
     const isGroupChat = msg.chat.type === "group" || msg.chat.type === "supergroup";
 
     if (isGroupChat && !this.isBotMentioned(msg)) return;
 
-    let input = isGroupChat ? this.stripMention(msg.text) : msg.text;
+    let input = isGroupChat ? this.stripMention(textContent) : textContent;
 
     if (input === "/start") {
       await this.sendMessage(
@@ -179,19 +198,20 @@ export class TelegramAdapter {
   // ─── Mention detection ─────────────────────────
 
   private isBotMentioned(msg: TgMessage): boolean {
-    if (!msg.text) return false;
+    const text = msg.text || msg.caption || "";
+    if (!text) return false;
 
     if (msg.entities) {
       for (const entity of msg.entities) {
         if (entity.type === "mention") {
-          const mention = msg.text.slice(entity.offset, entity.offset + entity.length);
+          const mention = text.slice(entity.offset, entity.offset + entity.length);
           if (mention.toLowerCase() === `@${this.botUsername.toLowerCase()}`) return true;
         }
         if (entity.type === "text_mention") return true;
       }
     }
 
-    const lower = msg.text.toLowerCase();
+    const lower = text.toLowerCase();
     const patterns = ["@agent", "@bot", "@assistant", "@eventbot", "@eventos"];
     return patterns.some((p) => lower.includes(p));
   }
@@ -200,6 +220,33 @@ export class TelegramAdapter {
     let cleaned = text.replace(new RegExp(`@${this.botUsername}`, "gi"), "").trim();
     cleaned = cleaned.replace(/@(?:agent|bot|assistant|eventbot|eventos)\b/gi, "").trim();
     return cleaned || text;
+  }
+
+  /** Download text-based document attachments via Telegram Bot API. */
+  private async extractDocument(doc: TgDocument): Promise<string> {
+    const textMimes = new Set(["text/plain", "text/csv", "text/tab-separated-values", "text/markdown", "application/json"]);
+    const textExts = new Set([".txt", ".csv", ".tsv", ".md", ".json"]);
+    const MAX_SIZE = 100_000;
+
+    const ext = doc.file_name?.match(/\.\w+$/)?.[0]?.toLowerCase() || "";
+    const isText = (doc.mime_type && textMimes.has(doc.mime_type)) || textExts.has(ext);
+    if (!isText) return "";
+    if (doc.file_size && doc.file_size > MAX_SIZE) return "";
+
+    try {
+      // Get file path from Telegram
+      const fileInfo = await this.api<{ file_path: string }>("getFile", { file_id: doc.file_id });
+      if (!fileInfo.file_path) return "";
+
+      // Download file content
+      const url = `https://api.telegram.org/file/bot${this.config.token}/${fileInfo.file_path}`;
+      const res = await fetch(url);
+      if (!res.ok) return "";
+      const text = await res.text();
+      return text.trim() ? `[File: ${doc.file_name || "attachment"}]\n${text}` : "";
+    } catch {
+      return "";
+    }
   }
 }
 

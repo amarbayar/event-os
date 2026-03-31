@@ -61,6 +61,12 @@ export class DiscordAdapter {
       input = input.replace(new RegExp(`<@!?${this.client.user.id}>`, "g"), "").trim();
     }
 
+    // Download text file attachments and append to input
+    const attachmentText = await this.extractAttachments(message);
+    if (attachmentText) {
+      input = input ? `${input}\n\n${attachmentText}` : attachmentText;
+    }
+
     if (!input) {
       await message.reply({ content: "How can I help? Ask me anything about the event.", allowedMentions: { repliedUser: false } });
       return;
@@ -93,5 +99,36 @@ export class DiscordAdapter {
       console.error("[discord] Error:", err);
       await message.reply({ content: "Something went wrong. Please try again.", allowedMentions: { repliedUser: false } }).catch(() => {});
     }
+  }
+
+  /** Download text-based attachments (txt, csv, tsv, md, json). */
+  private async extractAttachments(message: Message): Promise<string> {
+    if (!message.attachments.size) return "";
+
+    const textTypes = new Set(["text/plain", "text/csv", "text/tab-separated-values", "text/markdown", "application/json"]);
+    const textExts = new Set([".txt", ".csv", ".tsv", ".md", ".json"]);
+    const MAX_SIZE = 100_000; // 100KB per file
+
+    const parts: string[] = [];
+
+    for (const [, attachment] of message.attachments) {
+      const ext = attachment.name?.match(/\.\w+$/)?.[0]?.toLowerCase() || "";
+      const isText = (attachment.contentType && textTypes.has(attachment.contentType)) || textExts.has(ext);
+      if (!isText) continue;
+      if (attachment.size > MAX_SIZE) continue;
+
+      try {
+        const res = await fetch(attachment.url);
+        if (!res.ok) continue;
+        const text = await res.text();
+        if (text.trim()) {
+          parts.push(`[File: ${attachment.name}]\n${text}`);
+        }
+      } catch {
+        // Skip failed downloads
+      }
+    }
+
+    return parts.join("\n\n");
   }
 }
