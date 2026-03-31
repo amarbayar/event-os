@@ -134,7 +134,8 @@ async function checkAgentPermission(
   }
 
   // Organizer/coordinator: check team scope for the entity type
-  if (intent.intent === "manage" && intent.entityType) {
+  // Tasks are internal to-dos — any authenticated role above viewer can manage them
+  if (intent.intent === "manage" && intent.entityType && intent.entityType !== "task") {
     const hasScope = await userOwnsEntityType(ctx.userId, intent.entityType, ctx.orgId);
     if (!hasScope) {
       return {
