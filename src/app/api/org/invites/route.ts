@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       phone: phone || null,
       role,
       codeHash,
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
       invitedByUserId: ctx.user.id === "service" ? null : ctx.user.id,
     })
     .returning();

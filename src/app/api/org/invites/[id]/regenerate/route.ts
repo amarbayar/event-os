@@ -42,7 +42,7 @@ export async function POST(
     .update(orgInvites)
     .set({
       codeHash,
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
       attemptCount: 0,
       revokedAt: null, // clear revoked status if regenerating
       updatedAt: new Date(),
