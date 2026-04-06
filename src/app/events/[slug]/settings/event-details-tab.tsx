@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { useEventContext } from "@/lib/event-context";
 import { toast } from "sonner";
 import { toastApiError } from "@/lib/toast-helpers";
-import { useI18nWithFallback } from "@/lib/hooks/use-i18n-with-fallback";
+import { useSmartT } from "@/lib/hooks/use-i18n-with-fallback";
 
 type EditionData = {
   id: string;
@@ -40,11 +40,10 @@ export function EventDetailsTab() {
   const [status, setStatus] = useState("draft");
   const [cfpOpen, setCfpOpen] = useState(false);
 
-  const basicInfoText = useI18nWithFallback(
-    "Common",
-    "basicInformation",
-    "Basic Information",
-  );
+  const tSmart = useSmartT("Common");
+
+  const basicInfoText = tSmart("basicInformation", "Basic Information");
+  const eventNameText = tSmart("eventName", "Event Name");
 
   useEffect(() => {
     fetch(`/api/editions/${event.editionId}`)
@@ -123,7 +122,7 @@ export function EventDetailsTab() {
         <h2 className="text-lg font-medium">{basicInfoText}</h2>
 
         <div className="space-y-1.5">
-          <Label htmlFor="event-name">Event Name</Label>
+          <Label htmlFor="event-name">{eventNameText}</Label>
           <Input
             id="event-name"
             value={name}

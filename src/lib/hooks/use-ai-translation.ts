@@ -18,6 +18,11 @@ export function useAiTranslation(text: string) {
   const locale = useLocale();
   const [translated, setTranslated] = useState(text);
 
+  // Check if AI translation is enabled
+  if (process.env.NEXT_PUBLIC_ENABLE_AI_TRANSLATION !== "true") {
+    return text;
+  }
+
   useEffect(() => {
     setTranslated(text);
   }, [text]);
