@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { useEventContext } from "@/lib/event-context";
 import { toast } from "sonner";
 import { toastApiError } from "@/lib/toast-helpers";
-import { useSmartT } from "@/lib/hooks/use-i18n-with-fallback";
+import { useSmartT } from "@/lib/hooks/use-smart-t";
 
 type EditionData = {
   id: string;
