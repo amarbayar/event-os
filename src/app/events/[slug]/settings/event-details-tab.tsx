@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { useEventContext } from "@/lib/event-context";
 import { toast } from "sonner";
 import { toastApiError } from "@/lib/toast-helpers";
+import { useI18nWithFallback } from "@/lib/hooks/use-i18n-with-fallback";
 
 type EditionData = {
   id: string;
@@ -39,6 +40,12 @@ export function EventDetailsTab() {
   const [status, setStatus] = useState("draft");
   const [cfpOpen, setCfpOpen] = useState(false);
 
+  const basicInfoText = useI18nWithFallback(
+    "Common",
+    "basicInformation",
+    "Basic Information",
+  );
+
   useEffect(() => {
     fetch(`/api/editions/${event.editionId}`)
       .then((r) => r.json())
@@ -48,10 +55,10 @@ export function EventDetailsTab() {
           setEdition(e);
           setName(e.name);
           setStartDate(
-            e.startDate ? new Date(e.startDate).toISOString().slice(0, 10) : ""
+            e.startDate ? new Date(e.startDate).toISOString().slice(0, 10) : "",
           );
           setEndDate(
-            e.endDate ? new Date(e.endDate).toISOString().slice(0, 10) : ""
+            e.endDate ? new Date(e.endDate).toISOString().slice(0, 10) : "",
           );
           setVenue(e.venue ?? "");
           setTimezone(e.timezone ?? "Asia/Ulaanbaatar");
@@ -113,7 +120,7 @@ export function EventDetailsTab() {
     <div className="max-w-xl space-y-6">
       {/* Basic Info */}
       <div className="space-y-4">
-        <h2 className="text-lg font-medium">Basic Information</h2>
+        <h2 className="text-lg font-medium">{basicInfoText}</h2>
 
         <div className="space-y-1.5">
           <Label htmlFor="event-name">Event Name</Label>
