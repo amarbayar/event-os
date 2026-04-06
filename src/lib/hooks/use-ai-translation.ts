@@ -14,39 +14,36 @@ function looksLikeMongolian(text: string) {
   return /[\u0400-\u04FF]/.test(text);
 }
 
+const ENABLED = process.env.NEXT_PUBLIC_ENABLE_AI_TRANSLATION === "true";
+
 export function useAiTranslation(text: string) {
   const locale = useLocale();
   const [translated, setTranslated] = useState(text);
-
-  // Check if AI translation is enabled
-  if (process.env.NEXT_PUBLIC_ENABLE_AI_TRANSLATION !== "true") {
-    return text;
-  }
 
   useEffect(() => {
     setTranslated(text);
   }, [text]);
 
   useEffect(() => {
-    if (!text) {
-      return;
-    }
+    if (!ENABLED || !text) return;
 
-    const cacheKey = `${locale}:${text.trim().toLowerCase()}`;
+    const normalized = text.trim().toLowerCase();
+    const cacheKey = `${locale}:${normalized}`;
+
     const cached = cache.get(cacheKey);
 
     if (cached) {
       if (typeof cached === "string") {
         setTranslated(cached);
       } else {
-        cached.then((res) => {
-          setTranslated(res);
-        });
+        cached.then(setTranslated);
       }
       return;
     }
 
     const isMn = looksLikeMongolian(text);
+
+    // Skip unnecessary translation
     if ((locale === "mn" && isMn) || (locale === "en" && !isMn)) {
       setTranslated(text);
       return;
@@ -63,22 +60,14 @@ export function useAiTranslation(text: string) {
       },
       body: JSON.stringify({ text, target }),
     })
-      .then((res) => {
-        return res.json();
-      })
-      .then((data) => {
-        return data.translated || text;
-      })
-      .catch((err) => {
-        return text;
-      });
+      .then((res) => res.json())
+      .then((data) => data.translated || text)
+      .catch(() => text);
 
     cache.set(cacheKey, promise);
 
     promise.then((result) => {
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
 
       cache.set(cacheKey, result);
       setTranslated(result);

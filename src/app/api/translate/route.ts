@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { translateText } from "@/lib/i18n/translate";
 import { ratelimit } from "@/lib/rate-limit";
+import { redis } from "@/lib/redis";
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,16 +38,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid text" }, { status: 400 });
     }
 
-    if (text.length > 500) {
+    if (text.length > 1000) {
       return NextResponse.json(
         { error: "Text too long (max 500 chars)" },
         { status: 400 },
       );
     }
 
+    const normalized = text.trim().toLowerCase().replace(/\s+/g, " ");
+    const cacheKey = `translate:${source || "auto"}:${target}:${normalized}`;
+
+    const cached = await redis.get<string>(cacheKey);
+    if (cached) {
+      return NextResponse.json({ translated: cached });
+    }
+
     const translated = await translateText(text, {
       target,
       source,
+    });
+
+    await redis.set(cacheKey, translated, {
+      ex: 60 * 60 * 24 * 7,
     });
 
     return NextResponse.json({ translated });
