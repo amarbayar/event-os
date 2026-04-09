@@ -1,31 +1,32 @@
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
+import { db } from "@/db";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import {
-  updatePayment,
-  findPaymentByProviderRef,
-} from "@/lib/payments/payment-service";
+import { updatePayment } from "@/lib/payments/payment-service";
 import { isStripeWebhookEnabled } from "@/lib/helpers/check-stripe";
+import Stripe from "stripe";
+import { log } from "console";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   if (!isStripeWebhookEnabled()) {
-    console.warn(
-      "Stripe webhook received but Stripe webhook is disabled or not configured",
-    );
+    console.warn("Stripe webhook received but not configured");
     return NextResponse.json({ ok: true });
   }
 
   const body = await req.text();
   const sig = (await headers()).get("stripe-signature");
+  if (!sig) {
+    return new NextResponse("Missing signature", { status: 400 });
+  }
 
-  let event;
+  let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       body,
-      sig!,
+      sig,
       process.env.STRIPE_WEBHOOK_SECRET!,
     );
   } catch (err) {
@@ -35,18 +36,38 @@ export async function POST(req: Request) {
 
   try {
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      const sessionId = session.id;
+      const session = event.data.object as Stripe.Checkout.Session;
+      const paymentId = session.metadata?.paymentId;
 
-      const payment = await findPaymentByProviderRef(sessionId);
-      if (!payment) {
-        console.error("Payment not found for session:", sessionId);
+      if (!paymentId) {
+        console.error("Missing paymentId in metadata");
         return NextResponse.json({ ok: true });
       }
-      await updatePayment(payment.id, {
+
+      const existing = await db.query.payments.findFirst({
+        where: (
+          p: { id: string },
+          { eq }: { eq: (a: string, b: string) => boolean },
+        ) => eq(p.id, paymentId),
+      });
+
+      if (!existing) {
+        console.error("Payment not found:", paymentId);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (existing.status === "paid") {
+        return NextResponse.json({ ok: true });
+      }
+
+      console.log("Setting paid");
+
+      await updatePayment(paymentId, {
         status: "paid",
         paidAt: new Date(),
       });
+    } else {
+      console.log("Unhandled Stripe event:", event.type);
     }
 
     return NextResponse.json({ received: true });

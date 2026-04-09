@@ -52,6 +52,19 @@ export const queueStatusEnum = pgEnum("queue_status", [
   "failed",
 ]);
 
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "paid",
+  "failed",
+  "cancelled",
+]);
+
+export const paymentProviderEnum = pgEnum("payment_provider", [
+  "stripe",
+  "qpay",
+  "bank",
+]);
+
 // ─── Organizations ───────────────────────────────────────
 
 export const organizations = pgTable("organizations", {
@@ -1133,8 +1146,8 @@ export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
   amount: integer("amount").notNull(),
   currency: text("currency").default("usd"),
-  status: varchar("status", { length: 50 }).default("pending"), // pending | paid | failed | cancelled
-  provider: text("provider").notNull(), // "stripe" | "qpay" | "bank"
+  status: paymentStatusEnum("status").default("pending"),
+  provider: paymentProviderEnum("provider").notNull(),
   providerRef: text("provider_ref"), // stripe session id / payment intent id
   description: text("description"),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),

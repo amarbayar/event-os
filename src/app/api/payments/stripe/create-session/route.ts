@@ -37,6 +37,9 @@ export async function POST(req: Request) {
         quantity: 1,
       },
     ],
+    metadata: {
+      paymentId: payment.id,
+    },
     success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/payment/cancel`,
   });

@@ -1019,6 +1019,21 @@ export const failedJobs = sqliteTable(
   (table) => [index("failed_jobs_name_idx").on(table.jobName)]
 );
 
+
+export const payments = sqliteTable("payments", {
+  id: uuidPk(),
+  amount: integer("amount").notNull(),
+  currency: text("currency").default("usd"),
+  status: text("status").default("pending"), // pending | paid | failed | cancelled
+  provider: text("provider").notNull(), // stripe | qpay | bank
+  providerRef: text("provider_ref"),
+  description: text("description"),
+  userId: text("user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
+  createdAt: tsNow("created_at"),
+  paidAt: text("paid_at"),
+});
 // ─── Relations ───────────────────────────────────────────
 
 export const organizationsRelations = relations(organizations, ({ many }) => ({
