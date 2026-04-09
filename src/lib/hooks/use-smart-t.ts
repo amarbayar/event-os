@@ -8,10 +8,9 @@ export function useSmartT(namespace: string) {
 
   return (key: string, fallback: string) => {
     const hasKey = typeof t.has === "function" && t.has(key);
-
-    const baseText = hasKey ? t(key) : fallback;
-
-    const translated = useAiTranslation(baseText);
-    return translated;
+    if (hasKey) {
+      return t(key);
+    }
+    return useAiTranslation(fallback);
   };
 }
