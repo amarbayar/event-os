@@ -39,3 +39,12 @@ export async function updatePayment(
 
   return payment;
 }
+
+export async function getPaymentById(id: string) {
+  return db.query.payments.findFirst({
+    where: (
+      p: { id: string },
+      { eq }: { eq: (a: string, b: string) => boolean },
+    ) => eq(p.id, id),
+  });
+}
