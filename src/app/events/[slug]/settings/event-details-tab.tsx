@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { useEventContext } from "@/lib/event-context";
 import { toast } from "sonner";
 import { toastApiError } from "@/lib/toast-helpers";
+import { useSmartT } from "@/lib/hooks/use-smart-t";
 
 type EditionData = {
   id: string;
@@ -39,6 +40,11 @@ export function EventDetailsTab() {
   const [status, setStatus] = useState("draft");
   const [cfpOpen, setCfpOpen] = useState(false);
 
+  const tSmart = useSmartT("Common");
+
+  const basicInfoText = tSmart("basicInformation", "Basic Information");
+  const eventNameText = tSmart("eventName", "Event Name");
+
   useEffect(() => {
     fetch(`/api/editions/${event.editionId}`)
       .then((r) => r.json())
@@ -48,10 +54,10 @@ export function EventDetailsTab() {
           setEdition(e);
           setName(e.name);
           setStartDate(
-            e.startDate ? new Date(e.startDate).toISOString().slice(0, 10) : ""
+            e.startDate ? new Date(e.startDate).toISOString().slice(0, 10) : "",
           );
           setEndDate(
-            e.endDate ? new Date(e.endDate).toISOString().slice(0, 10) : ""
+            e.endDate ? new Date(e.endDate).toISOString().slice(0, 10) : "",
           );
           setVenue(e.venue ?? "");
           setTimezone(e.timezone ?? "Asia/Ulaanbaatar");
@@ -113,10 +119,10 @@ export function EventDetailsTab() {
     <div className="max-w-xl space-y-6">
       {/* Basic Info */}
       <div className="space-y-4">
-        <h2 className="text-lg font-medium">Basic Information</h2>
+        <h2 className="text-lg font-medium">{basicInfoText}</h2>
 
         <div className="space-y-1.5">
-          <Label htmlFor="event-name">Event Name</Label>
+          <Label htmlFor="event-name">{eventNameText}</Label>
           <Input
             id="event-name"
             value={name}

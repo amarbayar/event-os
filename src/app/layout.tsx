@@ -19,7 +19,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Event OS",
-  description: "Your event command center. Manage speakers, schedule sessions, track sponsors, and run check-in.",
+  description:
+    "Your event command center. Manage speakers, schedule sessions, track sponsors, and run check-in.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -44,9 +45,7 @@ export default async function RootLayout({
       className={`${dmSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
-        <NextIntlClientProvider>
-          {children}
-        </NextIntlClientProvider>
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
         <Toaster />
       </body>
     </html>
