@@ -1032,7 +1032,7 @@ export const payments = sqliteTable("payments", {
     onDelete: "cascade",
   }),
   createdAt: tsNow("created_at"),
-  paidAt: text("paid_at"),
+  paidAt: ts("paid_at"),
 });
 // ─── Relations ───────────────────────────────────────────
 
