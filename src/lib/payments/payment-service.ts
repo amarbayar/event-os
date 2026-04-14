@@ -28,7 +28,7 @@ export async function updatePayment(
   data: Partial<{
     providerRef: string;
     status: PaymentStatus;
-    paidAt: Date;
+    paidAt: Date | number;
   }>,
 ) {
   const [payment] = await db

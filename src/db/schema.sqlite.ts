@@ -10,7 +10,10 @@ import { randomUUID } from "crypto";
 
 // ─── Helper defaults ────────────────────────────────────
 
-const uuidPk = () => text("id").$defaultFn(() => randomUUID()).primaryKey();
+const uuidPk = () =>
+  text("id")
+    .$defaultFn(() => randomUUID())
+    .primaryKey();
 const uuidCol = (name: string) => text(name);
 const ts = (name: string) => integer(name, { mode: "timestamp" });
 const tsNow = (name: string) =>
@@ -83,7 +86,7 @@ export const eventEditions = sqliteTable(
   (table) => [
     index("edition_org_idx").on(table.organizationId),
     index("edition_slug_idx").on(table.slug),
-  ]
+  ],
 );
 
 // ─── Tracks ──────────────────────────────────────────────
@@ -110,7 +113,9 @@ export const speakerApplications = sqliteTable(
     organizationId: uuidCol("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuidCol("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuidCol("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     name: text("name").notNull(),
     email: text("email").notNull(),
     phone: text("phone"),
@@ -133,7 +138,9 @@ export const speakerApplications = sqliteTable(
     source: text("source").default("intake").notNull(),
     stage: text("stage").default("lead").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: tsNow("created_at"),
     updatedAt: tsNow("updated_at"),
@@ -142,7 +149,7 @@ export const speakerApplications = sqliteTable(
     index("speaker_edition_status_idx").on(table.editionId, table.status),
     index("speaker_edition_stage_idx").on(table.editionId, table.stage),
     index("speaker_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Sessions ────────────────────────────────────────────
@@ -157,8 +164,12 @@ export const sessions = sqliteTable(
     organizationId: uuidCol("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    trackId: uuidCol("track_id").references(() => tracks.id, { onDelete: "set null" }),
-    speakerId: uuidCol("speaker_id").references(() => speakerApplications.id, { onDelete: "set null" }),
+    trackId: uuidCol("track_id").references(() => tracks.id, {
+      onDelete: "set null",
+    }),
+    speakerId: uuidCol("speaker_id").references(() => speakerApplications.id, {
+      onDelete: "set null",
+    }),
     title: text("title").notNull(),
     description: text("description"),
     type: text("type").default("talk").notNull(),
@@ -167,7 +178,9 @@ export const sessions = sqliteTable(
     room: text("room"),
     day: integer("day").default(1).notNull(),
     sortOrder: integer("sort_order").default(0).notNull(),
-    hostId: uuidCol("host_id").references(() => users.id, { onDelete: "set null" }),
+    hostId: uuidCol("host_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     panelSpeakerIds: json("panel_speaker_ids").$type<string[]>(),
     durationMinutes: integer("duration_minutes").default(30).notNull(),
     version: integer("version").default(1).notNull(),
@@ -177,7 +190,7 @@ export const sessions = sqliteTable(
   (table) => [
     index("session_edition_time_idx").on(table.editionId, table.startTime),
     index("session_edition_speaker_idx").on(table.editionId, table.speakerId),
-  ]
+  ],
 );
 
 // ─── Sponsor Applications ────────────────────────────────
@@ -192,7 +205,9 @@ export const sponsorApplications = sqliteTable(
     organizationId: uuidCol("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuidCol("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuidCol("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     companyName: text("company_name").notNull(),
     contactName: text("contact_name").notNull(),
     contactEmail: text("contact_email").notNull(),
@@ -203,12 +218,14 @@ export const sponsorApplications = sqliteTable(
     source: text("source").default("intake").notNull(),
     stage: text("stage").default("lead").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: tsNow("created_at"),
     updatedAt: tsNow("updated_at"),
   },
-  (table) => [index("sponsor_org_idx").on(table.organizationId)]
+  (table) => [index("sponsor_org_idx").on(table.organizationId)],
 );
 
 // ─── Attendees ───────────────────────────────────────────
@@ -223,7 +240,9 @@ export const attendees = sqliteTable(
     organizationId: uuidCol("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuidCol("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuidCol("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     name: text("name").notNull(),
     email: text("email").notNull(),
     ticketType: text("ticket_type").default("general").notNull(),
@@ -234,14 +253,16 @@ export const attendees = sqliteTable(
     source: text("source").default("intake").notNull(),
     stage: text("stage").default("lead").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: tsNow("created_at"),
   },
   (table) => [
     index("attendee_edition_qr_idx").on(table.editionId, table.qrHash),
     index("attendee_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Event Queue ─────────────────────────────────────────
@@ -263,7 +284,7 @@ export const eventQueue = sqliteTable(
   },
   (table) => [
     index("queue_status_created_idx").on(table.status, table.createdAt),
-  ]
+  ],
 );
 
 // ─── Venues ──────────────────────────────────────────────
@@ -287,7 +308,9 @@ export const venues = sqliteTable(
     priceQuote: text("price_quote"),
     status: text("status").default("identified").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     pros: text("pros"),
     cons: text("cons"),
     mainImageUrl: text("main_image_url"),
@@ -304,7 +327,7 @@ export const venues = sqliteTable(
   (table) => [
     index("venue_edition_idx").on(table.editionId),
     index("venue_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Outreach (proactive sourcing for any entity) ────────
@@ -319,7 +342,9 @@ export const outreach = sqliteTable(
     organizationId: uuidCol("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuidCol("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuidCol("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     targetType: text("target_type").notNull(),
     name: text("name").notNull(),
     email: text("email"),
@@ -327,7 +352,9 @@ export const outreach = sqliteTable(
     role: text("role"),
     status: text("status").default("identified").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     lastContactDate: ts("last_contact_date"),
     nextFollowUp: ts("next_follow_up"),
     source: text("source"),
@@ -341,14 +368,16 @@ export const outreach = sqliteTable(
     index("outreach_edition_type_idx").on(table.editionId, table.targetType),
     index("outreach_org_idx").on(table.organizationId),
     index("outreach_followup_idx").on(table.nextFollowUp),
-  ]
+  ],
 );
 
 // ─── Teams ───────────────────────────────────────────────
 
 export const teams = sqliteTable("teams", {
   id: uuidPk(),
-  editionId: uuidCol("edition_id").references(() => eventEditions.id, { onDelete: "cascade" }),
+  editionId: uuidCol("edition_id").references(() => eventEditions.id, {
+    onDelete: "cascade",
+  }),
   organizationId: uuidCol("organization_id")
     .notNull()
     .references(() => organizations.id, { onDelete: "cascade" }),
@@ -371,7 +400,7 @@ export const teamEntityTypes = sqliteTable(
   },
   (table) => [
     uniqueIndex("team_entity_type_uniq").on(table.teamId, table.entityType),
-  ]
+  ],
 );
 
 export const teamMembers = sqliteTable("team_members", {
@@ -379,7 +408,9 @@ export const teamMembers = sqliteTable("team_members", {
   teamId: uuidCol("team_id")
     .notNull()
     .references(() => teams.id, { onDelete: "cascade" }),
-  userId: uuidCol("user_id").references(() => users.id, { onDelete: "set null" }),
+  userId: uuidCol("user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
   name: text("name").notNull(),
   email: text("email"),
   role: text("role"),
@@ -398,12 +429,16 @@ export const tasks = sqliteTable(
     organizationId: uuidCol("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    teamId: uuidCol("team_id").references(() => teams.id, { onDelete: "set null" }),
+    teamId: uuidCol("team_id").references(() => teams.id, {
+      onDelete: "set null",
+    }),
     title: text("title").notNull(),
     description: text("description"),
     status: text("status").default("todo").notNull(),
     priority: text("priority").default("medium").notNull(),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     assigneeName: text("assignee_name"),
     dueDate: ts("due_date"),
     linkedEntityType: text("linked_entity_type"),
@@ -420,7 +455,7 @@ export const tasks = sqliteTable(
     index("task_assignee_idx").on(table.assigneeId),
     index("task_due_idx").on(table.dueDate),
     index("task_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Invitations / Guest Allocations ─────────────────────
@@ -449,7 +484,9 @@ export const invitations = sqliteTable(
     source: text("source").default("intake").notNull(),
     stage: text("stage").default("lead").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: tsNow("created_at"),
   },
@@ -458,7 +495,7 @@ export const invitations = sqliteTable(
     index("invitation_org_idx").on(table.organizationId),
     index("invitation_source_idx").on(table.sourceType, table.sourceId),
     index("invitation_qr_idx").on(table.editionId, table.qrHash),
-  ]
+  ],
 );
 
 // ─── Volunteer Applications ──────────────────────────────
@@ -473,7 +510,9 @@ export const volunteerApplications = sqliteTable(
     organizationId: uuidCol("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuidCol("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuidCol("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     name: text("name").notNull(),
     email: text("email").notNull(),
     phone: text("phone"),
@@ -488,7 +527,9 @@ export const volunteerApplications = sqliteTable(
     source: text("source").default("intake").notNull(),
     stage: text("stage").default("lead").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: tsNow("created_at"),
     updatedAt: tsNow("updated_at"),
@@ -496,7 +537,7 @@ export const volunteerApplications = sqliteTable(
   (table) => [
     index("volunteer_edition_idx").on(table.editionId),
     index("volunteer_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Booths ──────────────────────────────────────────────
@@ -520,13 +561,17 @@ export const booths = sqliteTable(
     size: text("size"),
     price: integer("price"),
     status: text("status").default("available").notNull(),
-    sponsorId: uuidCol("sponsor_id").references(() => sponsorApplications.id, { onDelete: "set null" }),
+    sponsorId: uuidCol("sponsor_id").references(() => sponsorApplications.id, {
+      onDelete: "set null",
+    }),
     equipment: text("equipment"),
     notes: text("notes"),
     source: text("source").default("intake").notNull(),
     stage: text("stage").default("lead").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: tsNow("created_at"),
     updatedAt: tsNow("updated_at"),
@@ -534,7 +579,7 @@ export const booths = sqliteTable(
   (table) => [
     index("booth_edition_idx").on(table.editionId),
     index("booth_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Media Partners ──────────────────────────────────────
@@ -562,7 +607,9 @@ export const mediaPartners = sqliteTable(
     source: text("source").default("intake").notNull(),
     stage: text("stage").default("lead").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: tsNow("created_at"),
     updatedAt: tsNow("updated_at"),
@@ -570,7 +617,7 @@ export const mediaPartners = sqliteTable(
   (table) => [
     index("media_edition_idx").on(table.editionId),
     index("media_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Marketing Campaigns ─────────────────────────────────
@@ -592,12 +639,18 @@ export const campaigns = sqliteTable(
     scheduledDate: ts("scheduled_date"),
     publishedDate: ts("published_date"),
     status: text("status").default("draft").notNull(),
-    speakerId: uuidCol("speaker_id").references(() => speakerApplications.id, { onDelete: "set null" }),
-    sponsorId: uuidCol("sponsor_id").references(() => sponsorApplications.id, { onDelete: "set null" }),
+    speakerId: uuidCol("speaker_id").references(() => speakerApplications.id, {
+      onDelete: "set null",
+    }),
+    sponsorId: uuidCol("sponsor_id").references(() => sponsorApplications.id, {
+      onDelete: "set null",
+    }),
     notes: text("notes"),
     source: text("source").default("intake").notNull(),
     assignedTo: text("assigned_to"),
-    assigneeId: uuidCol("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuidCol("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: tsNow("created_at"),
     updatedAt: tsNow("updated_at"),
@@ -606,7 +659,7 @@ export const campaigns = sqliteTable(
     index("campaign_edition_idx").on(table.editionId),
     index("campaign_org_idx").on(table.organizationId),
     index("campaign_scheduled_idx").on(table.scheduledDate),
-  ]
+  ],
 );
 
 // ─── Entity Notes / Discussion Thread ────────────────────
@@ -629,7 +682,7 @@ export const entityNotes = sqliteTable(
   (table) => [
     index("note_entity_idx").on(table.entityType, table.entityId),
     index("note_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Checklist Templates ─────────────────────────────────
@@ -659,7 +712,7 @@ export const checklistTemplates = sqliteTable(
   },
   (table) => [
     index("checklist_tpl_edition_idx").on(table.editionId, table.entityType),
-  ]
+  ],
 );
 
 // ─── Checklist Items ─────────────────────────────────────
@@ -682,7 +735,9 @@ export const checklistItems = sqliteTable(
     status: text("status").default("pending").notNull(),
     value: text("value"),
     submittedAt: ts("submitted_at"),
-    approvedBy: uuidCol("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedBy: uuidCol("approved_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     approvedAt: ts("approved_at"),
     notes: text("notes"),
     reminderSentAt: ts("reminder_sent_at"),
@@ -692,8 +747,11 @@ export const checklistItems = sqliteTable(
   },
   (table) => [
     index("checklist_item_entity_idx").on(table.entityType, table.entityId),
-    index("checklist_item_edition_idx").on(table.editionId, table.organizationId),
-  ]
+    index("checklist_item_edition_idx").on(
+      table.editionId,
+      table.organizationId,
+    ),
+  ],
 );
 
 // ─── Notifications ───────────────────────────────────────
@@ -708,8 +766,9 @@ export const notifications = sqliteTable(
     organizationId: uuidCol("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    editionId: uuidCol("edition_id")
-      .references(() => eventEditions.id, { onDelete: "cascade" }),
+    editionId: uuidCol("edition_id").references(() => eventEditions.id, {
+      onDelete: "cascade",
+    }),
     type: text("type").notNull(),
     title: text("title").notNull(),
     message: text("message"),
@@ -723,7 +782,7 @@ export const notifications = sqliteTable(
   (table) => [
     index("notification_user_idx").on(table.userId, table.read),
     index("notification_created_idx").on(table.createdAt),
-  ]
+  ],
 );
 
 // ─── Audit Log ───────────────────────────────────────────
@@ -732,7 +791,9 @@ export const auditLog = sqliteTable(
   "audit_log",
   {
     id: uuidPk(),
-    organizationId: uuidCol("organization_id").references(() => organizations.id),
+    organizationId: uuidCol("organization_id").references(
+      () => organizations.id,
+    ),
     entityType: text("entity_type").notNull(),
     entityId: uuidCol("entity_id").notNull(),
     action: text("action").notNull(),
@@ -741,9 +802,7 @@ export const auditLog = sqliteTable(
     source: text("source").default("web").notNull(),
     createdAt: tsNow("created_at"),
   },
-  (table) => [
-    index("audit_entity_idx").on(table.entityType, table.entityId),
-  ]
+  (table) => [index("audit_entity_idx").on(table.entityType, table.entityId)],
 );
 
 // ─── Email Log ──────────────────────────────────────────
@@ -752,7 +811,9 @@ export const emailLog = sqliteTable(
   "email_log",
   {
     id: uuidPk(),
-    organizationId: uuidCol("organization_id").references(() => organizations.id),
+    organizationId: uuidCol("organization_id").references(
+      () => organizations.id,
+    ),
     driver: text("driver").notNull(), // mailgun, postmark, log
     fromEmail: text("from_email").notNull(),
     toEmails: json("to_emails").notNull(), // JSON array of email strings
@@ -768,8 +829,12 @@ export const emailLog = sqliteTable(
     index("email_log_org_idx").on(table.organizationId),
     index("email_log_entity_idx").on(table.entityType, table.entityId),
     index("email_log_created_idx").on(table.createdAt),
-    index("email_log_dedup_idx").on(table.entityId, table.subject, table.createdAt),
-  ]
+    index("email_log_dedup_idx").on(
+      table.entityId,
+      table.subject,
+      table.createdAt,
+    ),
+  ],
 );
 
 // ─── Contacts (cross-org person identity) ────────────────
@@ -790,9 +855,7 @@ export const contacts = sqliteTable(
     createdAt: tsNow("created_at"),
     updatedAt: tsNow("updated_at"),
   },
-  (table) => [
-    index("contact_email_idx").on(table.email),
-  ]
+  (table) => [index("contact_email_idx").on(table.email)],
 );
 
 // ─── Users (for NextAuth) ────────────────────────────────
@@ -806,7 +869,9 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash"),
   phone: text("phone"),
   forcePasswordChange: bool("force_password_change").default(false).notNull(),
-  contactId: uuidCol("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  contactId: uuidCol("contact_id").references(() => contacts.id, {
+    onDelete: "set null",
+  }),
   preferredLocale: text("preferred_locale").default("en"),
   createdAt: tsNow("created_at"),
 });
@@ -832,7 +897,7 @@ export const userOrganizations = sqliteTable(
     uniqueIndex("user_org_uniq").on(table.userId, table.organizationId),
     index("user_org_user_idx").on(table.userId),
     index("user_org_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── User ↔ Platform Links (bot identity mapping) ──
@@ -856,7 +921,7 @@ export const userPlatformLinks = sqliteTable(
     uniqueIndex("platform_link_uniq").on(table.platform, table.platformUserId),
     index("platform_link_user_idx").on(table.userId),
     index("platform_link_lookup_idx").on(table.platform, table.platformUserId),
-  ]
+  ],
 );
 
 // ─── Messaging Channel Config (per-org) ─────────────────
@@ -878,8 +943,11 @@ export const messagingChannels = sqliteTable(
     createdAt: tsNow("created_at"),
   },
   (table) => [
-    uniqueIndex("messaging_channel_uniq").on(table.organizationId, table.platform),
-  ]
+    uniqueIndex("messaging_channel_uniq").on(
+      table.organizationId,
+      table.platform,
+    ),
+  ],
 );
 
 export const authSessions = sqliteTable("auth_sessions", {
@@ -918,7 +986,7 @@ export const verificationTokens = sqliteTable(
   },
   (table) => [
     uniqueIndex("verification_token_uniq").on(table.identifier, table.token),
-  ]
+  ],
 );
 
 // ─── Org Invites (seat-first invite system) ─────────────
@@ -954,10 +1022,13 @@ export const orgInvites = sqliteTable(
     claimedAt: ts("claimed_at"),
     revokedAt: ts("revoked_at"),
     attemptCount: integer("attempt_count").default(0).notNull(),
-    invitedByUserId: uuidCol("invited_by_user_id")
-      .references(() => users.id, { onDelete: "set null" }),
-    acceptedByUserId: uuidCol("accepted_by_user_id")
-      .references(() => users.id, { onDelete: "set null" }),
+    invitedByUserId: uuidCol("invited_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    acceptedByUserId: uuidCol("accepted_by_user_id").references(
+      () => users.id,
+      { onDelete: "set null" },
+    ),
     createdAt: tsNow("created_at"),
     updatedAt: tsNow("updated_at"),
     version: integer("version").default(1).notNull(),
@@ -965,7 +1036,7 @@ export const orgInvites = sqliteTable(
   (table) => [
     index("org_invite_email_org_idx").on(table.email, table.organizationId),
     index("org_invite_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Job Queue ──────────────────────────────────────────
@@ -999,10 +1070,10 @@ export const jobs = sqliteTable(
     index("jobs_queue_status_available_idx").on(
       table.queue,
       table.status,
-      table.availableAt
+      table.availableAt,
     ),
     uniqueIndex("jobs_unique_key_idx").on(table.uniqueKey),
-  ]
+  ],
 );
 
 export const failedJobs = sqliteTable(
@@ -1016,9 +1087,8 @@ export const failedJobs = sqliteTable(
     organizationId: uuidCol("organization_id"),
     failedAt: tsNow("failed_at"),
   },
-  (table) => [index("failed_jobs_name_idx").on(table.jobName)]
+  (table) => [index("failed_jobs_name_idx").on(table.jobName)],
 );
-
 
 export const payments = sqliteTable("payments", {
   id: uuidPk(),
@@ -1042,16 +1112,13 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   userOrganizations: many(userOrganizations),
 }));
 
-export const eventSeriesRelations = relations(
-  eventSeries,
-  ({ one, many }) => ({
-    organization: one(organizations, {
-      fields: [eventSeries.organizationId],
-      references: [organizations.id],
-    }),
-    editions: many(eventEditions),
-  })
-);
+export const eventSeriesRelations = relations(eventSeries, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [eventSeries.organizationId],
+    references: [organizations.id],
+  }),
+  editions: many(eventEditions),
+}));
 
 export const eventEditionsRelations = relations(
   eventEditions,
@@ -1068,7 +1135,7 @@ export const eventEditionsRelations = relations(
     sessions: many(sessions),
     speakers: many(speakerApplications),
     attendees: many(attendees),
-  })
+  }),
 );
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -1102,7 +1169,7 @@ export const speakerApplicationsRelations = relations(
       references: [contacts.id],
     }),
     sessions: many(sessions),
-  })
+  }),
 );
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -1114,27 +1181,33 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   platformLinks: many(userPlatformLinks),
 }));
 
-export const userPlatformLinksRelations = relations(userPlatformLinks, ({ one }) => ({
-  user: one(users, {
-    fields: [userPlatformLinks.userId],
-    references: [users.id],
+export const userPlatformLinksRelations = relations(
+  userPlatformLinks,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userPlatformLinks.userId],
+      references: [users.id],
+    }),
+    organization: one(organizations, {
+      fields: [userPlatformLinks.organizationId],
+      references: [organizations.id],
+    }),
   }),
-  organization: one(organizations, {
-    fields: [userPlatformLinks.organizationId],
-    references: [organizations.id],
-  }),
-}));
+);
 
-export const userOrganizationsRelations = relations(userOrganizations, ({ one }) => ({
-  user: one(users, {
-    fields: [userOrganizations.userId],
-    references: [users.id],
+export const userOrganizationsRelations = relations(
+  userOrganizations,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userOrganizations.userId],
+      references: [users.id],
+    }),
+    organization: one(organizations, {
+      fields: [userOrganizations.organizationId],
+      references: [organizations.id],
+    }),
   }),
-  organization: one(organizations, {
-    fields: [userOrganizations.organizationId],
-    references: [organizations.id],
-  }),
-}));
+);
 
 export const orgInvitesRelations = relations(orgInvites, ({ one }) => ({
   organization: one(organizations, {
