@@ -43,16 +43,26 @@ export const editionStatusEnum = pgEnum("edition_status", [
   "archived",
 ]);
 
-export const agendaStatusEnum = pgEnum("agenda_status", [
-  "draft",
-  "published",
-]);
+export const agendaStatusEnum = pgEnum("agenda_status", ["draft", "published"]);
 
 export const queueStatusEnum = pgEnum("queue_status", [
   "pending",
   "processing",
   "done",
   "failed",
+]);
+
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "paid",
+  "failed",
+  "cancelled",
+]);
+
+export const paymentProviderEnum = pgEnum("payment_provider", [
+  "stripe",
+  "qpay",
+  "bank",
 ]);
 
 // ─── Organizations ───────────────────────────────────────
@@ -105,13 +115,13 @@ export const eventEditions = pgTable(
     endDate: timestamp("end_date"),
     venue: varchar("venue", { length: 500 }),
     status: editionStatusEnum("status").default("draft").notNull(),
-    agendaStatus: agendaStatusEnum("agenda_status")
-      .default("draft")
-      .notNull(),
+    agendaStatus: agendaStatusEnum("agenda_status").default("draft").notNull(),
     cfpOpen: boolean("cfp_open").default(false).notNull(),
     timezone: varchar("timezone", { length: 50 }).default("Asia/Ulaanbaatar"),
     agendaGapMinutes: integer("agenda_gap_minutes").default(5).notNull(),
-    agendaStartTime: varchar("agenda_start_time", { length: 5 }).default("09:00"),
+    agendaStartTime: varchar("agenda_start_time", { length: 5 }).default(
+      "09:00",
+    ),
     agendaEndTime: varchar("agenda_end_time", { length: 5 }).default("18:00"),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -120,7 +130,7 @@ export const eventEditions = pgTable(
   (table) => [
     index("edition_org_idx").on(table.organizationId),
     uniqueIndex("edition_slug_idx").on(table.slug),
-  ]
+  ],
 );
 
 // ─── Tracks ──────────────────────────────────────────────
@@ -147,7 +157,9 @@ export const speakerApplications = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuid("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     // Speaker info
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
@@ -174,7 +186,9 @@ export const speakerApplications = pgTable(
     source: varchar("source", { length: 50 }).default("intake").notNull(), // intake | outreach | sponsored
     stage: varchar("stage", { length: 50 }).default("lead").notNull(), // lead | engaged | confirmed | declined
     assignedTo: varchar("assigned_to", { length: 255 }),
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     // Meta
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -184,7 +198,7 @@ export const speakerApplications = pgTable(
     index("speaker_edition_status_idx").on(table.editionId, table.status),
     index("speaker_edition_stage_idx").on(table.editionId, table.stage),
     index("speaker_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Sessions ────────────────────────────────────────────
@@ -213,7 +227,9 @@ export const sessions = pgTable(
     room: varchar("room", { length: 255 }),
     day: integer("day").default(1).notNull(), // day number of the event
     sortOrder: integer("sort_order").default(0).notNull(),
-    hostId: uuid("host_id").references(() => users.id, { onDelete: "set null" }),
+    hostId: uuid("host_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     panelSpeakerIds: jsonb("panel_speaker_ids").$type<string[]>(),
     durationMinutes: integer("duration_minutes").default(30).notNull(),
     version: integer("version").default(1).notNull(),
@@ -223,7 +239,7 @@ export const sessions = pgTable(
   (table) => [
     index("session_edition_time_idx").on(table.editionId, table.startTime),
     index("session_edition_speaker_idx").on(table.editionId, table.speakerId),
-  ]
+  ],
 );
 
 // ─── Sponsor Applications ────────────────────────────────
@@ -238,7 +254,9 @@ export const sponsorApplications = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuid("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     companyName: varchar("company_name", { length: 255 }).notNull(),
     contactName: varchar("contact_name", { length: 255 }).notNull(),
     contactEmail: varchar("contact_email", { length: 255 }).notNull(),
@@ -249,12 +267,14 @@ export const sponsorApplications = pgTable(
     source: varchar("source", { length: 50 }).default("intake").notNull(),
     stage: varchar("stage", { length: 50 }).default("lead").notNull(),
     assignedTo: varchar("assigned_to", { length: 255 }),
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("sponsor_org_idx").on(table.organizationId)]
+  (table) => [index("sponsor_org_idx").on(table.organizationId)],
 );
 
 // ─── Attendees ───────────────────────────────────────────
@@ -269,7 +289,9 @@ export const attendees = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuid("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     ticketType: varchar("ticket_type", { length: 100 })
@@ -282,14 +304,16 @@ export const attendees = pgTable(
     source: varchar("source", { length: 50 }).default("intake").notNull(),
     stage: varchar("stage", { length: 50 }).default("lead").notNull(),
     assignedTo: varchar("assigned_to", { length: 255 }),
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     index("attendee_edition_qr_idx").on(table.editionId, table.qrHash),
     index("attendee_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Event Queue ─────────────────────────────────────────
@@ -311,7 +335,7 @@ export const eventQueue = pgTable(
   },
   (table) => [
     index("queue_status_created_idx").on(table.status, table.createdAt),
-  ]
+  ],
 );
 
 // ─── Venues ──────────────────────────────────────────────
@@ -335,7 +359,9 @@ export const venues = pgTable(
     priceQuote: text("price_quote"), // free-text for negotiation notes
     status: varchar("status", { length: 50 }).default("identified").notNull(), // identified, contacted, negotiating, proposal_received, finalized, declined
     assignedTo: varchar("assigned_to", { length: 255 }), // organizer responsible
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     pros: text("pros"),
     cons: text("cons"),
     mainImageUrl: text("main_image_url"),
@@ -352,7 +378,7 @@ export const venues = pgTable(
   (table) => [
     index("venue_edition_idx").on(table.editionId),
     index("venue_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Outreach (proactive sourcing for any entity) ────────
@@ -367,7 +393,9 @@ export const outreach = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuid("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     targetType: varchar("target_type", { length: 50 }).notNull(), // speaker, sponsor, booth, volunteer, media
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }),
@@ -375,7 +403,9 @@ export const outreach = pgTable(
     role: varchar("role", { length: 255 }), // their title/role
     status: varchar("status", { length: 50 }).default("identified").notNull(), // identified, contacted, interested, negotiating, confirmed, declined, converted
     assignedTo: varchar("assigned_to", { length: 255 }), // team member responsible
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     lastContactDate: timestamp("last_contact_date"),
     nextFollowUp: timestamp("next_follow_up"),
     source: varchar("source", { length: 255 }), // how we found them
@@ -389,26 +419,24 @@ export const outreach = pgTable(
     index("outreach_edition_type_idx").on(table.editionId, table.targetType),
     index("outreach_org_idx").on(table.organizationId),
     index("outreach_followup_idx").on(table.nextFollowUp),
-  ]
+  ],
 );
 
 // ─── Teams ───────────────────────────────────────────────
 
-export const teams = pgTable(
-  "teams",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    editionId: uuid("edition_id")
-      .references(() => eventEditions.id, { onDelete: "cascade" }), // nullable for org-wide RBAC teams
-    organizationId: uuid("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    name: varchar("name", { length: 255 }).notNull(), // Program, Logistics, Sponsors, etc.
-    color: varchar("color", { length: 7 }), // hex for UI
-    sortOrder: integer("sort_order").default(0).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  }
-);
+export const teams = pgTable("teams", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  editionId: uuid("edition_id").references(() => eventEditions.id, {
+    onDelete: "cascade",
+  }), // nullable for org-wide RBAC teams
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(), // Program, Logistics, Sponsors, etc.
+  color: varchar("color", { length: 7 }), // hex for UI
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 // ─── Team → Entity Type Mapping (RBAC) ──────────────────
 
@@ -423,23 +451,20 @@ export const teamEntityTypes = pgTable(
   },
   (table) => [
     uniqueIndex("team_entity_type_uniq").on(table.teamId, table.entityType),
-  ]
+  ],
 );
 
-export const teamMembers = pgTable(
-  "team_members",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    teamId: uuid("team_id")
-      .notNull()
-      .references(() => teams.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
-    name: varchar("name", { length: 255 }).notNull(),
-    email: varchar("email", { length: 255 }),
-    role: varchar("role", { length: 100 }), // lead, member
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  }
-);
+export const teamMembers = pgTable("team_members", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  teamId: uuid("team_id")
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  role: varchar("role", { length: 100 }), // lead, member
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 // ─── Tasks ───────────────────────────────────────────────
 
@@ -453,12 +478,16 @@ export const tasks = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
+    teamId: uuid("team_id").references(() => teams.id, {
+      onDelete: "set null",
+    }),
     title: varchar("title", { length: 500 }).notNull(),
     description: text("description"),
     status: varchar("status", { length: 50 }).default("todo").notNull(), // todo, in_progress, done, blocked
     priority: varchar("priority", { length: 20 }).default("medium").notNull(), // low, medium, high, urgent
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     assigneeName: varchar("assignee_name", { length: 255 }), // fallback if no user account
     dueDate: timestamp("due_date"),
     linkedEntityType: varchar("linked_entity_type", { length: 50 }), // speaker, sponsor, venue, session, etc.
@@ -475,7 +504,7 @@ export const tasks = pgTable(
     index("task_assignee_idx").on(table.assigneeId),
     index("task_due_idx").on(table.dueDate),
     index("task_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Invitations / Guest Allocations ─────────────────────
@@ -504,7 +533,9 @@ export const invitations = pgTable(
     source: varchar("source", { length: 50 }).default("intake").notNull(),
     stage: varchar("stage", { length: 50 }).default("lead").notNull(),
     assignedTo: varchar("assigned_to", { length: 255 }),
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -513,7 +544,7 @@ export const invitations = pgTable(
     index("invitation_org_idx").on(table.organizationId),
     index("invitation_source_idx").on(table.sourceType, table.sourceId),
     index("invitation_qr_idx").on(table.editionId, table.qrHash),
-  ]
+  ],
 );
 
 // ─── Volunteer Applications ──────────────────────────────
@@ -528,7 +559,9 @@ export const volunteerApplications = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    contactId: uuid("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     phone: varchar("phone", { length: 50 }),
@@ -543,7 +576,9 @@ export const volunteerApplications = pgTable(
     source: varchar("source", { length: 50 }).default("intake").notNull(),
     stage: varchar("stage", { length: 50 }).default("lead").notNull(),
     assignedTo: varchar("assigned_to", { length: 255 }),
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -551,7 +586,7 @@ export const volunteerApplications = pgTable(
   (table) => [
     index("volunteer_edition_idx").on(table.editionId),
     index("volunteer_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Booths ──────────────────────────────────────────────
@@ -583,7 +618,9 @@ export const booths = pgTable(
     source: varchar("source", { length: 50 }).default("intake").notNull(),
     stage: varchar("stage", { length: 50 }).default("lead").notNull(),
     assignedTo: varchar("assigned_to", { length: 255 }),
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -591,7 +628,7 @@ export const booths = pgTable(
   (table) => [
     index("booth_edition_idx").on(table.editionId),
     index("booth_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Media Partners ──────────────────────────────────────
@@ -619,7 +656,9 @@ export const mediaPartners = pgTable(
     source: varchar("source", { length: 50 }).default("intake").notNull(),
     stage: varchar("stage", { length: 50 }).default("lead").notNull(),
     assignedTo: varchar("assigned_to", { length: 255 }),
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -627,7 +666,7 @@ export const mediaPartners = pgTable(
   (table) => [
     index("media_edition_idx").on(table.editionId),
     index("media_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Marketing Campaigns ─────────────────────────────────
@@ -658,7 +697,9 @@ export const campaigns = pgTable(
     notes: text("notes"),
     source: varchar("source", { length: 50 }).default("intake").notNull(),
     assignedTo: varchar("assigned_to", { length: 255 }),
-    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeId: uuid("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -667,7 +708,7 @@ export const campaigns = pgTable(
     index("campaign_edition_idx").on(table.editionId),
     index("campaign_org_idx").on(table.organizationId),
     index("campaign_scheduled_idx").on(table.scheduledDate),
-  ]
+  ],
 );
 
 // ─── Audit Log ───────────────────────────────────────────
@@ -692,7 +733,7 @@ export const entityNotes = pgTable(
   (table) => [
     index("note_entity_idx").on(table.entityType, table.entityId),
     index("note_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Checklist Templates ─────────────────────────────────
@@ -722,7 +763,7 @@ export const checklistTemplates = pgTable(
   },
   (table) => [
     index("checklist_tpl_edition_idx").on(table.editionId, table.entityType),
-  ]
+  ],
 );
 
 // ─── Checklist Items ─────────────────────────────────────
@@ -745,7 +786,9 @@ export const checklistItems = pgTable(
     status: varchar("status", { length: 50 }).default("pending").notNull(),
     value: text("value"),
     submittedAt: timestamp("submitted_at"),
-    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedBy: uuid("approved_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     approvedAt: timestamp("approved_at"),
     notes: text("notes"),
     reminderSentAt: timestamp("reminder_sent_at"),
@@ -755,8 +798,11 @@ export const checklistItems = pgTable(
   },
   (table) => [
     index("checklist_item_entity_idx").on(table.entityType, table.entityId),
-    index("checklist_item_edition_idx").on(table.editionId, table.organizationId),
-  ]
+    index("checklist_item_edition_idx").on(
+      table.editionId,
+      table.organizationId,
+    ),
+  ],
 );
 
 // ─── Notifications ───────────────────────────────────────
@@ -771,8 +817,9 @@ export const notifications = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    editionId: uuid("edition_id")
-      .references(() => eventEditions.id, { onDelete: "cascade" }),
+    editionId: uuid("edition_id").references(() => eventEditions.id, {
+      onDelete: "cascade",
+    }),
     type: varchar("type", { length: 100 }).notNull(), // assignment, checklist_submitted, stage_change, comment, team_added, entity_created
     title: varchar("title", { length: 500 }).notNull(),
     message: text("message"),
@@ -786,7 +833,7 @@ export const notifications = pgTable(
   (table) => [
     index("notification_user_idx").on(table.userId, table.read),
     index("notification_created_idx").on(table.createdAt),
-  ]
+  ],
 );
 
 // ─── Audit Log ───────────────────────────────────────────
@@ -804,9 +851,7 @@ export const auditLog = pgTable(
     source: varchar("source", { length: 20 }).default("web").notNull(), // web, telegram, api
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [
-    index("audit_entity_idx").on(table.entityType, table.entityId),
-  ]
+  (table) => [index("audit_entity_idx").on(table.entityType, table.entityId)],
 );
 
 // ─── Email Log ──────────────────────────────────────────
@@ -815,7 +860,9 @@ export const emailLog = pgTable(
   "email_log",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+    organizationId: uuid("organization_id").references(() => organizations.id, {
+      onDelete: "set null",
+    }),
     driver: varchar("driver", { length: 50 }).notNull(), // mailgun, postmark, log
     fromEmail: varchar("from_email", { length: 255 }).notNull(),
     toEmails: jsonb("to_emails").notNull(), // JSON array of email strings
@@ -831,8 +878,12 @@ export const emailLog = pgTable(
     index("email_log_org_idx").on(table.organizationId),
     index("email_log_entity_idx").on(table.entityType, table.entityId),
     index("email_log_created_idx").on(table.createdAt),
-    index("email_log_dedup_idx").on(table.entityId, table.subject, table.createdAt),
-  ]
+    index("email_log_dedup_idx").on(
+      table.entityId,
+      table.subject,
+      table.createdAt,
+    ),
+  ],
 );
 
 // ─── Contacts (cross-org person identity) ────────────────
@@ -853,9 +904,7 @@ export const contacts = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [
-    index("contact_email_idx").on(table.email),
-  ]
+  (table) => [index("contact_email_idx").on(table.email)],
 );
 
 // ─── Users (for NextAuth) ────────────────────────────────
@@ -868,8 +917,12 @@ export const users = pgTable("users", {
   image: text("image"),
   passwordHash: text("password_hash"),
   phone: varchar("phone", { length: 50 }),
-  forcePasswordChange: boolean("force_password_change").default(false).notNull(),
-  contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  forcePasswordChange: boolean("force_password_change")
+    .default(false)
+    .notNull(),
+  contactId: uuid("contact_id").references(() => contacts.id, {
+    onDelete: "set null",
+  }),
   preferredLocale: varchar("preferred_locale", { length: 5 }).default("en"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -895,7 +948,7 @@ export const userOrganizations = pgTable(
     uniqueIndex("user_org_uniq").on(table.userId, table.organizationId),
     index("user_org_user_idx").on(table.userId),
     index("user_org_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Messaging Channel Config (per-org) ─────────────────
@@ -908,7 +961,7 @@ export const messagingChannels = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     platform: varchar("platform", { length: 50 }).notNull(), // telegram | discord | whatsapp
-    botToken: text("bot_token"),         // encrypted in prod, plaintext for now
+    botToken: text("bot_token"), // encrypted in prod, plaintext for now
     groupChatId: varchar("group_chat_id", { length: 100 }),
     groupTitle: varchar("group_title", { length: 255 }),
     botUsername: varchar("bot_username", { length: 255 }),
@@ -917,8 +970,11 @@ export const messagingChannels = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("messaging_channel_uniq").on(table.organizationId, table.platform),
-  ]
+    uniqueIndex("messaging_channel_uniq").on(
+      table.organizationId,
+      table.platform,
+    ),
+  ],
 );
 
 // ─── User ↔ Platform Links (bot identity mapping) ──
@@ -942,7 +998,7 @@ export const userPlatformLinks = pgTable(
     uniqueIndex("platform_link_uniq").on(table.platform, table.platformUserId),
     index("platform_link_user_idx").on(table.userId),
     index("platform_link_lookup_idx").on(table.platform, table.platformUserId),
-  ]
+  ],
 );
 
 export const authSessions = pgTable("auth_sessions", {
@@ -981,7 +1037,7 @@ export const verificationTokens = pgTable(
   },
   (table) => [
     uniqueIndex("verification_token_uniq").on(table.identifier, table.token),
-  ]
+  ],
 );
 
 // ─── Org Invites (seat-first invite system) ─────────────
@@ -1017,10 +1073,12 @@ export const orgInvites = pgTable(
     claimedAt: timestamp("claimed_at"),
     revokedAt: timestamp("revoked_at"),
     attemptCount: integer("attempt_count").default(0).notNull(),
-    invitedByUserId: uuid("invited_by_user_id")
-      .references(() => users.id, { onDelete: "set null" }),
-    acceptedByUserId: uuid("accepted_by_user_id")
-      .references(() => users.id, { onDelete: "set null" }),
+    invitedByUserId: uuid("invited_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    acceptedByUserId: uuid("accepted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     version: integer("version").default(1).notNull(),
@@ -1028,7 +1086,7 @@ export const orgInvites = pgTable(
   (table) => [
     index("org_invite_email_org_idx").on(table.email, table.organizationId),
     index("org_invite_org_idx").on(table.organizationId),
-  ]
+  ],
 );
 
 // ─── Job Queue ──────────────────────────────────────────
@@ -1064,10 +1122,10 @@ export const jobs = pgTable(
     index("jobs_queue_status_available_idx").on(
       table.queue,
       table.status,
-      table.availableAt
+      table.availableAt,
     ),
     uniqueIndex("jobs_unique_key_idx").on(table.uniqueKey),
-  ]
+  ],
 );
 
 export const failedJobs = pgTable(
@@ -1081,8 +1139,21 @@ export const failedJobs = pgTable(
     organizationId: uuid("organization_id"),
     failedAt: timestamp("failed_at").defaultNow().notNull(),
   },
-  (table) => [index("failed_jobs_name_idx").on(table.jobName)]
+  (table) => [index("failed_jobs_name_idx").on(table.jobName)],
 );
+
+export const payments = pgTable("payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  amount: integer("amount").notNull(),
+  currency: text("currency").default("usd"),
+  status: paymentStatusEnum("status").default("pending"),
+  provider: paymentProviderEnum("provider").notNull(),
+  providerRef: text("provider_ref"), // stripe session id / payment intent id
+  description: text("description"),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  paidAt: timestamp("paid_at"),
+});
 
 // ─── Relations ───────────────────────────────────────────
 
@@ -1092,16 +1163,13 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   userOrganizations: many(userOrganizations),
 }));
 
-export const eventSeriesRelations = relations(
-  eventSeries,
-  ({ one, many }) => ({
-    organization: one(organizations, {
-      fields: [eventSeries.organizationId],
-      references: [organizations.id],
-    }),
-    editions: many(eventEditions),
-  })
-);
+export const eventSeriesRelations = relations(eventSeries, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [eventSeries.organizationId],
+    references: [organizations.id],
+  }),
+  editions: many(eventEditions),
+}));
 
 export const eventEditionsRelations = relations(
   eventEditions,
@@ -1118,7 +1186,7 @@ export const eventEditionsRelations = relations(
     sessions: many(sessions),
     speakers: many(speakerApplications),
     attendees: many(attendees),
-  })
+  }),
 );
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -1152,7 +1220,7 @@ export const speakerApplicationsRelations = relations(
       references: [contacts.id],
     }),
     sessions: many(sessions),
-  })
+  }),
 );
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -1164,27 +1232,33 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   platformLinks: many(userPlatformLinks),
 }));
 
-export const userOrganizationsRelations = relations(userOrganizations, ({ one }) => ({
-  user: one(users, {
-    fields: [userOrganizations.userId],
-    references: [users.id],
+export const userOrganizationsRelations = relations(
+  userOrganizations,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userOrganizations.userId],
+      references: [users.id],
+    }),
+    organization: one(organizations, {
+      fields: [userOrganizations.organizationId],
+      references: [organizations.id],
+    }),
   }),
-  organization: one(organizations, {
-    fields: [userOrganizations.organizationId],
-    references: [organizations.id],
-  }),
-}));
+);
 
-export const userPlatformLinksRelations = relations(userPlatformLinks, ({ one }) => ({
-  user: one(users, {
-    fields: [userPlatformLinks.userId],
-    references: [users.id],
+export const userPlatformLinksRelations = relations(
+  userPlatformLinks,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userPlatformLinks.userId],
+      references: [users.id],
+    }),
+    organization: one(organizations, {
+      fields: [userPlatformLinks.organizationId],
+      references: [organizations.id],
+    }),
   }),
-  organization: one(organizations, {
-    fields: [userPlatformLinks.organizationId],
-    references: [organizations.id],
-  }),
-}));
+);
 
 export const orgInvitesRelations = relations(orgInvites, ({ one }) => ({
   organization: one(organizations, {

@@ -59,6 +59,7 @@ export const verificationTokens = s.verificationTokens as typeof pg.verification
 export const orgInvites = s.orgInvites as typeof pg.orgInvites;
 export const jobs = s.jobs as typeof pg.jobs;
 export const failedJobs = s.failedJobs as typeof pg.failedJobs;
+export const payments = s.payments as typeof pg.payments;
 
 // ─── Relations ──────────────────────────────────────────────
 export const organizationsRelations = s.organizationsRelations;

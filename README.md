@@ -24,47 +24,47 @@ The agent also runs on **Telegram and Discord** via built-in bot relay. @mention
 
 ## What's in the box
 
-| Module | What it does |
-|--------|-------------|
-| **Agent Intelligence** | Natural language CRUD — create, update, search, count any entity type. Bulk import from CSV/chat logs. RBAC-enforced, prompt injection hardened, multilingual. Cmd+K from anywhere. |
-| **Speaker Pipeline** | CFP form → review → accept/reject. Pipeline table with inline stage/source/assignee editing. |
-| **Sponsor Pipeline** | Outreach to confirmation. Same unified pipeline model as speakers. |
-| **Venue Pipeline** | Multiple venue candidates, negotiations, pricing, finalization. |
-| **Booth Management** | Inventory, reservations, company contacts, sponsor linking. |
-| **Volunteer Management** | Applications, assignments, pipeline tracking. |
-| **Media Partners** | TV/press/podcast pipeline with contact management. |
-| **Outreach CRM** | Proactive sourcing for all entity types. Follow-up tracking. |
-| **Agenda Builder** | Multi-track schedule, conflict detection (speaker double-booked? room collision?), draft/publish toggle. |
-| **Marketing Calendar** | Month-view content calendar. Click a day to add an item. Assign to team members. Platform tags (Twitter, Facebook, Instagram, LinkedIn, Telegram). |
-| **Task Board** | Kanban drag-and-drop (To Do → In Progress → Blocked → Done). Click cards for detail drawer with inline comments. Create/rename/delete teams. |
-| **Invitations** | Speaker +1s, organizer +1s, student passes. Configurable allocations. QR codes. |
-| **QR Check-in** | Scanner mode + dashboard mode with live stats. |
-| **Post-Confirmation Checklists** | When an entity is confirmed, auto-generate checklist items from templates (upload photo, submit slides, confirm travel). Track progress per entity. Admins configure templates in Settings. |
-| **Stakeholder Portal** | Confirmed speakers/sponsors get a login to self-service their checklist items — upload photos, submit bios, confirm travel. Organizers see submissions and approve/reject. |
-| **RBAC & Team Management** | 6 roles (owner → admin → organizer → coordinator → viewer → stakeholder). Team-scoped permissions — teams own entity types. Confirmed entities protected from non-admin deletion. Same rules enforced in web UI and agent. |
-| **Notifications** | In-app notifications for assignments, stage changes, checklist submissions, comments. Bell icon with unread badge. Mark read, bulk delete. |
-| **Telegram & Discord Bot** | Connect your team's chat from Settings. @mention the bot to query data, create records, manage your event. Configurable bot personality (language + mood). |
-| **AI Model Settings** | Pick your LLM provider (Gemini, z.ai, xAI, Ollama) and enter API key from the UI. Changes apply to both web chat and messaging bots. API keys encrypted at rest. |
-| **Localization** | English and Mongolian UI via next-intl. Locale switcher in sidebar. Agent responds in user's language. |
-| **Settings** | Tabbed: Event details, Team management (invite/roles), Checklist templates, AI Model, Messaging (Telegram/Discord connection + bot personality). |
-| **Public Agenda** | Attendee-facing schedule with day/track filters. |
-| **CFP Form** | Public speaker application form. |
+| Module                           | What it does                                                                                                                                                                                                               |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agent Intelligence**           | Natural language CRUD — create, update, search, count any entity type. Bulk import from CSV/chat logs. RBAC-enforced, prompt injection hardened, multilingual. Cmd+K from anywhere.                                        |
+| **Speaker Pipeline**             | CFP form → review → accept/reject. Pipeline table with inline stage/source/assignee editing.                                                                                                                               |
+| **Sponsor Pipeline**             | Outreach to confirmation. Same unified pipeline model as speakers.                                                                                                                                                         |
+| **Venue Pipeline**               | Multiple venue candidates, negotiations, pricing, finalization.                                                                                                                                                            |
+| **Booth Management**             | Inventory, reservations, company contacts, sponsor linking.                                                                                                                                                                |
+| **Volunteer Management**         | Applications, assignments, pipeline tracking.                                                                                                                                                                              |
+| **Media Partners**               | TV/press/podcast pipeline with contact management.                                                                                                                                                                         |
+| **Outreach CRM**                 | Proactive sourcing for all entity types. Follow-up tracking.                                                                                                                                                               |
+| **Agenda Builder**               | Multi-track schedule, conflict detection (speaker double-booked? room collision?), draft/publish toggle.                                                                                                                   |
+| **Marketing Calendar**           | Month-view content calendar. Click a day to add an item. Assign to team members. Platform tags (Twitter, Facebook, Instagram, LinkedIn, Telegram).                                                                         |
+| **Task Board**                   | Kanban drag-and-drop (To Do → In Progress → Blocked → Done). Click cards for detail drawer with inline comments. Create/rename/delete teams.                                                                               |
+| **Invitations**                  | Speaker +1s, organizer +1s, student passes. Configurable allocations. QR codes.                                                                                                                                            |
+| **QR Check-in**                  | Scanner mode + dashboard mode with live stats.                                                                                                                                                                             |
+| **Post-Confirmation Checklists** | When an entity is confirmed, auto-generate checklist items from templates (upload photo, submit slides, confirm travel). Track progress per entity. Admins configure templates in Settings.                                |
+| **Stakeholder Portal**           | Confirmed speakers/sponsors get a login to self-service their checklist items — upload photos, submit bios, confirm travel. Organizers see submissions and approve/reject.                                                 |
+| **RBAC & Team Management**       | 6 roles (owner → admin → organizer → coordinator → viewer → stakeholder). Team-scoped permissions — teams own entity types. Confirmed entities protected from non-admin deletion. Same rules enforced in web UI and agent. |
+| **Notifications**                | In-app notifications for assignments, stage changes, checklist submissions, comments. Bell icon with unread badge. Mark read, bulk delete.                                                                                 |
+| **Telegram & Discord Bot**       | Connect your team's chat from Settings. @mention the bot to query data, create records, manage your event. Configurable bot personality (language + mood).                                                                 |
+| **AI Model Settings**            | Pick your LLM provider (Gemini, z.ai, xAI, Ollama) and enter API key from the UI. Changes apply to both web chat and messaging bots. API keys encrypted at rest.                                                           |
+| **Localization**                 | English and Mongolian UI via next-intl. Locale switcher in sidebar. Agent responds in user's language.                                                                                                                     |
+| **Settings**                     | Tabbed: Event details, Team management (invite/roles), Checklist templates, AI Model, Messaging (Telegram/Discord connection + bot personality).                                                                           |
+| **Public Agenda**                | Attendee-facing schedule with day/track filters.                                                                                                                                                                           |
+| **CFP Form**                     | Public speaker application form.                                                                                                                                                                                           |
 
 ## Tech Stack
 
-| Layer | Choice | Why |
-|-------|--------|-----|
-| Framework | Next.js 16 (App Router) | Server components, API routes, one deploy target |
-| Language | TypeScript | Catch bugs before your users do |
-| Styling | Tailwind CSS + shadcn/ui | Fast, accessible components out of the box |
-| Database | PostgreSQL or SQLite | Postgres for production; SQLite for zero-setup local dev |
-| ORM | Drizzle | Type-safe, no magic, SQL when you need it |
-| Auth | NextAuth.js (v5) | Credentials + JWT + service token for API |
-| Passwords | bcrypt (12 rounds) | Proper key stretching. Legacy SHA-256 auto-detected for migration. |
+| Layer     | Choice                                 | Why                                                                          |
+| --------- | -------------------------------------- | ---------------------------------------------------------------------------- |
+| Framework | Next.js 16 (App Router)                | Server components, API routes, one deploy target                             |
+| Language  | TypeScript                             | Catch bugs before your users do                                              |
+| Styling   | Tailwind CSS + shadcn/ui               | Fast, accessible components out of the box                                   |
+| Database  | PostgreSQL or SQLite                   | Postgres for production; SQLite for zero-setup local dev                     |
+| ORM       | Drizzle                                | Type-safe, no magic, SQL when you need it                                    |
+| Auth      | NextAuth.js (v5)                       | Credentials + JWT + service token for API                                    |
+| Passwords | bcrypt (12 rounds)                     | Proper key stretching. Legacy SHA-256 auto-detected for migration.           |
 | Agent LLM | Gemini, z.ai (GLM), xAI (Grok), Ollama | Configurable from Settings UI. Abstracted — add providers with one interface |
-| Messaging | Built-in bot relay | Telegram + Discord bot integration, in-process adapter lifecycle |
-| i18n | next-intl | English + Mongolian, cookie-based locale switching |
-| Icons | Lucide React | Consistent, tree-shakeable |
+| Messaging | Built-in bot relay                     | Telegram + Discord bot integration, in-process adapter lifecycle             |
+| i18n      | next-intl                              | English + Mongolian, cookie-based locale switching                           |
+| Icons     | Lucide React                           | Consistent, tree-shakeable                                                   |
 
 ## Getting Started
 
@@ -132,7 +132,92 @@ npx drizzle-kit push
 npx tsx src/db/seed.ts
 ```
 
-### 5. Run
+### 5. Payments (Stripe)
+
+Event OS includes a basic Stripe checkout integration for handling payments.
+
+### 5.1. Configuration
+
+Add the following to your `.env.local`:
+
+```env
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+STRIPE_SECRET_KEY="sk_test_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+```
+
+- `NEXT_PUBLIC_APP_URL` → your app base URL (used for success/cancel redirects)
+- `STRIPE_SECRET_KEY` → from Stripe Dashboard
+- `STRIPE_WEBHOOK_SECRET` → generated via Stripe CLI or Dashboard
+
+---
+
+### 5.2. Local Testing (Stripe CLI)
+
+We recommend using the Stripe CLI for local development.
+
+#### 5.3. Install Stripe CLI
+
+```bash
+brew install stripe/stripe-cli/stripe
+```
+
+#### 5.4. Login
+
+```bash
+stripe login
+```
+
+#### 5.5 Start webhook forwarding
+
+```bash
+stripe listen --forward-to localhost:3000/api/payments/stripe/webhook
+```
+
+You will see output like:
+
+```bash
+Your webhook signing secret is whsec_xxx
+```
+
+Copy this value into your `.env.local` as:
+
+```env
+STRIPE_WEBHOOK_SECRET="whsec_xxx"
+```
+
+---
+
+### 5.6. Test Payment
+
+Use Stripe test card:
+
+```plaintext
+4242 4242 4242 4242
+Any future expiry date
+Any CVC
+```
+
+---
+
+### 5.7. Payment Flow
+
+```plaintext
+Frontend → /api/payments/stripe/create-session
+→ Stripe Checkout
+→ webhook (/api/payments/stripe/webhook)
+→ DB updated (payment marked as paid)
+→ redirect to success/cancel page
+```
+
+---
+
+### 5.8. Notes
+
+- This is an **MVP implementation (single Stripe account)**
+- Future improvement: **Stripe Connect (multi-tenant organizations)**
+
+### 6. Run
 
 ```bash
 npm run dev
@@ -142,46 +227,46 @@ Open `localhost:3000`. Log in with `admin@devsummit.mn` / `admin123`.
 
 **All seeded users** (password: `admin123`):
 
-| Name | Email | Role |
-|------|-------|------|
-| Amarbayar | admin@devsummit.mn | Owner |
-| Tuvshin | tuvshin@devsummit.mn | Organizer |
-| Oyungerel | oyungerel@devsummit.mn | Organizer |
+| Name       | Email                  | Role        |
+| ---------- | ---------------------- | ----------- |
+| Amarbayar  | admin@devsummit.mn     | Owner       |
+| Tuvshin    | tuvshin@devsummit.mn   | Organizer   |
+| Oyungerel  | oyungerel@devsummit.mn | Organizer   |
 | Bat-Erdene | baterdene@devsummit.mn | Coordinator |
-| Sarnai | sarnai@devsummit.mn | Coordinator |
+| Sarnai     | sarnai@devsummit.mn    | Coordinator |
 
 ### Database commands
 
-| Task | PostgreSQL | SQLite |
-|------|-----------|--------|
-| Push schema | `npx drizzle-kit push` | `DB_DIALECT=sqlite npx drizzle-kit push` |
-| Seed data | `npx tsx src/db/seed.ts` | `DB_DIALECT=sqlite npx tsx src/db/seed.ts` |
-| Browse DB | `npx drizzle-kit studio` | `DB_DIALECT=sqlite npx drizzle-kit studio` |
-| Reset DB | `psql -d event_os -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"` then push + seed | Delete `local.db` then push + seed |
+| Task        | PostgreSQL                                                                                 | SQLite                                     |
+| ----------- | ------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| Push schema | `npx drizzle-kit push`                                                                     | `DB_DIALECT=sqlite npx drizzle-kit push`   |
+| Seed data   | `npx tsx src/db/seed.ts`                                                                   | `DB_DIALECT=sqlite npx tsx src/db/seed.ts` |
+| Browse DB   | `npx drizzle-kit studio`                                                                   | `DB_DIALECT=sqlite npx drizzle-kit studio` |
+| Reset DB    | `psql -d event_os -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"` then push + seed | Delete `local.db` then push + seed         |
 
 ### Environment Variables
 
-| Variable | Required | What it is |
-|----------|----------|-----------|
-| `DB_DIALECT` | No | `postgresql` (default) or `sqlite` |
-| `DATABASE_URL` | PG only | PostgreSQL connection string |
-| `SQLITE_PATH` | No | SQLite file path (default: `local.db`) |
-| `AUTH_SECRET` | Yes | Random string — `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | No | `http://localhost:3000` for dev (auto-detected) |
-| `SERVICE_TOKEN` | No | Random token for API service auth |
-| `LLM_PROVIDER` | No | `gemini` (default), `xai`, `zai`, or `ollama` |
-| `GEMINI_API_KEY` | No | Free at [ai.google.dev](https://ai.google.dev) |
-| `XAI_API_KEY` | No | xAI API key |
-| `ZAI_API_KEY` | No | z.ai (ZhipuAI) API key |
-| `OLLAMA_URL` | No | Ollama URL (default: `localhost:11434`) |
-| `ENCRYPTION_KEY` | No | 64 hex chars for API key encryption — `openssl rand -hex 32`. Falls back to AUTH_SECRET |
-| `QUEUE_ENABLED` | No | `true` to route emails/notifications through the job queue |
-| `MAIL_DRIVER` | No | `log` (default), `mailgun`, or `postmark` |
-| `MAIL_FROM_ADDRESS` | No | Sender email (default: `noreply@example.com`) |
-| `MAIL_FROM_NAME` | No | Sender name (default: `Event OS`) |
-| `POSTMARK_SERVER_TOKEN` | Postmark only | Postmark API token |
-| `MAILGUN_API_KEY` | Mailgun only | Mailgun API key |
-| `MAILGUN_DOMAIN` | Mailgun only | Mailgun sending domain |
+| Variable                | Required      | What it is                                                                              |
+| ----------------------- | ------------- | --------------------------------------------------------------------------------------- |
+| `DB_DIALECT`            | No            | `postgresql` (default) or `sqlite`                                                      |
+| `DATABASE_URL`          | PG only       | PostgreSQL connection string                                                            |
+| `SQLITE_PATH`           | No            | SQLite file path (default: `local.db`)                                                  |
+| `AUTH_SECRET`           | Yes           | Random string — `openssl rand -base64 32`                                               |
+| `NEXTAUTH_URL`          | No            | `http://localhost:3000` for dev (auto-detected)                                         |
+| `SERVICE_TOKEN`         | No            | Random token for API service auth                                                       |
+| `LLM_PROVIDER`          | No            | `gemini` (default), `xai`, `zai`, or `ollama`                                           |
+| `GEMINI_API_KEY`        | No            | Free at [ai.google.dev](https://ai.google.dev)                                          |
+| `XAI_API_KEY`           | No            | xAI API key                                                                             |
+| `ZAI_API_KEY`           | No            | z.ai (ZhipuAI) API key                                                                  |
+| `OLLAMA_URL`            | No            | Ollama URL (default: `localhost:11434`)                                                 |
+| `ENCRYPTION_KEY`        | No            | 64 hex chars for API key encryption — `openssl rand -hex 32`. Falls back to AUTH_SECRET |
+| `QUEUE_ENABLED`         | No            | `true` to route emails/notifications through the job queue                              |
+| `MAIL_DRIVER`           | No            | `log` (default), `mailgun`, or `postmark`                                               |
+| `MAIL_FROM_ADDRESS`     | No            | Sender email (default: `noreply@example.com`)                                           |
+| `MAIL_FROM_NAME`        | No            | Sender name (default: `Event OS`)                                                       |
+| `POSTMARK_SERVER_TOKEN` | Postmark only | Postmark API token                                                                      |
+| `MAILGUN_API_KEY`       | Mailgun only  | Mailgun API key                                                                         |
+| `MAILGUN_DOMAIN`        | Mailgun only  | Mailgun sending domain                                                                  |
 
 ## Job Queue & Background Workers
 
@@ -278,16 +363,17 @@ WantedBy=multi-user.target
 **Vercel / serverless**
 
 Long-running workers can't run on serverless platforms. Options:
+
 - Use an external cron service (e.g., [cron-job.org](https://cron-job.org)) to hit an API route that processes a batch of jobs
 - Run the worker on a separate $5/mo VPS (DigitalOcean, Hetzner)
 - Skip the queue — without `QUEUE_ENABLED=true`, emails send synchronously inline
 
 ### Current job types
 
-| Job | Queue | Timeout | Retries | Backoff |
-|-----|-------|---------|---------|---------|
-| `send-email` | default | 30s | 3 | 15s exponential |
-| `send-notification` | default | 10s | 3 | 5s exponential |
+| Job                 | Queue   | Timeout | Retries | Backoff         |
+| ------------------- | ------- | ------- | ------- | --------------- |
+| `send-email`        | default | 30s     | 3       | 15s exponential |
+| `send-notification` | default | 10s     | 3       | 5s exponential  |
 
 ## Project Structure
 
@@ -443,6 +529,7 @@ GEMINI_API_KEY=your-key DB_DIALECT=sqlite npx vitest run tests/integration
 Tests run automatically on push to `main` and on pull requests. The workflow uses SQLite so no database service is needed.
 
 **Two jobs:**
+
 - **Unit & Integration** — fast (~2s), runs `tests/unit` + `tests/integration`
 - **E2E** — builds the app, starts the production server, runs `tests/e2e`
 
@@ -528,6 +615,7 @@ Never commit `.env.local`. The `.env.example` file has safe placeholders only.
 PRs welcome. Read `CLAUDE.md` for project conventions and the secret safety checklist.
 
 **When building features:**
+
 - Every DB mutation WHERE clause must include `organizationId`
 - Every new API route must use `requirePermission()`
 - Never use `window.confirm()`, `window.alert()`, or `window.prompt()` — use `useConfirm()` hook

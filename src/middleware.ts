@@ -10,6 +10,7 @@ const publicPaths = [
   "/change-password",
   "/api/auth",
   "/api/onboarding",
+  "/api/payments/stripe/webhook",
   "/apply",
   "/agenda",
   "/_next",
@@ -27,7 +28,10 @@ export async function middleware(request: NextRequest) {
   // Allow API routes with Bearer token — downstream requirePermission() validates the actual token.
   // The middleware does NOT validate the token itself; it lets Bearer requests through to the
   // route handler which calls requirePermission() with timing-safe service token comparison.
-  if (pathname.startsWith("/api/") && request.headers.get("authorization")?.startsWith("Bearer ")) {
+  if (
+    pathname.startsWith("/api/") &&
+    request.headers.get("authorization")?.startsWith("Bearer ")
+  ) {
     return NextResponse.next();
   }
 
