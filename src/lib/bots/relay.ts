@@ -35,6 +35,51 @@ export interface RelayConfig {
   orgId: string;
 }
 
+export class RelayApiError extends Error {
+  constructor(
+    message: string,
+    readonly userMessage: string,
+    readonly status: number,
+    readonly details?: string,
+  ) {
+    super(message);
+    this.name = "RelayApiError";
+  }
+}
+
+export async function readRelayError(
+  response: Response,
+  fallbackMessage: string,
+): Promise<RelayApiError> {
+  const contentType = response.headers.get("content-type") || "";
+  let userMessage = fallbackMessage;
+  let details = "";
+
+  try {
+    if (contentType.includes("application/json")) {
+      const json = await response.json();
+      const dataMessage = typeof json?.data?.message === "string" ? json.data.message : "";
+      const errorMessage = typeof json?.error === "string" ? json.error : "";
+      const topLevelMessage = typeof json?.message === "string" ? json.message : "";
+
+      userMessage = dataMessage || errorMessage || topLevelMessage || fallbackMessage;
+      details = [topLevelMessage, errorMessage].filter(Boolean).join(" | ");
+    } else {
+      const text = (await response.text()).trim();
+      if (text) {
+        userMessage = text;
+        details = text;
+      }
+    }
+  } catch {
+    // Fall back to status text below.
+  }
+
+  const statusDetail = `${response.status} ${response.statusText}`.trim();
+  const message = details ? `${statusDetail}: ${details}` : `${statusDetail}: ${userMessage}`;
+  return new RelayApiError(message, userMessage, response.status, details || undefined);
+}
+
 // ─── Identity result from /api/agent/identify ────────
 
 export interface UserIdentity {
@@ -88,7 +133,7 @@ export class Relay {
     });
 
     if (!res.ok) {
-      throw new Error(`Identify failed: ${res.status} ${res.statusText}`);
+      throw await readRelayError(res, "I couldn't verify your Event OS account. Try again in a moment.");
     }
 
     const json = await res.json();
@@ -116,7 +161,7 @@ export class Relay {
     });
 
     if (!res.ok) {
-      throw new Error(`Process failed: ${res.status} ${res.statusText}`);
+      throw await readRelayError(res, "Agent temporarily unavailable. Try again or use manual add.");
     }
 
     const json = await res.json();

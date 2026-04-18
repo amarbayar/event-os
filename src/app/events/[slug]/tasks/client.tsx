@@ -94,15 +94,24 @@ export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task
 
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.status === newStatus) return;
+    const previousStatus = task.status;
 
     // Optimistic update
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: newStatus } : t));
 
-    await fetch(`/api/tasks/${taskId}`, {
+    const res = await fetch(`/api/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": "999" },
       body: JSON.stringify({ status: newStatus }),
     });
+
+    if (!res.ok) {
+      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: previousStatus } : t));
+      toast.error(await getApiError(res, "Failed to move task"));
+      return;
+    }
+
+    refreshTasks();
   };
 
   const handleDragEnd = () => setDragging(null);

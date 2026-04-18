@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getProvider } from "@/lib/agent";
-import { InputType, AgentResponse, AgentIntent, LLMProvider } from "@/lib/agent/types";
+import { InputType, AgentResponse, LLMProvider } from "@/lib/agent/types";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
 import { getActiveIds } from "@/lib/queries";
 import { gateMention, sanitizeInput, isOffTopic } from "@/lib/agent/input-guard";
@@ -144,9 +144,11 @@ async function handleRequest(
   const ids = await getActiveIds(orgId);
   const resolvedEditionId = editionId || ids?.editionId || "";
   const resolvedOrgId = ids?.orgId || orgId;
+  let providerName: string | undefined;
 
   try {
     const provider = await getProvider(resolvedOrgId);
+    providerName = provider.name;
 
     // Decide: classify (smart routing) or extract (bulk import)
     const useClassify = mode !== "extract" && (inputType === "text" || !inputType);
@@ -201,6 +203,16 @@ async function handleRequest(
     return handleExtract(provider, input, inputType || "text", sanitizedContext, resolvedOrgId, resolvedEditionId);
 
   } catch (error) {
+    console.error("[agent/process] failed", {
+      orgId: resolvedOrgId,
+      editionId: resolvedEditionId,
+      userId,
+      role,
+      source,
+      mode: mode || "classify",
+      provider: providerName || "unresolved",
+      inputLength: input.length,
+    }, error);
     const message = error instanceof Error ? error.message : "Agent processing failed";
     return NextResponse.json({
       data: {

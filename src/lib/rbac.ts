@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { users, organizations, userOrganizations, teamMembers, teamEntityTypes, teams, eventEditions } from "@/db/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { getActiveIds } from "@/lib/queries";
+import { requiresTeamScope, resolveEffectiveRole } from "@/lib/rbac-utils";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ export async function requirePermission(
       ),
     });
 
-    const effectiveRole = membership?.role || role;
+    const effectiveRole = resolveEffectiveRole(role, membership?.role);
 
     const ctx: RbacContext = {
       user: {
@@ -132,12 +133,12 @@ export async function requirePermission(
     };
 
     // Owner/admin bypass — full access
-    if (ROLE_HIERARCHY[role] >= ROLE_HIERARCHY.admin) {
+    if ((ROLE_HIERARCHY[effectiveRole] || 0) >= ROLE_HIERARCHY.admin) {
       return ctx;
     }
 
     // Stakeholder: can only read/update their own linked entity + checklist items
-    if (role === "stakeholder") {
+    if (effectiveRole === "stakeholder") {
       if (action === "read") return ctx;
       if (action === "delete") return forbidden("You don't have permission to delete records.");
       // Stakeholders can't create new entities
@@ -153,20 +154,22 @@ export async function requirePermission(
     }
 
     // Viewer cannot write
-    if (role === "viewer") {
+    if (effectiveRole === "viewer") {
       return forbidden("You don't have permission to modify this resource. Contact an admin.");
     }
 
-    // Organizer/coordinator — check team scope
-    const hasScope = await userOwnsEntityType(userId, entityType, orgId);
-    if (!hasScope) {
-      return forbidden(
-        `You don't have permission to edit ${entityType}s. Ask an admin to add you to a team that manages ${entityType}s.`
-      );
+    // Organizer/coordinator — check team scope when the entity is owned by an RBAC team.
+    if (requiresTeamScope(entityType)) {
+      const hasScope = await userOwnsEntityType(userId, entityType, orgId);
+      if (!hasScope) {
+        return forbidden(
+          `You don't have permission to edit ${entityType}s. Ask an admin to add you to a team that manages ${entityType}s.`
+        );
+      }
     }
 
     // Coordinator cannot delete
-    if (action === "delete" && role === "coordinator") {
+    if (action === "delete" && effectiveRole === "coordinator") {
       return forbidden("Coordinators cannot delete records. Ask an organizer or admin.");
     }
 
