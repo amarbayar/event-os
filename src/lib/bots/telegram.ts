@@ -5,6 +5,7 @@
  */
 
 import type { Relay } from "./relay";
+import { RelayApiError } from "./relay";
 
 const API = "https://api.telegram.org";
 
@@ -159,7 +160,7 @@ export class TelegramAdapter {
 
     if (isGroupChat && !this.isBotMentioned(msg)) return;
 
-    let input = isGroupChat ? this.stripMention(textContent) : textContent;
+    const input = isGroupChat ? this.stripMention(textContent) : textContent;
 
     if (input === "/start") {
       await this.sendMessage(
@@ -190,6 +191,16 @@ export class TelegramAdapter {
 
       await this.sendMessage(msg.chat.id, result.text, msg.message_id);
     } catch (err) {
+      if (err instanceof RelayApiError) {
+        console.error("[telegram] Relay error:", {
+          status: err.status,
+          userMessage: err.userMessage,
+          details: err.details,
+        });
+        await this.sendMessage(msg.chat.id, err.userMessage, msg.message_id).catch(() => {});
+        return;
+      }
+
       console.error("[telegram] Error:", err);
       await this.sendMessage(msg.chat.id, "Something went wrong. Please try again.", msg.message_id).catch(() => {});
     }

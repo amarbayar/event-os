@@ -47,6 +47,19 @@ export async function PATCH(
     }
   }
 
+  if ("dueDate" in updates) {
+    const rawDueDate = updates.dueDate;
+    if (rawDueDate === null || rawDueDate === "") {
+      updates.dueDate = null;
+    } else {
+      const parsedDueDate = new Date(String(rawDueDate));
+      if (Number.isNaN(parsedDueDate.getTime())) {
+        return NextResponse.json({ error: "Invalid dueDate" }, { status: 400 });
+      }
+      updates.dueDate = parsedDueDate;
+    }
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }

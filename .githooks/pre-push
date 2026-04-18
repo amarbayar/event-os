@@ -10,6 +10,14 @@ NC='\033[0m'
 
 echo -e "${YELLOW}Running pre-push checks...${NC}"
 
+SQLITE_TEST_DB=".pre-push-integration.db"
+
+cleanup_sqlite_test_db() {
+  rm -f "$SQLITE_TEST_DB" "$SQLITE_TEST_DB-shm" "$SQLITE_TEST_DB-wal"
+}
+
+trap cleanup_sqlite_test_db EXIT
+
 # 1. Type check
 echo -e "${YELLOW}[1/3] Type checking...${NC}"
 npx tsc --noEmit 2>&1
@@ -29,7 +37,14 @@ fi
 
 # 3. Integration tests on SQLite (same as CI — catches cross-dialect issues)
 echo -e "${YELLOW}[3/3] Integration tests (SQLite)...${NC}"
-DB_DIALECT=sqlite npx vitest run tests/integration 2>&1
+cleanup_sqlite_test_db
+DB_DIALECT=sqlite SQLITE_PATH="$SQLITE_TEST_DB" npx drizzle-kit push 2>&1
+if [ $? -ne 0 ]; then
+  echo -e "${RED}PUSH BLOCKED: SQLite schema setup failed.${NC}"
+  exit 1
+fi
+
+DB_DIALECT=sqlite SQLITE_PATH="$SQLITE_TEST_DB" npx vitest run tests/integration 2>&1
 if [ $? -ne 0 ]; then
   echo -e "${RED}PUSH BLOCKED: Integration tests failed.${NC}"
   exit 1
