@@ -162,14 +162,20 @@ NOTES:
 
 // ─── SQL Generation Prompt ────────────────────────────
 
-function buildSqlPrompt(question: string, ctx: AgentContext): string {
-  return `You are a SQL query generator for an event management database.
+type Attempt = { sql: string; error: string };
+
+function buildSqlPrompt(
+  question: string,
+  ctx: AgentContext,
+  previousAttempts: Attempt[] = [],
+): string {
+  let prompt = `You are a SQL query generator for an event management database.
 
 ${SCHEMA_DESCRIPTION}
 
 RULES:
 1. Write ONLY a SELECT query (CTEs with WITH are OK). No INSERT, UPDATE, DELETE, DROP, ALTER, or any mutation.
-2. ALWAYS include: WHERE organization_id = '${ctx.orgId}' AND edition_id = '${ctx.editionId}' (or in each CTE/subquery that touches an entity table)
+2. ALWAYS include: WHERE organization_id = '${ctx.orgId}' AND edition_id = '${ctx.editionId}' (or in each CTE/subquery that touches an entity table). Some tables don't have edition_id — if the schema above doesn't list it for that table, filter only by organization_id.
 3. Do NOT add LIMIT or OFFSET — pagination is handled externally.
 4. Use snake_case column names (the database uses snake_case).
 5. Select only the columns needed to answer the question — do NOT use SELECT *. Always include the name/title column plus 2-3 relevant detail columns.
@@ -181,6 +187,16 @@ RULES:
 11. In UNION ALL queries: cast enum columns (stage, status) to TEXT — e.g., stage::text, status::text — because different tables may use different enum types.
 
 User question: ${question}`;
+
+  if (previousAttempts.length > 0) {
+    prompt += `\n\nYour previous attempts failed. Study each error and write a corrected query. Do not repeat the same mistake.\n`;
+    previousAttempts.forEach((a, i) => {
+      prompt += `\n--- Attempt ${i + 1} ---\nSQL: ${a.sql}\nError: ${a.error}\n`;
+    });
+    prompt += `\nReturn ONLY the corrected SQL query (no explanation, no markdown).`;
+  }
+
+  return prompt;
 }
 
 // ─── Validate generated SQL ───────────────────────────
@@ -273,30 +289,145 @@ const ctx_placeholder_org = "organization_id";
 
 // ─── Execute SQL query ────────────────────────────────
 
+const MAX_ITERATIONS = 3;
+const PAGE_SIZE = 50;
+
+/** Extract a short, user-safe string from a pg error without leaking stack/internals. */
+function sanitizePgError(err: unknown): string {
+  const e = err as { cause?: { message?: string }; message?: string };
+  const raw = e?.cause?.message || e?.message || String(err);
+  return raw.split("\n")[0].slice(0, 300);
+}
+
+async function callLlmForSql(
+  provider: { generate: (p: string) => Promise<string> },
+  question: string,
+  ctx: AgentContext,
+  attempts: Attempt[],
+): Promise<string> {
+  const prompt = buildSqlPrompt(question, ctx, attempts);
+  // One transient retry on LLM API hiccups — distinct from the outer SQL-correction loop.
+  let raw = "";
+  for (let i = 0; i < 2; i++) {
+    try {
+      raw = (await provider.generate(prompt)).trim();
+      break;
+    } catch (err) {
+      if (i === 1) throw err;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  return raw.replace(/^```\w*\n?/m, "").replace(/\n?```$/m, "").trim();
+}
+
+async function runCountAndSelect(
+  baseSql: string,
+): Promise<{ rows: Record<string, unknown>[]; total: number }> {
+  const isCte = /^\s*WITH\b/i.test(baseSql);
+
+  let total = -1;
+  if (!isCte) {
+    const countSql = `SELECT COUNT(*) as total FROM (${baseSql}) _count_subq`;
+    const countResult = await Promise.race([
+      db.execute(sql.raw(countSql)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Count timeout")), 5000)),
+    ]);
+    const countObj = countResult as { rows?: Record<string, unknown>[] };
+    const countRows = countObj.rows || (countResult as Record<string, unknown>[]) || [];
+    total = Number(countRows[0]?.total || 0);
+  }
+
+  const pagedSql = `${baseSql} LIMIT ${PAGE_SIZE}`;
+  const queryResult = await Promise.race([
+    db.execute(sql.raw(pagedSql)),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 5000)),
+  ]);
+  const queryObj = queryResult as { rows?: Record<string, unknown>[] };
+  const rows = queryObj.rows || (queryResult as Record<string, unknown>[]) || [];
+  return { rows: Array.isArray(rows) ? rows : [], total };
+}
+
+function formatRows(
+  rows: Record<string, unknown>[],
+  total: number,
+): { message: string; data: unknown } {
+  const cleanRows = rows.map((row) => {
+    const clean: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) {
+      if (!REDACTED_COLUMNS.has(k) && k !== "id") clean[k] = v;
+    }
+    return clean;
+  });
+
+  // Single aggregate (e.g. a COUNT query)
+  if (cleanRows.length === 1 && Object.keys(cleanRows[0]).length <= 2) {
+    const vals = Object.entries(cleanRows[0])
+      .map(([k, v]) => `**${formatColumnName(k)}:** ${v}`)
+      .join(", ");
+    return { message: vals, data: cleanRows };
+  }
+
+  const formatted = cleanRows.map((row, i) => {
+    const name = row.name || row.title || row.company_name || row.contact_name || row.assignee_name || "";
+    const nameKeys = new Set(["name", "title", "company_name", "contact_name", "assignee_name"]);
+    const details = Object.entries(row)
+      .filter(([k, v]) => !nameKeys.has(k) && v !== null && v !== "")
+      .slice(0, 4)
+      .map(([k, v]) => `${formatColumnName(k)}: ${formatValue(k, v)}`)
+      .join(" | ");
+    if (name) return `${i + 1}. **${formatValue("name", name)}**${details ? ` — ${details}` : ""}`;
+    return `${i + 1}. ${details}`;
+  }).join("\n");
+
+  const shown = cleanRows.length;
+  let paginationNote = "";
+  if (total > 0 && total > shown) {
+    paginationNote = `\n\nShowing ${shown} of ${total}. Say "show more" for the next page.`;
+  } else if (total === -1 && shown === PAGE_SIZE) {
+    paginationNote = `\n\nShowing first ${PAGE_SIZE}. Say "show more" to continue.`;
+  }
+
+  const count = total > 0 ? total : shown;
+  return {
+    message: `${count} result${count !== 1 ? "s" : ""}:\n${formatted}${paginationNote}`,
+    data: { items: cleanRows, total, pageSize: PAGE_SIZE },
+  };
+}
+
 export async function executeSqlQuery(
   question: string,
-  ctx: AgentContext
+  ctx: AgentContext,
 ): Promise<{ message: string; success: boolean; data?: unknown }> {
+  if (!question || !question.trim()) {
+    return { message: "What would you like to know?", success: true };
+  }
+
+  let provider;
   try {
-    // Step 1: Get LLM to generate SQL
     const { getProvider } = await import("@/lib/agent");
-    const provider = await getProvider(ctx.orgId);
+    provider = await getProvider(ctx.orgId);
+  } catch (err) {
+    console.error("SQL query: provider unavailable:", err);
+    return {
+      message: "The language model isn't configured. Ask an admin to set up an LLM provider in Settings.",
+      success: false,
+    };
+  }
 
-    const prompt = buildSqlPrompt(question, ctx);
-    let generatedSql = "";
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        generatedSql = (await provider.generate(prompt)).trim();
-        break;
-      } catch (err) {
-        if (attempt === 1) throw err;
-        // Retry once on transient LLM API errors
-        await new Promise((r) => setTimeout(r, 2000));
-      }
+  const attempts: Attempt[] = [];
+
+  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    // 1. Generate (with feedback on previous attempts)
+    let generatedSql: string;
+    try {
+      generatedSql = await callLlmForSql(provider, question, ctx, attempts);
+    } catch (err) {
+      console.error("LLM SQL generation failed:", err);
+      return {
+        message: "I'm having trouble reaching the language model. Please try again.",
+        success: false,
+      };
     }
-
-    // Clean up — remove markdown fences if present
-    generatedSql = generatedSql.replace(/^```\w*\n?/m, "").replace(/\n?```$/m, "").trim();
 
     if (!generatedSql || generatedSql === "CANNOT_ANSWER") {
       return {
@@ -305,115 +436,38 @@ export async function executeSqlQuery(
       };
     }
 
-    // Step 2: Validate
+    // 2. Validate
     const validation = validateSql(generatedSql);
     if (!validation.valid) {
-      console.error("SQL validation failed:", validation.error, "Query:", generatedSql);
-      return {
-        message: "I couldn't generate a safe query for that question. Try rephrasing it.",
-        success: false,
-      };
+      console.warn(`SQL attempt ${iter + 1}/${MAX_ITERATIONS} validation failed:`, validation.error, "Query:", generatedSql);
+      attempts.push({ sql: generatedSql, error: `Validation failed: ${validation.error}` });
+      continue;
     }
 
-    // Step 3: Strip any existing LIMIT — we control pagination
+    // 3. Normalize — strip user-side LIMIT/OFFSET, trailing semicolon
     let baseSql = generatedSql.replace(/\bLIMIT\s+\d+/i, "").replace(/\bOFFSET\s+\d+/i, "").trim();
     if (baseSql.endsWith(";")) baseSql = baseSql.slice(0, -1).trim();
 
-    const PAGE_SIZE = 50;
-    const isCte = /^\s*WITH\b/i.test(baseSql);
-
-    // Step 4: Run COUNT (skip for CTEs — can't wrap in subquery)
-    let totalCount = -1;
-    if (!isCte) {
-      try {
-        const countSql = `SELECT COUNT(*) as total FROM (${baseSql}) _count_subq`;
-        const countResult = await Promise.race([
-          db.execute(sql.raw(countSql)),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Count timeout")), 5000)),
-        ]);
-        const countObj = countResult as { rows?: Record<string, unknown>[] };
-        const countRows = countObj.rows || (countResult as Record<string, unknown>[]) || [];
-        totalCount = Number(countRows[0]?.total || 0);
-        if (totalCount === 0) {
-          return { message: "No results found.", success: true, data: { items: [] } };
-        }
-      } catch {
-        totalCount = -1;
+    // 4. Execute
+    console.log(`Executing LLM SQL (attempt ${iter + 1}/${MAX_ITERATIONS}):`, baseSql);
+    try {
+      const { rows, total } = await runCountAndSelect(baseSql);
+      if (rows.length === 0) {
+        return { message: "No results found.", success: true, data: { items: [] } };
       }
+      const formatted = formatRows(rows, total);
+      return { message: formatted.message, success: true, data: formatted.data };
+    } catch (err) {
+      const safe = sanitizePgError(err);
+      console.warn(`SQL attempt ${iter + 1}/${MAX_ITERATIONS} execution failed:`, safe);
+      attempts.push({ sql: baseSql, error: `Database error: ${safe}` });
+      continue;
     }
-
-    // Step 5: Execute with LIMIT
-    const pagedSql = `${baseSql} LIMIT ${PAGE_SIZE}`;
-
-    console.log("Executing LLM SQL (paged):", pagedSql);
-    const queryResult = await Promise.race([
-      db.execute(sql.raw(pagedSql)),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 5000)),
-    ]);
-    const queryObj = queryResult as { rows?: Record<string, unknown>[] };
-    const rows = queryObj.rows || (queryResult as Record<string, unknown>[]) || [];
-
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return { message: "No results found.", success: true, data: { items: [] } };
-    }
-
-    // Step 6: Strip sensitive columns
-    const cleanRows = rows.map((row: Record<string, unknown>) => {
-      const clean: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(row)) {
-        if (!REDACTED_COLUMNS.has(k) && k !== "id") {
-          clean[k] = v;
-        }
-      }
-      return clean;
-    });
-
-    // Step 7: Format response
-    // Single aggregate result (e.g., COUNT)
-    if (cleanRows.length === 1 && Object.keys(cleanRows[0]).length <= 2) {
-      const vals = Object.entries(cleanRows[0])
-        .map(([k, v]) => `**${formatColumnName(k)}:** ${v}`)
-        .join(", ");
-      return { message: vals, success: true, data: cleanRows };
-    }
-
-    // Multiple rows
-    const formatted = cleanRows.map((row: Record<string, unknown>, i: number) => {
-      const name = row.name || row.title || row.company_name || row.contact_name || row.assignee_name || "";
-      const nameKeys = new Set(["name", "title", "company_name", "contact_name", "assignee_name"]);
-      const details = Object.entries(row)
-        .filter(([k, v]) => !nameKeys.has(k) && v !== null && v !== "")
-        .slice(0, 4)
-        .map(([k, v]) => `${formatColumnName(k)}: ${formatValue(k, v)}`)
-        .join(" | ");
-      if (name) {
-        return `${i + 1}. **${formatValue("name", name)}**${details ? ` — ${details}` : ""}`;
-      }
-      return `${i + 1}. ${details}`;
-    }).join("\n");
-
-    // Pagination
-    const shown = cleanRows.length;
-    let paginationNote = "";
-    if (totalCount > 0 && totalCount > shown) {
-      paginationNote = `\n\nShowing ${shown} of ${totalCount}. Say "show more" for the next page.`;
-    } else if (totalCount === -1 && shown === PAGE_SIZE) {
-      paginationNote = `\n\nShowing first ${PAGE_SIZE}. Say "show more" to continue.`;
-    }
-
-    const count = totalCount > 0 ? totalCount : shown;
-    return {
-      message: `${count} result${count !== 1 ? "s" : ""}:\n${formatted}${paginationNote}`,
-      success: true,
-      data: { items: cleanRows, total: totalCount, pageSize: PAGE_SIZE },
-    };
-
-  } catch (error: any) {
-    console.error("SQL query error:", error.message);
-    if (error.cause) console.error("SQL cause:", error.cause);
-    return {
-      message: "I had trouble running that query. Try rephrasing your question.",
-      success: false,
-    };
   }
+
+  console.error(`SQL query exhausted ${MAX_ITERATIONS} attempts. Question: ${question}. Attempts:`, attempts);
+  return {
+    message: "I couldn't build a working query for that question. Try rephrasing it or asking something simpler.",
+    success: false,
+  };
 }

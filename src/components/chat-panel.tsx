@@ -127,7 +127,6 @@ export function ChatPanel({
         body: JSON.stringify({
           input,
           inputType,
-          editionId: "active",
           context: recentMessages || undefined,
         }),
       });
