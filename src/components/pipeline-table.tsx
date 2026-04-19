@@ -4,10 +4,9 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/confirm-dialog";
 import { NotesButton, NotesPanel } from "@/components/notes-panel";
-import { Trash2, MoreHorizontal, CheckCircle2, ListChecks, Pencil } from "lucide-react";
+import { Trash2, CheckCircle2 } from "lucide-react";
 import { stageKeys, sourceKeys } from "@/components/pipeline-view";
 
 type OrgUser = { id: string; name: string | null; email: string };
@@ -16,7 +15,6 @@ type ChecklistCount = { done: number; total: number };
 // ─── Types ───────────────────────────────────────────────
 
 type Stage = "lead" | "engaged" | "confirmed" | "declined";
-type Source = "intake" | "outreach" | "sponsored";
 
 type Column<T> = {
   key: string;
@@ -51,58 +49,6 @@ const sourceColors: Record<string, string> = {
 };
 
 const stages: Stage[] = ["lead", "engaged", "confirmed", "declined"];
-
-// ─── Inline editable cell ────────────────────────────────
-
-function InlineEdit({
-  value,
-  onSave,
-  placeholder,
-}: {
-  value: string;
-  onSave: (val: string) => void;
-  placeholder?: string;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        className="w-full rounded border border-yellow-400 bg-yellow-50 px-1.5 py-0.5 text-xs outline-none"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          setEditing(false);
-          if (draft !== value) onSave(draft);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            setEditing(false);
-            if (draft !== value) onSave(draft);
-          }
-          if (e.key === "Escape") {
-            setEditing(false);
-            setDraft(value);
-          }
-        }}
-      />
-    );
-  }
-
-  return (
-    <span
-      onClick={() => setEditing(true)}
-      className={`group/edit relative cursor-text inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors hover:bg-yellow-50 ${
-        value ? "" : "text-stone-300 italic"
-      }`}
-    >
-      {value || placeholder || ""}
-      <Pencil className="h-3 w-3 text-stone-300 opacity-0 transition-opacity duration-100 group-hover/edit:opacity-100 shrink-0" />
-    </span>
-  );
-}
 
 // ─── Stage dropdown ──────────────────────────────────────
 
@@ -367,7 +313,7 @@ export function PipelineTable<
                 <UserDropdown
                   value={item.assignedTo}
                   users={orgUsers}
-                  onSelect={(name, userId) => {
+                  onSelect={(name) => {
                     handlePatch(item.id, "assignedTo", name);
                     // TODO: also set assigneeId when PATCH supports it
                   }}

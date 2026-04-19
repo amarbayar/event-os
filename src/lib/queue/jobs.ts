@@ -42,7 +42,12 @@ export const sendNotificationJob: JobDefinition<RawNotifyParams> = {
 interface SendEmailPayload {
   to: MailAddress | MailAddress[];
   mailable: Mailable;
-  options?: { orgId?: string; entityType?: string; entityId?: string };
+  options?: {
+    orgId?: string;
+    entityType?: string;
+    entityId?: string;
+    disableDeduplication?: boolean;
+  };
 }
 
 export const sendEmailJob: JobDefinition<SendEmailPayload> = {

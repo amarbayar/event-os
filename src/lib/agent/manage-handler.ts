@@ -4,7 +4,6 @@ import { eq, and, sql, getTableColumns, SQL } from "drizzle-orm";
 import { ilikeFn as ilike } from "@/db/dialect";
 import { AgentIntent, DispatchResult, DrizzleTable, col } from "./types";
 import { AgentContext } from "./dispatcher";
-import { notify } from "@/lib/notify";
 import { validateAgenda } from "@/lib/agenda-validator";
 
 // ─── Manage Handler ──────────────────────────────────
@@ -171,8 +170,6 @@ function coerceDateFields(values: Record<string, unknown>): void {
 // Sessions use startTime/endTime (timestamp fields). The LLM sends
 // these as ISO strings or partial dates. We handle them specially
 // because they're not in the global DATE_FIELDS set.
-
-const SESSION_TIME_FIELDS = new Set(["startTime", "endTime"]);
 
 // ─── Agenda validation helper ────────────────────────────
 //
@@ -403,7 +400,7 @@ async function applyUpdate(
   config: typeof ENTITY_CONFIG[string],
   userFields: string[]
 ): Promise<DispatchResult> {
-  const { table, nameField, label } = config;
+  const { table, nameField } = config;
   const params = intent.params || {};
 
   // Filter to allowed fields + resolve aliases, exclude search-related keys

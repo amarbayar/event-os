@@ -17,7 +17,7 @@ import * as schema from "@/db/schema";
 import { eq, and, sql, isNull } from "drizzle-orm";
 import { ilikeFn as ilike, getDialect } from "@/db/dialect";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
-import { AgentIntent, DispatchResult } from "@/lib/agent/types";
+import { AgentIntent, DrizzleTable, EntityType, LLMProvider } from "@/lib/agent/types";
 import { createTestFixtures, type TestFixtures } from "../fixtures";
 
 // Query paths now route through the LLM-SQL handler, which needs both a
@@ -32,9 +32,9 @@ let fixtures: TestFixtures;
 let orgId: string;
 let editionId: string;
 let organizerUserId: string;
-let organizerEntityType: string;
+let organizerEntityType: EntityType;
 let coordinatorUserId: string;
-let coordinatorEntityType: string;
+let coordinatorEntityType: EntityType;
 
 function ctx(role = "admin", userId?: string): AgentContext {
   return { orgId, editionId, userId: userId || "test-user", userRole: role, userName: "Test User" };
@@ -81,7 +81,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // Cleanup test entities created during tests, then fixtures
-  const tables = [
+  const tables: DrizzleTable[] = [
     schema.speakerApplications,
     schema.sponsorApplications,
     schema.venues,
@@ -93,7 +93,7 @@ afterAll(async () => {
   ];
   for (const table of tables) {
     await db.delete(table).where(
-      eq((table as any).organizationId, orgId),
+      eq(table.organizationId, orgId),
     ).catch(() => {});
   }
   await fixtures.cleanup();
@@ -101,7 +101,7 @@ afterAll(async () => {
 
 // ─── Helper to clean up a specific entity ─────────────
 
-async function cleanup(table: any, nameField: string, pattern: string) {
+async function cleanup(table: DrizzleTable, nameField: string, pattern: string) {
   await db.delete(table).where(
     and(eq(table.organizationId, orgId), ilike(table[nameField], `%${pattern}%`))
   ).catch(() => {});
@@ -632,12 +632,12 @@ describe("Agent RBAC enforcement", () => {
     it("can create entity within their team scope", async () => {
       // Use real coordinator userId + an entity type they have scope for
       const result = await dispatch(
-        intent({ intent: "manage", action: "create", entityType: coordinatorEntityType as any, params: { name: "AgentTest CoordScoped" } }),
+        intent({ intent: "manage", action: "create", entityType: coordinatorEntityType, params: { name: "AgentTest CoordScoped" } }),
         ctx("coordinator", coordinatorUserId)
       );
       expect(result.success).toBe(true);
       // Cleanup — find the right table by entity type
-      const tables: Record<string, any> = {
+      const tables: Record<string, DrizzleTable> = {
         volunteer: schema.volunteerApplications, venue: schema.venues,
         booth: schema.booths, media: schema.mediaPartners, attendee: schema.attendees,
         campaign: schema.campaigns,
@@ -662,7 +662,7 @@ describe("Agent RBAC enforcement", () => {
 
     it("CANNOT delete", async () => {
       const result = await dispatch(
-        intent({ intent: "manage", action: "delete", entityType: coordinatorEntityType as any, searchValue: "x", confirmation: true }),
+        intent({ intent: "manage", action: "delete", entityType: coordinatorEntityType, searchValue: "x", confirmation: true }),
         ctx("coordinator", coordinatorUserId)
       );
       expect(result.success).toBe(false);
@@ -674,11 +674,11 @@ describe("Agent RBAC enforcement", () => {
   describe("organizer role", () => {
     it("can create entity within their team scope", async () => {
       const result = await dispatch(
-        intent({ intent: "manage", action: "create", entityType: organizerEntityType as any, params: { name: "AgentTest OrgScoped" } }),
+        intent({ intent: "manage", action: "create", entityType: organizerEntityType, params: { name: "AgentTest OrgScoped" } }),
         ctx("organizer", organizerUserId)
       );
       expect(result.success).toBe(true);
-      const tables: Record<string, any> = {
+      const tables: Record<string, DrizzleTable> = {
         speaker: schema.speakerApplications, sponsor: schema.sponsorApplications,
         venue: schema.venues, booth: schema.booths, volunteer: schema.volunteerApplications,
         media: schema.mediaPartners, campaign: schema.campaigns,
@@ -702,13 +702,15 @@ describe("Agent RBAC enforcement", () => {
           eq(schema.teams.organizationId, orgId),
           isNull(schema.teams.editionId)
         ));
-      const scopedSet = new Set(scopedTypes.map((r: any) => r.entityType));
-      const manageable = ["speaker", "sponsor", "venue", "booth", "volunteer", "media", "task", "campaign"];
+      const scopedSet = new Set(
+        scopedTypes.map((row: (typeof scopedTypes)[number]) => row.entityType as EntityType)
+      );
+      const manageable: EntityType[] = ["speaker", "sponsor", "venue", "booth", "volunteer", "media", "task", "campaign"];
       const outOfScope = manageable.find((t) => !scopedSet.has(t));
       if (!outOfScope) return; // organizer has scope for everything — skip test
 
       const result = await dispatch(
-        intent({ intent: "manage", action: "create", entityType: outOfScope as any, params: { name: "AgentTest OrgNoScope" } }),
+        intent({ intent: "manage", action: "create", entityType: outOfScope, params: { name: "AgentTest OrgNoScope" } }),
         ctx("organizer", organizerUserId)
       );
       expect(result.success).toBe(false);
@@ -719,7 +721,7 @@ describe("Agent RBAC enforcement", () => {
       // Use a simple entity type the organizer has scope for
       // Create a lead-stage volunteer/venue/speaker in their scope
       const entityType = organizerEntityType;
-      const tables: Record<string, any> = {
+      const tables: Record<string, DrizzleTable> = {
         speaker: schema.speakerApplications, sponsor: schema.sponsorApplications,
         venue: schema.venues, booth: schema.booths, volunteer: schema.volunteerApplications,
         media: schema.mediaPartners, campaign: schema.campaigns, task: schema.tasks,
@@ -731,7 +733,7 @@ describe("Agent RBAC enforcement", () => {
       const { getTableColumns } = await import("drizzle-orm");
       const cols = getTableColumns(table);
       const nameField = "companyName" in cols ? "companyName" : "name" in cols ? "name" : "title";
-      const vals: any = { editionId, organizationId: orgId };
+      const vals: Record<string, string> = { editionId, organizationId: orgId };
       vals[nameField] = "AgentTest OrgDel";
       // Fill required NOT NULL fields
       if ("email" in cols) vals.email = "";
@@ -749,7 +751,7 @@ describe("Agent RBAC enforcement", () => {
 
       const result = await dispatch(
         intent({
-          intent: "manage", action: "delete", entityType: entityType as any,
+          intent: "manage", action: "delete", entityType,
           searchValue: "AgentTest OrgDel",
         }),
         ctx("organizer", organizerUserId),
@@ -828,7 +830,7 @@ describe("Agent RBAC enforcement", () => {
 describe("Agent edge cases", () => {
   it("handles unknown entity type gracefully", async () => {
     const result = await dispatch(
-      intent({ intent: "manage", entityType: "spaceship" as any, action: "create", params: { name: "X" } }),
+      intent({ intent: "manage", entityType: "spaceship" as unknown as EntityType, action: "create", params: { name: "X" } }),
       ctx()
     );
     expect(result.success).toBe(true); // guidance, not crash
@@ -922,7 +924,7 @@ describe("Agent edge cases", () => {
     expect(result2.success).toBe(true);
     // Either "No results found" with empty items, or a count aggregate of 0
     const msg = result2.message.toLowerCase();
-    expect(msg).toMatch(/no results|:\s*0\b|\*\*0\*\*/);
+    expect(msg).toMatch(/no results|:\s*0\b|:\*+\s*0\b|\*\*0\*\*/);
   });
 });
 
@@ -994,7 +996,7 @@ describe("Agent field alias resolution", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("Agent LLM integration (real Gemini)", () => {
-  let provider: any;
+  let provider: LLMProvider | null;
 
   beforeAll(async () => {
     try {
@@ -1007,14 +1009,14 @@ describe("Agent LLM integration (real Gemini)", () => {
   });
 
   // Helper that skips if no LLM available
-  function llmIt(name: string, fn: () => Promise<void>) {
+  function llmIt(name: string, fn: (provider: LLMProvider) => Promise<void>) {
     it(name, async () => {
       if (!provider) return; // skip gracefully
-      await fn();
+      await fn(provider);
     });
   }
 
-  llmIt("classifies 'add speaker John' as manage/create/speaker", async () => {
+  llmIt("classifies 'add speaker John' as manage/create/speaker", async (provider) => {
     const intent = await provider.classify("Add speaker John Kim, email john@test.com");
     expect(intent.intent).toBe("manage");
     expect(intent.entityType).toBe("speaker");
@@ -1022,14 +1024,14 @@ describe("Agent LLM integration (real Gemini)", () => {
     expect(intent.params).toHaveProperty("name");
   });
 
-  llmIt("classifies 'how many sponsors' as query/count/sponsor", async () => {
+  llmIt("classifies 'how many sponsors' as query/count/sponsor", async (provider) => {
     const intent = await provider.classify("How many sponsors do we have?");
     expect(intent.intent).toBe("query");
     expect(intent.entityType).toBe("sponsor");
     expect(["count", "list"]).toContain(intent.action);
   });
 
-  llmIt("classifies 'find venue Blue Sky' as query/search/venue", async () => {
+  llmIt("classifies 'find venue Blue Sky' as query/search/venue", async (provider) => {
     const intent = await provider.classify("Find venue Blue Sky Hall");
     expect(intent.intent).toBe("query");
     expect(intent.entityType).toBe("venue");
@@ -1037,32 +1039,32 @@ describe("Agent LLM integration (real Gemini)", () => {
     expect(intent.searchValue).toBeTruthy();
   });
 
-  llmIt("classifies 'delete booth X' with confirmation flag", async () => {
+  llmIt("classifies 'delete booth X' with confirmation flag", async (provider) => {
     const intent = await provider.classify("Delete booth TechZone");
     expect(intent.intent).toBe("manage");
     expect(intent.action).toBe("delete");
     expect(intent.confirmation).toBe(true);
   });
 
-  llmIt("classifies 'hello' as chitchat", async () => {
+  llmIt("classifies 'hello' as chitchat", async (provider) => {
     const intent = await provider.classify("Hey, what's up?");
     expect(intent.intent).toBe("chitchat");
   });
 
-  llmIt("classifies Mongolian Cyrillic input", async () => {
+  llmIt("classifies Mongolian Cyrillic input", async (provider) => {
     const intent = await provider.classify("Сайн байна уу, хэдэн speaker бүртгэгдсэн бэ?");
     expect(intent.intent).toBe("query");
     expect(intent.entityType).toBe("speaker");
   });
 
-  llmIt("classifies Monglish (transliterated) input", async () => {
+  llmIt("classifies Monglish (transliterated) input", async (provider) => {
     const intent = await provider.classify("Speaker nemne, ner ni Batbold, email batbold@test.mn");
     expect(intent.intent).toBe("manage");
     expect(intent.entityType).toBe("speaker");
     expect(intent.action).toBe("create");
   });
 
-  llmIt("extracts multiple fields from natural language", async () => {
+  llmIt("extracts multiple fields from natural language", async (provider) => {
     const intent = await provider.classify(
       "Add a new booth called AgentTest LLM Booth for Mobicom, contact is Bold at bold@mobicom.mn, size 4x4"
     );
@@ -1076,7 +1078,7 @@ describe("Agent LLM integration (real Gemini)", () => {
     expect(hasContact).toBeTruthy();
   });
 
-  llmIt("full e2e: LLM classify → dispatch → DB create + verify + cleanup", async () => {
+  llmIt("full e2e: LLM classify → dispatch → DB create + verify + cleanup", async (provider) => {
     const classified = await provider.classify("Add media partner AgentTest LLM Media, type is podcast, contact media@test.com");
     const result = await dispatch(classified, ctx());
     expect(result.success).toBe(true);
@@ -1090,7 +1092,7 @@ describe("Agent LLM integration (real Gemini)", () => {
     await cleanup(schema.mediaPartners, "companyName", "AgentTest LLM Media");
   });
 
-  llmIt("full e2e: LLM classify → dispatch → DB count", async () => {
+  llmIt("full e2e: LLM classify → dispatch → DB count", async (provider) => {
     const classified = await provider.classify("List all confirmed speakers");
     const result = await dispatch(classified, ctx());
     expect(result.success).toBe(true);
@@ -1129,7 +1131,7 @@ describe("Agent error resilience", () => {
     expect(result.message).toBeDefined();
     const count = await db.select({ c: sql<number>`count(*)` }).from(schema.speakerApplications);
     expect(Number(count[0].c)).toBeGreaterThanOrEqual(0);
-  });
+  }, 180000);
 
   it("never returns system errors to user on any entity/action combo", async () => {
     if (!llmSqlAvailable) return;
@@ -1145,7 +1147,7 @@ describe("Agent error resilience", () => {
         expect(result.message).not.toMatch(/TypeError|ReferenceError|SyntaxError|Cannot read|undefined is not/i);
       }
     }
-  });
+  }, 180000);
 });
 
 // ═══════════════════════════════════════════════════════

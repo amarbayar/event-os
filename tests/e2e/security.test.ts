@@ -16,13 +16,11 @@ const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:3000";
 
 let f: TestFixtures;
 let orgId: string;
-let editionId: string;
 let speakerId: string;
 
 beforeAll(async () => {
   f = await createTestFixtures();
   orgId = f.orgId;
-  editionId = f.editionId;
   speakerId = f.speakerId;
 });
 

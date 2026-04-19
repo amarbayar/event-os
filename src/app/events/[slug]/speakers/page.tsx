@@ -10,7 +10,6 @@ export default async function SpeakersPage() {
   const speakers = await getSpeakers();
 
   // Fetch tracks for the dropdown
-  const org = await db.query.organizations.findFirst();
   const edition = await db.query.eventEditions.findFirst();
   const allTracks = edition
     ? await db.query.tracks.findMany({

@@ -3,14 +3,14 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/db";
+import { getDialect } from "@/db/dialect";
 import {
   users,
   userOrganizations,
-  accounts,
-  authSessions,
-  verificationTokens,
   orgInvites,
 } from "@/db/schema";
+import * as pgSchema from "@/db/schema.pg";
+import * as sqliteSchema from "@/db/schema.sqlite";
 import { eq, desc, and, isNull, gt } from "drizzle-orm";
 
 // ─── Auth Provider Configuration ────────────────────────
@@ -82,22 +82,29 @@ if (authProvider !== "credentials" && process.env.GOOGLE_CLIENT_ID) {
   );
 }
 
+const authAdapter =
+  authProvider === "credentials"
+    ? undefined
+    : getDialect() === "sqlite"
+      ? DrizzleAdapter(db, {
+          usersTable: sqliteSchema.users,
+          accountsTable: sqliteSchema.accounts,
+          sessionsTable: sqliteSchema.authSessions,
+          verificationTokensTable: sqliteSchema.verificationTokens,
+        } as never)
+      : DrizzleAdapter(db, {
+          usersTable: pgSchema.users,
+          accountsTable: pgSchema.accounts,
+          sessionsTable: pgSchema.authSessions,
+          verificationTokensTable: pgSchema.verificationTokens,
+        } as never);
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true, // Required behind reverse proxy (Nginx)
   providers,
   // Only use DrizzleAdapter when Google OAuth is configured — it conflicts
   // with Credentials provider in some NextAuth v5 versions
-  ...(authProvider !== "credentials"
-    ? {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        adapter: DrizzleAdapter(db, {
-          usersTable: users as any,
-          accountsTable: accounts as any,
-          sessionsTable: authSessions as any,
-          verificationTokensTable: verificationTokens as any,
-        }),
-      }
-    : {}),
+  ...(authAdapter ? { adapter: authAdapter } : {}),
   session: {
     strategy: "jwt", // CRITICAL: must be explicit — DrizzleAdapter defaults to "database"
     maxAge: 8 * 60 * 60, // 8 hours (not the default 30 days)
@@ -144,13 +151,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
-      // OAuth path: look up membership when role is missing
-      if (!token.role && token.sub) {
-        const membership = await getLatestMembership(token.sub);
-        if (membership) {
+      const userId = token.sub || user?.id;
+
+      if (userId) {
+        const [membership, currentUser] = await Promise.all([
+          token.role ? null : getLatestMembership(userId),
+          db.query.users.findFirst({
+            where: eq(users.id, userId),
+            columns: { forcePasswordChange: true },
+          }),
+        ]);
+
+        // OAuth path: look up membership when role is missing
+        if (!token.role && membership) {
           token.role = membership.role;
           token.organizationId = membership.organizationId;
         }
+
+        token.forcePasswordChange = currentUser?.forcePasswordChange ?? false;
       }
 
       return token;

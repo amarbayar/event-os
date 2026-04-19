@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { randomUUID } from "crypto";
 import { auth } from "@/lib/auth";
-
-const UPLOAD_DIR = path.join(process.cwd(), "public/uploads");
-const MAX_SIZE = 20 * 1024 * 1024; // 20MB — modern phone cameras
+import {
+  MAX_UPLOAD_SIZE_BYTES,
+  isAllowedUploadMimeType,
+} from "@/lib/upload-config";
+import { storeUploadedFile } from "@/lib/uploads";
 
 export async function POST(req: NextRequest) {
   // Auth check — uploads require login
@@ -21,37 +20,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  // Path traversal protection
-  if (folder.includes("..")) {
-    return NextResponse.json({ error: "Invalid folder" }, { status: 400 });
-  }
-  const resolvedPath = path.resolve(UPLOAD_DIR, folder);
-  if (!resolvedPath.startsWith(path.resolve(UPLOAD_DIR))) {
-    return NextResponse.json({ error: "Invalid folder" }, { status: 400 });
-  }
-
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "File too large. Max 5MB." }, { status: 400 });
-  }
-
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-  if (!allowedTypes.includes(file.type)) {
+  if (file.size > MAX_UPLOAD_SIZE_BYTES) {
     return NextResponse.json(
-      { error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF." },
+      { error: "File too large. Max 20MB." },
       { status: 400 }
     );
   }
 
-  const ext = file.name.split(".").pop() || "jpg";
-  const fileName = `${randomUUID()}.${ext}`;
-  const folderPath = resolvedPath;
+  if (!isAllowedUploadMimeType(file.type)) {
+    return NextResponse.json(
+      {
+        error:
+          "Invalid file type. Allowed: JPEG, PNG, WebP, GIF, PDF, PPT, PPTX, DOC, DOCX.",
+      },
+      { status: 400 }
+    );
+  }
 
-  await mkdir(folderPath, { recursive: true });
+  try {
+    const bytes = await file.arrayBuffer();
+    const stored = await storeUploadedFile({
+      buffer: Buffer.from(bytes),
+      mimeType: file.type,
+      originalName: file.name,
+      folder,
+    });
 
-  const bytes = await file.arrayBuffer();
-  await writeFile(path.join(folderPath, fileName), Buffer.from(bytes));
-
-  const url = `/uploads/${folder}/${fileName}`;
-
-  return NextResponse.json({ data: { url, fileName } }, { status: 201 });
+    return NextResponse.json(
+      {
+        data: {
+          url: stored.url,
+          fileName: stored.fileName,
+          provider: stored.provider,
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Upload failed:", error);
+    return NextResponse.json(
+      { error: "Failed to store uploaded file" },
+      { status: 500 }
+    );
+  }
 }

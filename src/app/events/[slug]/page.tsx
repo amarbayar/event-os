@@ -1,9 +1,23 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Calendar, Mic2, Users, ScanLine, Store, Ticket, ClipboardList, AlertTriangle, ArrowRight, Clock } from "lucide-react";
-import { getDashboardData, getDashboardStats } from "@/lib/queries";
+import { Calendar, Mic2, ScanLine, Store, Ticket, ClipboardList, AlertTriangle, ArrowRight, Clock } from "lucide-react";
+import { getDashboardData } from "@/lib/queries";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+type OverdueTask = {
+  id: string;
+  title: string;
+  dueDate: Date | string | null;
+  assigneeName: string | null;
+};
+
+type RecentActivityItem = {
+  id: string;
+  type: string;
+  title: string;
+  createdAt: Date | string;
+};
 
 function PipelineBar({ label, stages, href }: {
   label: string;
@@ -56,6 +70,8 @@ export default async function DashboardPage({
   }
 
   const { edition, daysUntil, speakers, sponsors, venues, booths, attendees, sessions, tasks, pendingChecklist, recentActivity } = data;
+  const overdueTasks = tasks.overdue as OverdueTask[];
+  const recentActivityItems = recentActivity as RecentActivityItem[];
 
   // Getting started steps
   const steps = [
@@ -251,7 +267,7 @@ export default async function DashboardPage({
                   <AlertTriangle className="h-3.5 w-3.5" /> Needs Attention
                 </h2>
                 <div className="space-y-2.5">
-                  {tasks.overdue.map((task: any) => (
+                  {overdueTasks.map((task) => (
                     <Link key={task.id} href={`${b}/tasks`} className="flex items-start gap-2 text-sm hover:text-primary transition-colors">
                       <Clock className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
                       <div>
@@ -289,7 +305,7 @@ export default async function DashboardPage({
                 <p className="text-sm text-muted-foreground">No recent activity for this event.</p>
               ) : (
                 <div className="space-y-3">
-                  {recentActivity.map((n: any) => (
+                  {recentActivityItems.map((n) => (
                     <div key={n.id} className="flex items-start gap-2">
                       <div className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${
                         n.type === "assignment" ? "bg-blue-400" :

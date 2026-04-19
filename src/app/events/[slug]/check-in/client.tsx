@@ -47,7 +47,6 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isOnline, setIsOnline] = useState(true);
-  const [queuedScans, setQueuedScans] = useState(0);
   const [stats, setStats] = useState(initialStats);
 
   // 5-second polling for stats
@@ -73,6 +72,7 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
   }, []);
 
   const handleScan = useCallback((qrData: string) => {
+    void qrData;
     // Simulate scan result
     const isKnown = Math.random() > 0.2;
     if (!isKnown) {

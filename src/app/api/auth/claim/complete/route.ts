@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, userOrganizations, orgInvites } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { hash } from "@/lib/password";
 import { jwtVerify } from "jose";
 

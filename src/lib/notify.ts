@@ -46,12 +46,11 @@ async function resolveContent(params: NotifyParams): Promise<{ title: string; me
       locale: params.locale,
       namespace: "Notifications",
     });
+    const translate = t as (key: string, values?: Record<string, string>) => string;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const title = t(params.titleKey as any, params.titleParams as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const title = translate(params.titleKey, params.titleParams);
     const message = params.messageKey
-      ? t(params.messageKey as any, params.messageParams as any)
+      ? translate(params.messageKey, params.messageParams)
       : null;
 
     return { title, message };

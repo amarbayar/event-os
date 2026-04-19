@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { orgInvites } from "@/db/schema";
-import { eq, and, isNull, gt } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { compare } from "@/lib/password";
 import { SignJWT } from "jose";
 

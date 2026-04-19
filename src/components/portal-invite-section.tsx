@@ -17,7 +17,8 @@ export function PortalInviteSection({
 }) {
   const [status, setStatus] = useState<"checking" | "idle" | "loading" | "invited" | "already" | "error">("checking");
   const [showConfirm, setShowConfirm] = useState(false);
-  const [inviteInfo, setInviteInfo] = useState<{ email: string; password: string } | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; password?: string; resent?: boolean } | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     fetch(`/api/portal/status?entityType=${entityType}&entityId=${entityId}`)
@@ -29,25 +30,30 @@ export function PortalInviteSection({
 
   const handleInvite = async () => {
     setStatus("loading");
+    setErrorMessage("");
     const res = await fetch("/api/portal/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entityType, entityId }),
+      body: JSON.stringify({ entityType, entityId, resend: status === "already" }),
     });
     const data = await res.json();
     if (res.ok) {
-      if (data.data.alreadyInvited) {
+      if (data.data.alreadyInvited && !data.data.resent) {
         setStatus("already");
       } else {
-        setInviteInfo({ email: entityEmail, password: data.data.tempPassword });
+        setInviteInfo({
+          email: entityEmail,
+          password: data.data.tempPassword,
+          resent: !!data.data.resent,
+        });
         setStatus("invited");
       }
     } else {
       setStatus("error");
+      setErrorMessage(data.error || t("inviteFailed"));
     }
     setShowConfirm(false);
   };
-
   const t = useTranslations("Portal");
   const tC = useTranslations("Common");
 
@@ -58,7 +64,7 @@ export function PortalInviteSection({
       {status === "already" && (
         <div className="rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-700">
           {t("alreadyInvited", { email: entityEmail })}
-          <Button size="sm" variant="outline" className="h-6 text-[10px] ml-2" onClick={() => { setStatus("idle"); setShowConfirm(true); }}>
+          <Button size="sm" variant="outline" className="h-6 text-[10px] ml-2" onClick={() => setShowConfirm(true)}>
             {t("resendInvite")}
           </Button>
         </div>
@@ -66,15 +72,23 @@ export function PortalInviteSection({
 
       {status === "invited" && inviteInfo && (
         <div className="rounded-md bg-emerald-50 px-3 py-2 space-y-1">
-          <p className="text-xs font-medium text-emerald-800">{t("inviteCreated")}</p>
+          <p className="text-xs font-medium text-emerald-800">
+            {inviteInfo.resent ? t("inviteResent") : t("inviteCreated")}
+          </p>
           <p className="text-xs text-emerald-700">{t("inviteEmail", { email: inviteInfo.email })}</p>
-          <p className="text-xs text-emerald-700">{t("invitePassword", { password: inviteInfo.password })}</p>
-          <p className="text-xs text-emerald-600">{t("shareCredentials")}</p>
+          {inviteInfo.password ? (
+            <>
+              <p className="text-xs text-emerald-700">{t("invitePassword", { password: inviteInfo.password })}</p>
+              <p className="text-xs text-emerald-600">{t("shareCredentials")}</p>
+            </>
+          ) : (
+            <p className="text-xs text-emerald-600">{t("checkInbox")}</p>
+          )}
         </div>
       )}
 
       {status === "error" && (
-        <p className="text-xs text-red-600">{t("inviteFailed")}</p>
+        <p className="text-xs text-red-600">{errorMessage || t("inviteFailed")}</p>
       )}
 
       {showConfirm && (

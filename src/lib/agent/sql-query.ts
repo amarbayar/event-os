@@ -1,4 +1,5 @@
 import { db } from "@/db";
+import { getDialect } from "@/db/dialect";
 import { sql } from "drizzle-orm";
 import { AgentContext } from "./dispatcher";
 
@@ -329,22 +330,31 @@ async function runCountAndSelect(
   if (!isCte) {
     const countSql = `SELECT COUNT(*) as total FROM (${baseSql}) _count_subq`;
     const countResult = await Promise.race([
-      db.execute(sql.raw(countSql)),
+      executeRawRows(countSql),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Count timeout")), 5000)),
     ]);
-    const countObj = countResult as { rows?: Record<string, unknown>[] };
-    const countRows = countObj.rows || (countResult as Record<string, unknown>[]) || [];
-    total = Number(countRows[0]?.total || 0);
+    total = Number(countResult[0]?.total || 0);
   }
 
   const pagedSql = `${baseSql} LIMIT ${PAGE_SIZE}`;
-  const queryResult = await Promise.race([
-    db.execute(sql.raw(pagedSql)),
+  const rows = await Promise.race([
+    executeRawRows(pagedSql),
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 5000)),
   ]);
-  const queryObj = queryResult as { rows?: Record<string, unknown>[] };
-  const rows = queryObj.rows || (queryResult as Record<string, unknown>[]) || [];
   return { rows: Array.isArray(rows) ? rows : [], total };
+}
+
+async function executeRawRows(rawQuery: string): Promise<Record<string, unknown>[]> {
+  const query = sql.raw(rawQuery);
+
+  if (getDialect() === "sqlite") {
+    const rows = await db.all(query) as Record<string, unknown>[];
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  const result = await db.execute(query) as { rows?: Record<string, unknown>[] } | Record<string, unknown>[];
+  const rows = Array.isArray(result) ? result : result.rows ?? [];
+  return Array.isArray(rows) ? rows : [];
 }
 
 function formatRows(

@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -20,11 +21,9 @@ import {
   AlertTriangle,
   AlertCircle,
   Clock,
-  Pencil,
   Trash2,
   X,
   Lock,
-  Unlock,
   GripVertical,
   ChevronDown,
   ChevronUp,
@@ -133,7 +132,6 @@ const SESSION_TYPES: { value: SessionType; label: string }[] = [
 const SPEAKER_SESSION_TYPES: SessionType[] = ["talk", "keynote", "lightning", "fireside"];
 const PANEL_SESSION_TYPES: SessionType[] = ["panel"];
 const HOST_SESSION_TYPES: SessionType[] = ["opening", "closing"];
-const NO_SPEAKER_TYPES: SessionType[] = ["break", "coffee", "lunch", "networking"];
 
 const typeColors: Record<SessionType, string> = {
   keynote: "bg-yellow-50 border-yellow-300",
@@ -242,7 +240,7 @@ export function AgendaClient({
   const [showConflicts, setShowConflicts] = useState(false);
   const [gapMinutes, setGapMinutes] = useState(initialGapMinutes);
   const [gapLocked, setGapLocked] = useState(true);
-  const [agendaStatus, setAgendaStatus] = useState(initialAgendaStatus);
+  const agendaStatus = initialAgendaStatus;
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -648,8 +646,9 @@ export function AgendaClient({
           onChange={(e) => {
             setFormTitle(e.target.value);
             setFormErrors((prev) => {
-              const { title: _, ...rest } = prev;
-              return rest;
+              const next = { ...prev };
+              delete next.title;
+              return next;
             });
           }}
           placeholder="e.g., Opening Keynote"
@@ -1213,7 +1212,6 @@ export function AgendaClient({
 
                   const sessionIssues = sessionIssueMap.get(session.id) || [];
                   const hasError = sessionIssues.some((i) => i.severity === "error");
-                  const hasWarning = sessionIssues.some((i) => i.severity === "warning");
                   const isUnconfirmed =
                     session.speaker && session.speaker.stage !== "confirmed";
                   const isDragging = dragSessionId === session.id;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
@@ -17,6 +17,7 @@ const showGoogle = authProvider !== "credentials";
 
 export default function LoginPage() {
   const t = useTranslations("Auth");
+  const hydrated = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -72,6 +73,19 @@ export default function LoginPage() {
       return;
     }
 
+    try {
+      const passwordStatusRes = await fetch("/api/auth/password-status", {
+        cache: "no-store",
+      });
+      const passwordStatus = await passwordStatusRes.json();
+      if (passwordStatus.data?.forcePasswordChange) {
+        window.location.href = `/change-password?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+        return;
+      }
+    } catch {
+      // If the password status check fails, fall through to the normal redirect.
+    }
+
     window.location.href = callbackUrl;
   };
 
@@ -99,7 +113,7 @@ export default function LoginPage() {
                 type="button"
                 variant="outline"
                 className="w-full"
-                disabled={loading}
+                disabled={!hydrated || loading}
                 onClick={handleGoogleSignIn}
               >
                 <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
@@ -124,7 +138,7 @@ export default function LoginPage() {
             )}
 
             {showCredentials && (
-              <form onSubmit={handleCredentialsSubmit} className="space-y-4">
+              <form method="post" onSubmit={handleCredentialsSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="email">{t("email")}</Label>
                   <Input
@@ -134,7 +148,13 @@ export default function LoginPage() {
                     placeholder="admin@devsummit.mn"
                     defaultValue={searchParams.get("email") || ""}
                     aria-invalid={!!fieldErrors.email}
-                    onChange={() => setFieldErrors((prev) => { const { email: _, ...rest } = prev; return rest; })}
+                    onChange={() =>
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.email;
+                        return next;
+                      })
+                    }
                   />
                   {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
                 </div>
@@ -146,7 +166,13 @@ export default function LoginPage() {
                     type="password"
                     placeholder={t("passwordMinLength")}
                     aria-invalid={!!fieldErrors.password}
-                    onChange={() => setFieldErrors((prev) => { const { password: _, ...rest } = prev; return rest; })}
+                    onChange={() =>
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.password;
+                        return next;
+                      })
+                    }
                   />
                   {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
                 </div>
@@ -155,8 +181,8 @@ export default function LoginPage() {
                     {error}
                   </div>
                 )}
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? t("signingIn") : t("signIn")}
+                <Button type="submit" className="w-full" disabled={!hydrated || loading}>
+                  {!hydrated ? t("signingIn") : loading ? t("signingIn") : t("signIn")}
                 </Button>
               </form>
             )}

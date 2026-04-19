@@ -4,6 +4,10 @@ import { userOrganizations } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
+type DbTransaction = Awaited<
+  ReturnType<typeof import("@/db/connection").createConnection>
+>["db"];
+
 // POST — transfer organization ownership (owner only)
 export async function POST(req: NextRequest) {
   const ctx = await requirePermission(req, "organization", "update");
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Swap roles atomically: current owner → admin, new owner → owner
-  await db.transaction(async (tx: any) => {
+  await db.transaction(async (tx: DbTransaction) => {
     await tx
       .update(userOrganizations)
       .set({ role: "admin" })

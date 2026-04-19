@@ -70,8 +70,9 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ data: { linked: true } }, { status: 201 });
-  } catch (e: any) {
-    if (e.message?.includes("unique") || e.code === "23505") {
+  } catch (error: unknown) {
+    const dbError = error as Error & { code?: string };
+    if (dbError.message?.includes("unique") || dbError.code === "23505") {
       return NextResponse.json({ error: "This platform account is already linked." }, { status: 409 });
     }
     return NextResponse.json({ error: "Failed to create link." }, { status: 500 });

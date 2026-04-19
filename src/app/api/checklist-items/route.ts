@@ -3,6 +3,19 @@ import { db } from "@/db";
 import { checklistItems, checklistTemplates } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
+import { syncChecklistItemsFromTemplates } from "@/lib/checklist";
+
+function stakeholderOwnsEntity(
+  ctx: { user: { role: string; linkedEntityType?: string | null; linkedEntityId?: string | null } },
+  entityType: string,
+  entityId: string
+) {
+  if (ctx.user.role !== "stakeholder") return true;
+  return (
+    ctx.user.linkedEntityType === entityType &&
+    ctx.user.linkedEntityId === entityId
+  );
+}
 
 // GET — list checklist items for an entity (auto-syncs new templates)
 export async function GET(req: NextRequest) {
@@ -17,38 +30,11 @@ export async function GET(req: NextRequest) {
   const ctx = await requirePermission(req, entityType, "read");
   if (isRbacError(ctx)) return ctx;
 
-  // Auto-sync: check for new templates that don't have items yet
-  const existingItems = await db.query.checklistItems.findMany({
-    where: and(
-      eq(checklistItems.entityType, entityType),
-      eq(checklistItems.entityId, entityId),
-    ),
-  });
-
-  // Only sync if entity already has at least one item (i.e., was confirmed)
-  if (existingItems.length > 0) {
-    const existingTemplateIds = new Set(existingItems.map((i: typeof existingItems[number]) => i.templateId));
-    const templates = await db.query.checklistTemplates.findMany({
-      where: and(
-        eq(checklistTemplates.editionId, ctx.editionId),
-        eq(checklistTemplates.entityType, entityType),
-      ),
-    });
-
-    // Create items for any templates that don't have items yet
-    for (const template of templates) {
-      if (!existingTemplateIds.has(template.id)) {
-        await db.insert(checklistItems).values({
-          templateId: template.id,
-          editionId: ctx.editionId,
-          entityType,
-          entityId,
-          organizationId: ctx.orgId,
-          status: "pending",
-        });
-      }
-    }
+  if (!stakeholderOwnsEntity(ctx, entityType, entityId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  await syncChecklistItemsFromTemplates(entityType, entityId, ctx.editionId, ctx.orgId);
 
   const items = await db
     .select({
@@ -91,6 +77,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await requirePermission(req, "checklist", "read");
   if (isRbacError(ctx)) return ctx;
+
+  if (ctx.user.role === "stakeholder") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await req.json();
   const { entityType } = body;

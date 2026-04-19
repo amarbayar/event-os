@@ -49,7 +49,7 @@ export function AttendeesClient({
   initialAttendees: Attendee[];
   stats: Stats;
 }) {
-  const [attendees, setAttendees] = useState(initialAttendees);
+  const attendees = initialAttendees;
   const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [drawerForm, setDrawerForm] = useState<Record<string, string | null>>({});

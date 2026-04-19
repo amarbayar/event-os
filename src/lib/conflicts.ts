@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { sessions } from "@/db/schema";
-import { eq, and, ne, isNotNull } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 export type Conflict = {
   type:
@@ -21,7 +21,7 @@ export async function detectConflicts(
   const allSessions = await db.query.sessions.findMany({
     where: eq(sessions.editionId, editionId),
     with: { speaker: true, track: true },
-    orderBy: (s: any, { asc }: any) => [asc(s.day), asc(s.startTime)],
+    orderBy: [asc(sessions.day), asc(sessions.startTime)],
   });
 
   const conflicts: Conflict[] = [];

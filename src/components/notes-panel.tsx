@@ -43,14 +43,34 @@ export function NotesPanel({
 
   // Fetch notes when panel opens
   useEffect(() => {
-    if (isOpen && entityId) {
-      setLoading(true);
-      fetch(`/api/notes?entityType=${entityType}&entityId=${entityId}`)
-        .then((r) => r.json())
-        .then((d) => setNotes(d.data || []))
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    }
+    if (!isOpen || !entityId) return;
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        setLoading(true);
+        try {
+          const response = await fetch(
+            `/api/notes?entityType=${entityType}&entityId=${entityId}`
+          );
+          const data = await response.json();
+          if (!cancelled) {
+            setNotes(data.data || []);
+          }
+        } catch {
+          // Keep the last successful note list.
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      })();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [isOpen, entityType, entityId]);
 
   // Scroll to bottom on new notes

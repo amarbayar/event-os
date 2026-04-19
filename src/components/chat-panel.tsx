@@ -16,7 +16,6 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
-  FileUp,
 } from "lucide-react";
 
 type PanelSize = "expanded" | "compact" | "hidden";
@@ -132,15 +131,22 @@ export function ChatPanel({
       });
 
       const json = await res.json();
-      const data = json.data;
+      const data = json?.data as
+        | { message?: string; entities?: Message["entities"]; actions?: Message["actions"]; questions?: Message["questions"] }
+        | undefined;
+      const messageText =
+        data?.message ||
+        (typeof json?.error === "string" ? json.error : "") ||
+        (typeof json?.message === "string" ? json.message : "") ||
+        t("processFailed");
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.message || t("processFailed"),
-        entities: data.entities,
-        actions: data.actions,
-        questions: data.questions,
+        content: messageText,
+        entities: res.ok ? data?.entities : undefined,
+        actions: res.ok ? data?.actions : undefined,
+        questions: res.ok ? data?.questions : undefined,
         timestamp: new Date(),
       };
 

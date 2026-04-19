@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { eventEditions, eventSeries, tracks } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
 export async function POST(req: NextRequest) {
   const ctx = await requirePermission(req, "edition", "create");
   if (isRbacError(ctx)) return ctx;
-  const ids = { orgId: ctx.orgId, editionId: ctx.editionId };
+  const orgId = ctx.orgId;
 
   const body = await req.json();
   const { name, startDate, endDate, venue } = body;
@@ -22,14 +23,14 @@ export async function POST(req: NextRequest) {
 
   // Find or create series for this org
   let series = await db.query.eventSeries.findFirst({
-    where: (s: any, { eq }: any) => eq(s.organizationId, ids.orgId),
+    where: eq(eventSeries.organizationId, orgId),
   });
 
   if (!series) {
     const [newSeries] = await db
       .insert(eventSeries)
       .values({
-        organizationId: ids.orgId,
+        organizationId: orgId,
         name: name.replace(/\s*\d{4}$/, ""),
         slug: slug.replace(/-\d{4}$/, ""),
       })
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     .insert(eventEditions)
     .values({
       seriesId: series.id,
-      organizationId: ids.orgId,
+      organizationId: orgId,
       name,
       slug,
       startDate: startDate ? new Date(startDate) : null,

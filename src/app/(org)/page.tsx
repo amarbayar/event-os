@@ -9,7 +9,7 @@ import {
   attendees,
   sessions,
 } from "@/db/schema";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,6 @@ import {
   Users,
   Presentation,
   ArrowRight,
-  Plus,
 } from "lucide-react";
 import { CreateEventButton } from "./create-event-button";
 

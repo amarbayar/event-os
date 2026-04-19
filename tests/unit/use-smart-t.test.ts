@@ -15,10 +15,6 @@ vi.mock("next-intl", () => ({
   },
 }));
 
-vi.mock("@/lib/hooks/use-ai-translation", () => ({
-  useAiTranslation: (text: string) => `AI:${text}`,
-}));
-
 describe("useSmartT", () => {
   it("returns existing translation", () => {
     const t = useSmartT("Common");
@@ -28,11 +24,11 @@ describe("useSmartT", () => {
     expect(result).toBe("Translated");
   });
 
-  it("falls back to AI when missing", () => {
+  it("falls back to the provided string when missing", () => {
     const t = useSmartT("Common");
 
     const result = t("missing", "Fallback");
 
-    expect(result).toBe("AI:Fallback");
+    expect(result).toBe("Fallback");
   });
 });

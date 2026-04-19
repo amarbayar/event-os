@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, userOrganizations, organizations, speakerApplications, sponsorApplications, venues, booths, volunteerApplications, mediaPartners } from "@/db/schema";
+import { users, userOrganizations, organizations } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { hash } from "@/lib/password";
 import { mail } from "@/lib/mail";
 import { portalInvite } from "@/lib/mail/mailables/portal-invite";
 import { portalAdded } from "@/lib/mail/mailables/portal-added";
+import { absoluteAppUrl } from "@/lib/app-url";
+import {
+  findStakeholderEntity,
+  getStakeholderEntityConfig,
+} from "@/lib/stakeholder-entities";
 
 // POST — invite a confirmed entity to the stakeholder portal
 // Creates a user with role="stakeholder" linked to the entity
@@ -15,42 +20,18 @@ export async function POST(req: NextRequest) {
   if (isRbacError(ctx)) return ctx;
 
   const body = await req.json();
-  const { entityType, entityId } = body;
+  const { entityType, entityId, resend } = body;
 
   if (!entityType || !entityId) {
     return NextResponse.json({ error: "entityType and entityId required" }, { status: 400 });
   }
 
-  // Look up the entity to get name + email
-  const entityTables: Record<string, { table: any; nameField: string; emailField: string }> = {
-    speaker: { table: speakerApplications, nameField: "name", emailField: "email" },
-    sponsor: { table: sponsorApplications, nameField: "contactName", emailField: "contactEmail" },
-    venue: { table: venues, nameField: "contactName", emailField: "contactEmail" },
-    booth: { table: booths, nameField: "companyName", emailField: "contactEmail" },
-    volunteer: { table: volunteerApplications, nameField: "name", emailField: "email" },
-    media: { table: mediaPartners, nameField: "contactName", emailField: "contactEmail" },
-  };
-
-  const config = entityTables[entityType];
+  const config = getStakeholderEntityConfig(entityType);
   if (!config) {
     return NextResponse.json({ error: `Unsupported entity type: ${entityType}` }, { status: 400 });
   }
 
-  // Look up entity by type
-  let entity: Record<string, unknown> | undefined;
-  if (entityType === "speaker") {
-    entity = await db.query.speakerApplications.findFirst({ where: eq(speakerApplications.id, entityId) }) as Record<string, unknown> | undefined;
-  } else if (entityType === "sponsor") {
-    entity = await db.query.sponsorApplications.findFirst({ where: eq(sponsorApplications.id, entityId) }) as Record<string, unknown> | undefined;
-  } else if (entityType === "venue") {
-    entity = await db.query.venues.findFirst({ where: eq(venues.id, entityId) }) as Record<string, unknown> | undefined;
-  } else if (entityType === "booth") {
-    entity = await db.query.booths.findFirst({ where: eq(booths.id, entityId) }) as Record<string, unknown> | undefined;
-  } else if (entityType === "volunteer") {
-    entity = await db.query.volunteerApplications.findFirst({ where: eq(volunteerApplications.id, entityId) }) as Record<string, unknown> | undefined;
-  } else if (entityType === "media") {
-    entity = await db.query.mediaPartners.findFirst({ where: eq(mediaPartners.id, entityId) }) as Record<string, unknown> | undefined;
-  }
+  const entity = await findStakeholderEntity(entityType, entityId);
 
   if (!entity) {
     return NextResponse.json({ error: "Entity not found" }, { status: 404 });
@@ -58,9 +39,19 @@ export async function POST(req: NextRequest) {
 
   const entityName = (entity[config.nameField] as string) || "";
   const entityEmail = (entity[config.emailField] as string) || "";
+  const entityStage = (entity.stage as string | undefined) || null;
+  const portalUrl = absoluteAppUrl("/portal", req);
+  const shouldExposeTempPassword = (process.env.MAIL_DRIVER || "log") === "log";
 
   if (!entityEmail) {
     return NextResponse.json({ error: "Entity has no email address — cannot create portal account" }, { status: 400 });
+  }
+
+  if (entityStage && entityStage !== "confirmed") {
+    return NextResponse.json(
+      { error: "Entity must be confirmed before portal access can be granted" },
+      { status: 400 }
+    );
   }
 
   // Get org name (for email templates) and check for existing user in parallel
@@ -82,12 +73,98 @@ export async function POST(req: NextRequest) {
         eq(userOrganizations.userId, existing.id),
         eq(userOrganizations.organizationId, ctx.orgId),
         eq(userOrganizations.role, "stakeholder"),
+        eq(userOrganizations.linkedEntityType, entityType),
         eq(userOrganizations.linkedEntityId, entityId),
       ),
     });
 
     if (existingMembership) {
-      return NextResponse.json({ data: { id: existing.id, email: existing.email, alreadyInvited: true } });
+      if (!resend) {
+        return NextResponse.json({
+          data: {
+            id: existing.id,
+            email: existing.email,
+            alreadyInvited: true,
+            portalUrl,
+          },
+        });
+      }
+
+      if (existing.forcePasswordChange) {
+        const { randomBytes } = await import("crypto");
+        const rawPassword = randomBytes(8).toString("base64url");
+        const passwordHash = await hash(rawPassword);
+
+        await db
+          .update(users)
+          .set({
+            passwordHash,
+            forcePasswordChange: true,
+          })
+          .where(eq(users.id, existing.id));
+
+        const mailResult = await mail(
+          { email: existing.email, name: existing.name || entityName || undefined },
+          portalInvite({
+            name: existing.name || entityName,
+            tempPassword: rawPassword,
+            portalUrl,
+            organizationName: orgName,
+          }),
+          {
+            orgId: ctx.orgId,
+            entityType,
+            entityId,
+            disableDeduplication: true,
+          }
+        );
+
+        if (!mailResult.success) {
+          return NextResponse.json(
+            { error: "Failed to send portal invite email" },
+            { status: 502 }
+          );
+        }
+
+        return NextResponse.json({
+          data: {
+            id: existing.id,
+            email: existing.email,
+            alreadyInvited: true,
+            resent: true,
+            portalUrl,
+            ...(shouldExposeTempPassword ? { tempPassword: rawPassword } : {}),
+          },
+        });
+      }
+
+      const mailResult = await mail(
+        { email: existing.email, name: existing.name || entityName || undefined },
+        portalAdded({ name: existing.name || entityName, portalUrl, organizationName: orgName }),
+        {
+          orgId: ctx.orgId,
+          entityType,
+          entityId,
+          disableDeduplication: true,
+        }
+      );
+
+      if (!mailResult.success) {
+        return NextResponse.json(
+          { error: "Failed to send portal access email" },
+          { status: 502 }
+        );
+      }
+
+      return NextResponse.json({
+        data: {
+          id: existing.id,
+          email: existing.email,
+          alreadyInvited: true,
+          resent: true,
+          portalUrl,
+        },
+      });
     }
 
     // Add stakeholder membership to this org
@@ -100,14 +177,21 @@ export async function POST(req: NextRequest) {
     });
 
     // Notify existing user they've been added to a new org
-    await mail(
+    const mailResult = await mail(
       { email: existing.email, name: existing.name || undefined },
-      portalAdded({ name: existing.name || entityName, portalUrl: "/portal", organizationName: orgName }),
+      portalAdded({ name: existing.name || entityName, portalUrl, organizationName: orgName }),
       { orgId: ctx.orgId, entityType, entityId }
     );
 
+    if (!mailResult.success) {
+      return NextResponse.json(
+        { error: "Failed to send portal access email" },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json({
-      data: { id: existing.id, name: existing.name, email: existing.email, role: "stakeholder", portalUrl: `/portal` },
+      data: { id: existing.id, name: existing.name, email: existing.email, role: "stakeholder", portalUrl },
     }, { status: 201 });
   }
 
@@ -122,6 +206,7 @@ export async function POST(req: NextRequest) {
       name: entityName,
       email: entityEmail,
       passwordHash: tempPassword,
+      forcePasswordChange: true,
     })
     .returning({ id: users.id, name: users.name, email: users.email });
 
@@ -134,18 +219,25 @@ export async function POST(req: NextRequest) {
   });
 
   // Send portal invite email with temp password
-  await mail(
+  const mailResult = await mail(
     { email: entityEmail, name: entityName },
-    portalInvite({ name: entityName, tempPassword: rawPassword, portalUrl: "/portal", organizationName: orgName }),
+    portalInvite({ name: entityName, tempPassword: rawPassword, portalUrl, organizationName: orgName }),
     { orgId: ctx.orgId, entityType, entityId }
   );
+
+  if (!mailResult.success) {
+    return NextResponse.json(
+      { error: "Failed to send portal invite email" },
+      { status: 502 }
+    );
+  }
 
   return NextResponse.json({
     data: {
       ...user,
       role: "stakeholder",
-      tempPassword: rawPassword,
-      portalUrl: `/portal`,
+      ...(shouldExposeTempPassword ? { tempPassword: rawPassword } : {}),
+      portalUrl,
     },
   }, { status: 201 });
 }
