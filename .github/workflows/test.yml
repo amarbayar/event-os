@@ -55,14 +55,11 @@ jobs:
           npx drizzle-kit push
           npx tsx src/db/seed.ts
 
-      - name: Start server and run e2e tests
-        run: |
-          AUTH_SECRET=ci-test-secret SERVICE_TOKEN=ci-test-token npm run dev &
-          for i in $(seq 1 30); do curl -s -o /dev/null http://localhost:3000 && break; sleep 1; done
-          curl -sf http://localhost:3000 > /dev/null || { echo "Server failed to start"; exit 1; }
-          SERVICE_TOKEN=ci-test-token npx vitest run tests/e2e
+      - name: Run API e2e tests
+        run: npm run test:e2e:api
         env:
-          PORT: 3000
+          AUTH_SECRET: ci-test-secret
+          SERVICE_TOKEN: ci-test-token
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
   e2e-browser:

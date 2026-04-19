@@ -587,10 +587,11 @@ GEMINI_API_KEY=your-key DB_DIALECT=sqlite npx vitest run tests/integration
 
 Tests run automatically on push to `main` and on pull requests. The workflow uses SQLite so no database service is needed.
 
-**Two jobs:**
+**Three jobs:**
 
 - **Unit & Integration** — fast (~2s), runs `tests/unit` + `tests/integration`
-- **E2E** — builds the app, starts the production server, runs `tests/e2e`
+- **API E2E** — boots a dev server and runs `tests/e2e` through `npm run test:e2e:api`
+- **Browser E2E** — runs Playwright against `tests/e2e-browser`
 
 **To enable LLM tests in CI**, add your Gemini API key as a repository secret:
 
