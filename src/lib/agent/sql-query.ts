@@ -357,10 +357,15 @@ async function executeRawRows(rawQuery: string): Promise<Record<string, unknown>
   return Array.isArray(rows) ? rows : [];
 }
 
-function formatRows(
-  rows: Record<string, unknown>[],
-  total: number,
-): { message: string; data: unknown } {
+type FormattedResult = {
+  message: string;
+  data: unknown;
+  cleanRows: Record<string, unknown>[];
+  /** true for single-row aggregate results (COUNT/SUM/etc) where a natural-language answer reads much better than "**Total:** 8". */
+  isSingleAggregate: boolean;
+};
+
+function formatRows(rows: Record<string, unknown>[], total: number): FormattedResult {
   const cleanRows = rows.map((row) => {
     const clean: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(row)) {
@@ -374,7 +379,7 @@ function formatRows(
     const vals = Object.entries(cleanRows[0])
       .map(([k, v]) => `**${formatColumnName(k)}:** ${v}`)
       .join(", ");
-    return { message: vals, data: cleanRows };
+    return { message: vals, data: cleanRows, cleanRows, isSingleAggregate: true };
   }
 
   const formatted = cleanRows.map((row, i) => {
@@ -401,7 +406,49 @@ function formatRows(
   return {
     message: `${count} result${count !== 1 ? "s" : ""}:\n${formatted}${paginationNote}`,
     data: { items: cleanRows, total, pageSize: PAGE_SIZE },
+    cleanRows,
+    isSingleAggregate: false,
   };
+}
+
+/**
+ * Second LLM pass: phrase the answer naturally in the question's language.
+ *
+ * Only worth doing for single-aggregate results where the raw "**Total:** 8"
+ * rendering reads poorly. For multi-row lists the existing numbered format is
+ * already fine and this extra ~1s round-trip isn't justified.
+ */
+async function naturalizeAggregateAnswer(
+  provider: { generate: (p: string) => Promise<string> },
+  question: string,
+  row: Record<string, unknown>,
+): Promise<string | null> {
+  const prompt = `You are writing a one-line answer to a user's question about their event data.
+
+User question: ${question}
+Query result: ${JSON.stringify(row)}
+
+Write ONE SHORT SENTENCE answering the question.
+- Use the same language as the user's question (English, Mongolian, etc.).
+- Use ONLY the numbers and values from the query result — never invent any.
+- No markdown, no bullet points, no prefix like "Answer:", no quotes.
+- Natural and conversational, not a data dump.
+
+Respond with ONLY the one-line answer.`;
+
+  try {
+    const answer = (await provider.generate(prompt)).trim();
+    // Strip any accidental markdown or surrounding quotes/code fences.
+    return answer
+      .replace(/^```\w*\n?/m, "")
+      .replace(/\n?```$/m, "")
+      .replace(/^["'`]|["'`]$/g, "")
+      .slice(0, 500)
+      .trim() || null;
+  } catch (err) {
+    console.warn("naturalizeAggregateAnswer failed, falling back to raw format:", err);
+    return null;
+  }
 }
 
 export async function executeSqlQuery(
@@ -466,6 +513,17 @@ export async function executeSqlQuery(
         return { message: "No results found.", success: true, data: { items: [] } };
       }
       const formatted = formatRows(rows, total);
+
+      // For single-aggregate results (e.g. COUNT(*)), the raw "**Total:** 8"
+      // rendering is terse and loses the question's language. One extra LLM
+      // round-trip rephrases it naturally. On failure we keep the raw format.
+      if (formatted.isSingleAggregate) {
+        const natural = await naturalizeAggregateAnswer(provider, question, formatted.cleanRows[0]);
+        if (natural) {
+          return { message: natural, success: true, data: formatted.data };
+        }
+      }
+
       return { message: formatted.message, success: true, data: formatted.data };
     } catch (err) {
       const safe = sanitizePgError(err);
