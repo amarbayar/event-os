@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import net from "node:net";
+import path from "node:path";
 import process from "node:process";
 import { config } from "dotenv";
 
@@ -7,6 +8,7 @@ config({ path: ".env.local" });
 config();
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+const nextBin = path.join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
 const API_TEST_FILES = [
   "tests/e2e/pipeline.test.ts",
   "tests/e2e/security.test.ts",
@@ -63,7 +65,7 @@ async function waitForServer(baseUrl: string, server: ChildProcess, timeoutMs = 
 async function stopServer(server: ChildProcess) {
   if (server.exitCode !== null) return;
 
-  server.kill("SIGTERM");
+  sendSignal(server, "SIGTERM");
 
   const deadline = Date.now() + 10_000;
   while (server.exitCode === null && Date.now() < deadline) {
@@ -71,8 +73,23 @@ async function stopServer(server: ChildProcess) {
   }
 
   if (server.exitCode === null) {
-    server.kill("SIGKILL");
+    sendSignal(server, "SIGKILL");
   }
+}
+
+function sendSignal(child: ChildProcess, signal: NodeJS.Signals) {
+  if (child.pid === undefined) return;
+
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // Fall back to killing the direct child when process-group signaling isn't available.
+    }
+  }
+
+  child.kill(signal);
 }
 
 function createTestEnv(baseUrl: string) {
@@ -128,9 +145,10 @@ async function main() {
   const baseUrl = `http://127.0.0.1:${port}`;
   const env = createTestEnv(baseUrl);
 
-  const server = spawn(npmCmd, ["run", "dev", "--", "--hostname", "127.0.0.1"], {
+  const server = spawn(process.execPath, [nextBin, "dev", "--hostname", "127.0.0.1"], {
     cwd: process.cwd(),
     env,
+    detached: process.platform !== "win32",
     stdio: ["ignore", "pipe", "pipe"],
   });
   pipeOutput(server, "server");
