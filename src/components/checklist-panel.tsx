@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -174,18 +174,28 @@ export function ChecklistPanel({
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchItems = () => {
+  const fetchItems = useCallback(async () => {
     setLoading(true);
-    fetch(`/api/checklist-items?entityType=${entityType}&entityId=${entityId}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.data) setItems(d.data); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
+    try {
+      const response = await fetch(
+        `/api/checklist-items?entityType=${entityType}&entityId=${entityId}`
+      );
+      const data = await response.json();
+      if (data.data) setItems(data.data);
+    } catch {
+      // Keep the current checklist state if refresh fails.
+    } finally {
+      setLoading(false);
+    }
+  }, [entityId, entityType]);
 
   useEffect(() => {
-    if (entityId) fetchItems();
-  }, [entityId, entityType]);
+    if (!entityId) return;
+    const timeoutId = window.setTimeout(() => {
+      void fetchItems();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [entityId, fetchItems]);
 
   const handleSubmit = async (itemId: string, value: string) => {
     await fetch(`/api/checklist-items/${itemId}`, {
@@ -193,7 +203,7 @@ export function ChecklistPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "submitted", value }),
     });
-    fetchItems();
+    await fetchItems();
   };
 
   const handleApprove = async (itemId: string) => {
@@ -202,7 +212,7 @@ export function ChecklistPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "approved" }),
     });
-    fetchItems();
+    await fetchItems();
   };
 
   const handleReject = async (itemId: string, notes: string) => {
@@ -211,7 +221,7 @@ export function ChecklistPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "needs_revision", notes }),
     });
-    fetchItems();
+    await fetchItems();
   };
 
   const activeItems = items.filter((i) => i.status !== "archived");

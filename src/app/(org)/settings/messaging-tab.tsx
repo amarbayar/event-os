@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -365,19 +366,6 @@ function TelegramSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) =>
     }
   };
 
-  const disconnect = async () => {
-    await fetch("/api/messaging/telegram", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "disconnect" }),
-    });
-    setConfig(null);
-    setStep("idle");
-    setToken("");
-    setBotInfo(null);
-    setGroups([]);
-  };
-
   // Loading state — prevents flash of empty form
   if (step === "loading") {
     return (
@@ -461,7 +449,7 @@ function TelegramSetup({ onConnected }: { onConnected?: (cfg: PlatformConfig) =>
               <div className="flex gap-2">
                 <Input
                   placeholder="e.g., -1001234567890"
-                  onChange={(e) => setError("")}
+                  onChange={() => setError("")}
                   id="manual-group-id"
                 />
                 <Button size="sm" onClick={() => {

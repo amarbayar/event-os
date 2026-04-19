@@ -25,7 +25,7 @@ import {
   Mail,
   ArrowLeft,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 type NavItem = { href: string; labelKey: string; icon: React.ElementType };
@@ -119,22 +119,44 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
-  // Resolve full path with basePath prefix
   const normPath = pathname.replace(/\/$/, "") || "/";
-  const fullHref = (href: string) => href === "/" ? (basePath || "/") : `${basePath}${href}`;
+  const fullHref = useCallback(
+    (href: string) => (href === "/" ? (basePath || "/") : `${basePath}${href}`),
+    [basePath]
+  );
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setMobileOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [normPath]);
 
   // Auto-expand the group that contains the active page
   useEffect(() => {
-    for (const group of navGroups) {
-      if (group.items.some((item) => normPath === fullHref(item.href) || normPath.startsWith(fullHref(item.href) + "/"))) {
-        setExpandedGroups((prev) => new Set([...prev, group.key]));
-      }
-    }
-  }, [pathname, basePath]);
+    const activeGroups = navGroups
+      .filter((group) =>
+        group.items.some((item) => {
+          const href = fullHref(item.href);
+          return normPath === href || normPath.startsWith(`${href}/`);
+        })
+      )
+      .map((group) => group.key);
+
+    if (activeGroups.length === 0) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setExpandedGroups((prev) => {
+        const next = new Set(prev);
+        for (const groupKey of activeGroups) {
+          next.add(groupKey);
+        }
+        return next;
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [fullHref, normPath]);
 
   const toggleGroup = (label: string) => {
     setExpandedGroups((prev) => {

@@ -8,7 +8,7 @@
 
 import { testDb } from "./setup";
 import * as schema from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { hashSync } from "bcryptjs";
 
@@ -27,6 +27,8 @@ export async function createTestFixtures(): Promise<TestFixtures> {
   const orgId = uuid();
   const editionId = uuid();
   const password = hashSync("test-password", 4); // fast rounds for tests
+  const speakerEmail = `fixture-speaker-${orgId.slice(0, 8)}@test.local`;
+  const sponsorEmail = `fixture-sponsor-${orgId.slice(0, 8)}@test.local`;
 
   // ─── Organization ──────────────────────────────────
   await testDb.insert(schema.organizations).values({
@@ -132,7 +134,7 @@ export async function createTestFixtures(): Promise<TestFixtures> {
   await testDb.insert(schema.speakerApplications).values({
     id: speakerId,
     name: "Fixture Speaker",
-    email: "fixture-speaker@test.local",
+    email: speakerEmail,
     talkTitle: "Test Talk",
     stage: "confirmed",
     organizationId: orgId,
@@ -144,7 +146,7 @@ export async function createTestFixtures(): Promise<TestFixtures> {
     id: sponsorId,
     companyName: "Fixture Sponsor Co",
     contactName: "Fixture Contact",
-    contactEmail: "fixture-sponsor@test.local",
+    contactEmail: sponsorEmail,
     stage: "lead",
     organizationId: orgId,
     editionId,
@@ -209,6 +211,9 @@ export async function createTestFixtures(): Promise<TestFixtures> {
     await testDb.delete(schema.speakerApplications).where(eq(schema.speakerApplications.organizationId, orgId));
     await testDb.delete(schema.sponsorApplications).where(eq(schema.sponsorApplications.organizationId, orgId));
     await testDb.delete(schema.userOrganizations).where(eq(schema.userOrganizations.organizationId, orgId));
+    await testDb
+      .delete(schema.users)
+      .where(inArray(schema.users.email, [speakerEmail, sponsorEmail]));
     if (userIds.length > 0) {
       await testDb.delete(schema.users).where(inArray(schema.users.id, userIds));
     }

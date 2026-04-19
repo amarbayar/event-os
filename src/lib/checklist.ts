@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { checklistTemplates, checklistItems } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 
 // ─── Generate checklist items when entity stage → confirmed ─────
 //
@@ -67,7 +67,7 @@ export async function generateChecklistItems(
         eq(checklistTemplates.editionId, editionId),
         eq(checklistTemplates.entityType, entityType)
       ),
-      orderBy: (t: any, { asc }: any) => asc(t.sortOrder),
+      orderBy: [asc(checklistTemplates.sortOrder)],
     });
 
     if (templates.length === 0) {
@@ -89,6 +89,62 @@ export async function generateChecklistItems(
     return templates.length;
   } catch (error) {
     console.error("Failed to generate checklist items:", error);
+    return 0;
+  }
+}
+
+export async function syncChecklistItemsFromTemplates(
+  entityType: string,
+  entityId: string,
+  editionId: string,
+  orgId: string
+): Promise<number> {
+  try {
+    const existingItems = await db.query.checklistItems.findMany({
+      where: and(
+        eq(checklistItems.entityType, entityType),
+        eq(checklistItems.entityId, entityId),
+        eq(checklistItems.editionId, editionId)
+      ),
+    });
+
+    const hasActiveItems = existingItems.some(
+      (item: typeof existingItems[number]) => item.status !== "archived"
+    );
+    if (!hasActiveItems) {
+      return 0;
+    }
+
+    const existingTemplateIds = new Set(
+      existingItems.map((item: typeof existingItems[number]) => item.templateId)
+    );
+
+    const templates = await db.query.checklistTemplates.findMany({
+      where: and(
+        eq(checklistTemplates.editionId, editionId),
+        eq(checklistTemplates.entityType, entityType)
+      ),
+      orderBy: [asc(checklistTemplates.sortOrder)],
+    });
+
+    let created = 0;
+    for (const template of templates) {
+      if (existingTemplateIds.has(template.id)) continue;
+
+      await db.insert(checklistItems).values({
+        templateId: template.id,
+        editionId,
+        entityType,
+        entityId,
+        organizationId: orgId,
+        status: "pending",
+      });
+      created++;
+    }
+
+    return created;
+  } catch (error) {
+    console.error("Failed to sync checklist items from templates:", error);
     return 0;
   }
 }

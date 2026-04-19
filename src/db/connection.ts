@@ -18,6 +18,7 @@ export async function createConnection(pgUrlOverride?: string): Promise<{
     const { drizzle } = await import("drizzle-orm/better-sqlite3");
     const sqlite = new Database(process.env.SQLITE_PATH || "local.db");
     sqlite.pragma("journal_mode = WAL");
+    sqlite.pragma("busy_timeout = 5000");
     sqlite.pragma("foreign_keys = ON");
     return { db: drizzle(sqlite, { schema: sqliteSchema }), close: async () => { sqlite.close(); } };
   }

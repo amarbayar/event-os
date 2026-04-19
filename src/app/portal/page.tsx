@@ -2,20 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { signOut } from "next-auth/react";
 import { formatDate } from "@/lib/i18n/date";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { FileUpload } from "@/components/file-upload";
+import { getChecklistUploadDescriptor } from "@/lib/upload-config";
 import {
   CheckCircle2,
   Circle,
   AlertCircle,
   Clock,
-  Upload,
   MapPin,
   Calendar,
-  Mic2,
   LogOut,
 } from "lucide-react";
 
@@ -45,6 +46,10 @@ const statusConfig: Record<string, { icon: React.ElementType; color: string; bg:
   needs_revision: { icon: AlertCircle, color: "text-orange-600", bg: "bg-orange-50" },
 };
 
+function isLikelyLink(value: string) {
+  return value.startsWith("/") || /^https?:\/\//i.test(value);
+}
+
 // ─── Profile Section (editable entity fields) ──────────
 
 function ProfileSection({
@@ -61,6 +66,7 @@ function ProfileSection({
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   // Fields shown per entity type
   const fieldsByType: Record<string, { key: string; labelKey: string; type: "text" | "textarea" | "url" }[]> = {
@@ -96,17 +102,27 @@ function ProfileSection({
     for (const f of fields) {
       initial[f.key] = (entity[f.key] as string) || "";
     }
+    setError("");
     setForm(initial);
     setEditing(true);
   };
 
   const handleSave = async () => {
     setSaving(true);
-    await fetch("/api/portal/update-profile", {
+    setError("");
+    const res = await fetch("/api/portal/update-profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      setError(data?.error || t("saveFailed"));
+      setSaving(false);
+      return;
+    }
+
     setSaving(false);
     setEditing(false);
     onUpdate();
@@ -146,6 +162,9 @@ function ProfileSection({
             </Button>
             <Button size="sm" variant="outline" onClick={() => setEditing(false)}>{tc("cancel")}</Button>
           </div>
+          {error && (
+            <p className="text-xs text-red-600">{error}</p>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -171,23 +190,57 @@ function ProfileSection({
 
 function PortalItemInput({
   itemId,
+  itemName,
   itemType,
+  fieldKey,
+  entityType,
+  entityId,
+  initialValue,
   onSubmit,
 }: {
   itemId: string;
+  itemName: string;
   itemType: string;
-  onSubmit: (id: string, value: string) => void;
+  fieldKey: string | null;
+  entityType: string;
+  entityId: string;
+  initialValue?: string | null;
+  onSubmit: (id: string, value: string) => Promise<void>;
 }) {
   const t = useTranslations("Portal");
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue || "");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const upload = getChecklistUploadDescriptor({
+    entityType,
+    entityId,
+    fieldKey,
+    itemName,
+  });
+
+  useEffect(() => {
+    setValue(initialValue || "");
+  }, [initialValue]);
 
   if (itemType === "confirmation") {
     return (
       <div className="mt-3">
-        <Button size="sm" onClick={async () => { setSubmitting(true); await onSubmit(itemId, "true"); setSubmitting(false); }} disabled={submitting}>
+        <Button size="sm" onClick={async () => {
+          setSubmitting(true);
+          setError("");
+          try {
+            await onSubmit(itemId, "true");
+          } catch (submitError) {
+            setError(
+              submitError instanceof Error ? submitError.message : t("submitFailed")
+            );
+          } finally {
+            setSubmitting(false);
+          }
+        }} disabled={submitting}>
           {submitting ? t("confirming") : t("confirm")}
         </Button>
+        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       </div>
     );
   }
@@ -198,7 +251,19 @@ function PortalItemInput({
 
   return (
     <div className="mt-3 space-y-2">
-      {itemType === "text_input" ? (
+      {itemType === "file_upload" ? (
+        <FileUpload
+          value={value}
+          onChange={(nextValue) => {
+            setValue(nextValue);
+            setError("");
+          }}
+          folder={upload.folder}
+          accept={upload.accept}
+          label={t("uploadFile")}
+          preview={upload.preview}
+        />
+      ) : itemType === "text_input" ? (
         <Textarea value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} rows={3} />
       ) : (
         <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} />
@@ -208,20 +273,27 @@ function PortalItemInput({
         disabled={!value.trim() || submitting}
         onClick={async () => {
           setSubmitting(true);
-          await onSubmit(itemId, value.trim());
-          setValue("");
-          setSubmitting(false);
+          setError("");
+          try {
+            await onSubmit(itemId, value.trim());
+          } catch (submitError) {
+            setError(
+              submitError instanceof Error ? submitError.message : t("submitFailed")
+            );
+          } finally {
+            setSubmitting(false);
+          }
         }}
       >
         {submitting ? t("submitting") : t("submit")}
       </Button>
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }
 
 export default function PortalPage() {
   const t = useTranslations("Portal");
-  const tc = useTranslations("Common");
   const locale = useLocale();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -239,11 +311,17 @@ export default function PortalPage() {
   }, []);
 
   const handleSubmitItem = async (itemId: string, value: string) => {
-    await fetch(`/api/checklist-items/${itemId}`, {
+    const res = await fetch(`/api/checklist-items/${itemId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "submitted", value }),
     });
+
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      throw new Error(payload?.error || t("submitFailed"));
+    }
+
     // Refresh
     const r = await fetch("/api/portal/me");
     const d = await r.json();
@@ -293,7 +371,7 @@ export default function PortalPage() {
           <div className="flex items-center gap-3">
             <span className="text-sm text-stone-600">{user.name}</span>
             <Button variant="outline" size="sm" onClick={() => {
-              fetch("/api/auth/signout", { method: "POST" }).then(() => window.location.href = "/login");
+              signOut({ callbackUrl: "/login" });
             }}>
               <LogOut className="h-3 w-3 mr-1" /> {t("signOut")}
             </Button>
@@ -347,7 +425,18 @@ export default function PortalPage() {
 
                     {/* Show submitted value */}
                     {item.value && item.status !== "needs_revision" && (
-                      <p className="text-xs text-sky-600 mt-2 break-all">{item.value}</p>
+                      isLikelyLink(item.value) ? (
+                        <a
+                          href={item.value}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 block break-all text-xs text-sky-600 underline underline-offset-2"
+                        >
+                          {item.value}
+                        </a>
+                      ) : (
+                        <p className="text-xs text-sky-600 mt-2 break-all">{item.value}</p>
+                      )
                     )}
 
                     {/* Revision feedback */}
@@ -362,7 +451,12 @@ export default function PortalPage() {
                     {(item.status === "pending" || item.status === "needs_revision") && (
                       <PortalItemInput
                         itemId={item.id}
+                        itemName={item.name}
                         itemType={item.itemType}
+                        fieldKey={item.fieldKey}
+                        entityType={user.linkedEntityType}
+                        entityId={user.linkedEntityId}
+                        initialValue={item.value}
                         onSubmit={handleSubmitItem}
                       />
                     )}

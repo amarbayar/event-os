@@ -1,15 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { signOut } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 export default function ChangePasswordPage() {
+  const hydrated = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -53,9 +58,12 @@ export default function ChangePasswordPage() {
     }
 
     setSuccess(true);
-    // Redirect to dashboard after brief delay
+    // Sign out so the next login picks up the refreshed forcePasswordChange flag.
     setTimeout(() => {
-      window.location.href = "/";
+      signOut({ redirect: false }).finally(() => {
+        const nextUrl = `/login?passwordChanged=1&callbackUrl=${encodeURIComponent(callbackUrl)}`;
+        window.location.href = nextUrl;
+      });
     }, 1500);
   };
 
@@ -79,10 +87,10 @@ export default function ChangePasswordPage() {
 
             {success ? (
               <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
-                Password changed. Redirecting...
+                Password changed. Redirecting to sign in...
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form method="post" onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="oldPassword">Current (temporary) password</Label>
                   <Input
@@ -116,8 +124,8 @@ export default function ChangePasswordPage() {
                     {error}
                   </div>
                 )}
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Changing..." : "Change password"}
+                <Button type="submit" className="w-full" disabled={!hydrated || loading}>
+                  {!hydrated ? "Loading..." : loading ? "Changing..." : "Change password"}
                 </Button>
               </form>
             )}

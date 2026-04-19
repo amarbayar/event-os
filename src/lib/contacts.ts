@@ -1,6 +1,5 @@
 import { db } from "@/db";
 import { contacts } from "@/db/schema";
-import { eq } from "drizzle-orm";
 
 /**
  * Find or create a contact by email. Returns the contact ID.

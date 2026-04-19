@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { inArray } from "drizzle-orm";
 import { createConnection } from "./connection";
 import { getDialect } from "./dialect";
 import * as pgSchema from "./schema.pg";
@@ -218,7 +219,7 @@ async function seed() {
     });
   }
   const userRecords = await db.query.users.findMany({
-    where: (u: any, { inArray }: any) => inArray(u.email, teamUsers.map((tu: typeof teamUsers[number]) => tu.email)),
+    where: inArray(schema.users.email, teamUsers.map((teamUser) => teamUser.email)),
   });
   const userMap = Object.fromEntries(userRecords.map((u: typeof userRecords[number]) => [u.name, u.id]));
 

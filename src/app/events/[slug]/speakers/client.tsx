@@ -79,7 +79,7 @@ export function SpeakersClient({
   sessions: SessionSlot[];
 }) {
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
-  const [speakers, setSpeakers] = useState(initialSpeakers);
+  const speakers = initialSpeakers;
   const [copied, setCopied] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [selectedSpeaker, setSelectedSpeaker] = useState<Speaker | null>(null);
@@ -459,12 +459,12 @@ export function SpeakersClient({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
-                  <Input name="name" placeholder="e.g., Batbold T." aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
+                  <Input name="name" placeholder="e.g., Batbold T." aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.name; return next; })} />
                   {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Email</Label>
-                  <Input name="email" type="email" placeholder="batbold@example.com" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const { email: _, ...rest } = prev; return rest; })} />
+                  <Input name="email" type="email" placeholder="batbold@example.com" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.email; return next; })} />
                   {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-1.5">

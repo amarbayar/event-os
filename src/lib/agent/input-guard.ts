@@ -115,6 +115,7 @@ export function sanitizeInput(input: string): SanitizeResult {
 //  This function is kept as a no-op for backward compatibility
 //  with callers that still invoke it.
 
-export function isOffTopic(_input: string): { offTopic: boolean; message?: string } {
+export function isOffTopic(input: string): { offTopic: boolean; message?: string } {
+  void input;
   return { offTopic: false };
 }

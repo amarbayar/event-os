@@ -1,7 +1,6 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useAiTranslation } from "@/lib/hooks/use-ai-translation";
 
 export function useSmartT(namespace: string) {
   const t = useTranslations(namespace);
@@ -9,8 +8,8 @@ export function useSmartT(namespace: string) {
   return (key: string, fallback: string) => {
     const hasKey = typeof t.has === "function" && t.has(key);
     if (hasKey) {
-      return t(key);
+      return t(key as never);
     }
-    return useAiTranslation(fallback);
+    return fallback;
   };
 }

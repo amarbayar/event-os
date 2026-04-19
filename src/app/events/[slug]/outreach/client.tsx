@@ -117,7 +117,7 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
-                  <Input name="name" placeholder="e.g., Jane Doe" aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
+                  <Input name="name" placeholder="e.g., Jane Doe" aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.name; return next; })} />
                   {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">
@@ -135,7 +135,7 @@ export function OutreachClient({ initialOutreach }: { initialOutreach: OutreachR
                 </div>
                 <div className="space-y-1.5">
                   <Label>Email</Label>
-                  <Input name="email" type="email" placeholder="jane@company.com" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const { email: _, ...rest } = prev; return rest; })} />
+                  <Input name="email" type="email" placeholder="jane@company.com" aria-invalid={!!errors.email} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.email; return next; })} />
                   {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-1.5">

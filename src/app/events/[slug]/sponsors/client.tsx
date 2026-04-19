@@ -41,7 +41,7 @@ type Sponsor = {
 
 export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[] }) {
   const { source, stage, setSource, setStage, filter } = usePipelineFilters();
-  const [sponsors, setSponsors] = useState(initialSponsors);
+  const sponsors = initialSponsors;
   const [showForm, setShowForm] = useState(false);
   const [selectedSponsor, setSelectedSponsor] = useState<Sponsor | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
@@ -261,7 +261,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Company Name *</Label>
-                  <Input name="companyName" placeholder="e.g., Khan Bank" aria-invalid={!!errors.companyName} onChange={() => setErrors((prev) => { const { companyName: _, ...rest } = prev; return rest; })} />
+                  <Input name="companyName" placeholder="e.g., Khan Bank" aria-invalid={!!errors.companyName} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.companyName; return next; })} />
                   {errors.companyName && <p className="text-xs text-destructive">{errors.companyName}</p>}
                 </div>
                 <div className="space-y-1.5">
@@ -270,7 +270,7 @@ export function SponsorsClient({ initialSponsors }: { initialSponsors: Sponsor[]
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Email</Label>
-                  <Input name="contactEmail" type="email" placeholder="events@company.mn" aria-invalid={!!errors.contactEmail} onChange={() => setErrors((prev) => { const { contactEmail: _, ...rest } = prev; return rest; })} />
+                  <Input name="contactEmail" type="email" placeholder="events@company.mn" aria-invalid={!!errors.contactEmail} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.contactEmail; return next; })} />
                   {errors.contactEmail && <p className="text-xs text-destructive">{errors.contactEmail}</p>}
                 </div>
                 <div className="space-y-1.5">

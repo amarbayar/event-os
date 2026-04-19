@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -83,23 +83,28 @@ export function TeamTab() {
       .catch(() => {});
   };
 
-  const fetchAll = () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
-    Promise.all([
-      fetch("/api/users").then((r) => r.json()),
-      fetch("/api/org/invites").then((r) => r.json()),
-    ])
-      .then(([userData, inviteData]) => {
-        if (userData.data) setMembers(userData.data);
-        if (Array.isArray(inviteData)) setInvites(inviteData);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
+    try {
+      const [userData, inviteData] = await Promise.all([
+        fetch("/api/users").then((r) => r.json()),
+        fetch("/api/org/invites").then((r) => r.json()),
+      ]);
+      if (userData.data) setMembers(userData.data);
+      if (Array.isArray(inviteData)) setInvites(inviteData);
+    } catch {
+      // Ignore refresh failures; keep the last successful state visible.
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchAll();
-  }, []);
+    const timeoutId = window.setTimeout(() => {
+      void fetchAll();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchAll]);
 
   const handleInvite = async () => {
     if (!inviteEmail.trim() || !inviteName.trim()) return;

@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -9,7 +10,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { toastApiError } from "@/lib/toast-helpers";
-import { applyBrandColor, clearBrandColor } from "@/lib/brand";
+import { applyBrandColor } from "@/lib/brand";
 import { Loader2 } from "lucide-react";
 
 type Org = {

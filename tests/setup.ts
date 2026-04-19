@@ -1,8 +1,10 @@
 // Test setup — database connection for integration tests
 import { config } from "dotenv";
+import { eq } from "drizzle-orm";
 config({ path: ".env.local" });
 config(); // also load .env if it exists
 import { createConnection } from "@/db/connection";
+import * as schema from "@/db/schema";
 
 const TEST_DB_URL =
   process.env.TEST_DATABASE_URL ||
@@ -21,12 +23,12 @@ export async function getTestIds() {
   const orgs = await testDb.query.organizations.findMany();
   for (const org of orgs) {
     const members = await testDb.query.userOrganizations.findMany({
-      where: (uo: any, { eq }: any) => eq(uo.organizationId, org.id),
+      where: eq(schema.userOrganizations.organizationId, org.id),
     });
     if (members.length >= 3) {
       // Has enough users to be a seeded org
       const edition = await testDb.query.eventEditions.findFirst({
-        where: (ed: any, { eq }: any) => eq(ed.organizationId, org.id),
+        where: eq(schema.eventEditions.organizationId, org.id),
       });
       if (edition) {
         return { orgId: org.id, editionId: edition.id };
@@ -37,7 +39,10 @@ export async function getTestIds() {
   // No suitable seed data — create fixtures
   const fixtures = await createTestFixtures();
   // Store cleanup for later (best-effort, process exit will also clean up)
-  (globalThis as any).__testFixturesCleanup = fixtures.cleanup;
+  const testGlobals = globalThis as typeof globalThis & {
+    __testFixturesCleanup?: () => Promise<void>;
+  };
+  testGlobals.__testFixturesCleanup = fixtures.cleanup;
   return { orgId: fixtures.orgId, editionId: fixtures.editionId };
 }
 

@@ -272,7 +272,7 @@ function CreateDialog({ initialDate, onClose, onCreate }: {
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Title *</Label>
-            <Input autoFocus value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((prev) => { const { title: _, ...rest } = prev; return rest; }); }} placeholder="e.g., Speaker Spotlight: Sarah K." aria-invalid={!!errors.title} />
+            <Input autoFocus value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((prev) => { const next = { ...prev }; delete next.title; return next; }); }} placeholder="e.g., Speaker Spotlight: Sarah K." aria-invalid={!!errors.title} />
             {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
           </div>
           <div className="space-y-1.5">

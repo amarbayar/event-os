@@ -55,7 +55,11 @@ export function EntityDrawer({
 
   // Reset tab when drawer opens
   useEffect(() => {
-    if (isOpen) setActiveTab(0);
+    if (!isOpen) return;
+    const frameId = window.requestAnimationFrame(() => {
+      setActiveTab(0);
+    });
+    return () => window.cancelAnimationFrame(frameId);
   }, [isOpen]);
 
   const cycleSize = useCallback(() => {

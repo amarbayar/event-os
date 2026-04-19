@@ -8,19 +8,41 @@ import { useState, useEffect, useRef } from "react";
 export function useAnimatedMount(isOpen: boolean, exitDuration = 150) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
+  const mountFrameRef = useRef<number | null>(null);
+  const visibleFrameRef = useRef<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
+    if (mountFrameRef.current !== null) {
+      cancelAnimationFrame(mountFrameRef.current);
+    }
+    if (visibleFrameRef.current !== null) {
+      cancelAnimationFrame(visibleFrameRef.current);
+    }
+    clearTimeout(timeoutRef.current);
+
     if (isOpen) {
-      setMounted(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setVisible(true));
+      mountFrameRef.current = requestAnimationFrame(() => {
+        setMounted(true);
+        visibleFrameRef.current = requestAnimationFrame(() => {
+          setVisible(true);
+        });
       });
     } else {
-      setVisible(false);
+      visibleFrameRef.current = requestAnimationFrame(() => {
+        setVisible(false);
+      });
       timeoutRef.current = setTimeout(() => setMounted(false), exitDuration);
     }
-    return () => clearTimeout(timeoutRef.current);
+    return () => {
+      if (mountFrameRef.current !== null) {
+        cancelAnimationFrame(mountFrameRef.current);
+      }
+      if (visibleFrameRef.current !== null) {
+        cancelAnimationFrame(visibleFrameRef.current);
+      }
+      clearTimeout(timeoutRef.current);
+    };
   }, [isOpen, exitDuration]);
 
   return { mounted, visible };

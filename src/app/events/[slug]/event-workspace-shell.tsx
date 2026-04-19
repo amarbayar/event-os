@@ -68,7 +68,10 @@ export function EventWorkspaceShell({
 
   // Close chat panel on navigation
   useEffect(() => {
-    setChatOpen(false);
+    const timeoutId = window.setTimeout(() => {
+      setChatOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [currentPath]);
 
   // Sync the edition cookie so API calls (agent, etc.) use the right event

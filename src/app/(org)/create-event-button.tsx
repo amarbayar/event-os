@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,15 @@ export function CreateEventButton() {
   const router = useRouter();
   const backdropRef = useRef<HTMLDivElement>(null);
 
+  const close = useCallback(() => {
+    setOpen(false);
+    setError("");
+    setName("");
+    setStartDate("");
+    setEndDate("");
+    setVenue("");
+  }, []);
+
   // Close on Escape
   useEffect(() => {
     if (!open) return;
@@ -26,16 +35,7 @@ export function CreateEventButton() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [open]);
-
-  const close = () => {
-    setOpen(false);
-    setError("");
-    setName("");
-    setStartDate("");
-    setEndDate("");
-    setVenue("");
-  };
+  }, [close, open]);
 
   const handleCreate = async () => {
     if (!name.trim()) {

@@ -52,7 +52,12 @@ export async function middleware(request: NextRequest) {
   try {
     const token = await getToken({ req: request });
     if (token?.forcePasswordChange && pathname !== "/change-password") {
-      return NextResponse.redirect(new URL("/change-password", request.url));
+      const changePasswordUrl = new URL("/change-password", request.url);
+      changePasswordUrl.searchParams.set(
+        "callbackUrl",
+        `${pathname}${request.nextUrl.search}`
+      );
+      return NextResponse.redirect(changePasswordUrl);
     }
   } catch {
     // JWT decode failed — let the request through, auth() will handle it

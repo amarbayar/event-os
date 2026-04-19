@@ -315,17 +315,17 @@ export function MediaClient({ initialPartners }: { initialPartners: MediaPartner
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Company Name *</Label>
-                  <Input name="companyName" placeholder="e.g., Eagle News" aria-invalid={!!errors.companyName} onChange={() => setErrors((prev) => { const { companyName: _, ...rest } = prev; return rest; })} />
+                  <Input name="companyName" placeholder="e.g., Eagle News" aria-invalid={!!errors.companyName} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.companyName; return next; })} />
                   {errors.companyName && <p className="text-xs text-destructive">{errors.companyName}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Name *</Label>
-                  <Input name="contactName" placeholder="e.g., Oyunaa B." aria-invalid={!!errors.contactName} onChange={() => setErrors((prev) => { const { contactName: _, ...rest } = prev; return rest; })} />
+                  <Input name="contactName" placeholder="e.g., Oyunaa B." aria-invalid={!!errors.contactName} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.contactName; return next; })} />
                   {errors.contactName && <p className="text-xs text-destructive">{errors.contactName}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Email *</Label>
-                  <Input name="contactEmail" type="email" placeholder="press@media.mn" aria-invalid={!!errors.contactEmail} onChange={() => setErrors((prev) => { const { contactEmail: _, ...rest } = prev; return rest; })} />
+                  <Input name="contactEmail" type="email" placeholder="press@media.mn" aria-invalid={!!errors.contactEmail} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.contactEmail; return next; })} />
                   {errors.contactEmail && <p className="text-xs text-destructive">{errors.contactEmail}</p>}
                 </div>
                 <div className="space-y-1.5">

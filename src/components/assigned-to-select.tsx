@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 type OrgUser = { id: string; name: string | null; email: string };
@@ -16,14 +16,7 @@ export function AssignedToSelect({
 }) {
   const t = useTranslations("Chat");
   const [users, setUsers] = useState<OrgUser[]>([]);
-  const [internalValue, setInternalValue] = useState(controlledValue || "");
-
-  // Controlled mode: sync internal state with prop
-  useEffect(() => {
-    if (controlledValue !== undefined) {
-      setInternalValue(controlledValue);
-    }
-  }, [controlledValue]);
+  const [uncontrolledValue, setUncontrolledValue] = useState(controlledValue || "");
 
   useEffect(() => {
     fetch("/api/users")
@@ -33,14 +26,18 @@ export function AssignedToSelect({
   }, []);
 
   const handleChange = (val: string) => {
-    setInternalValue(val);
+    if (controlledValue === undefined) {
+      setUncontrolledValue(val);
+    }
     onChange?.(val);
   };
+
+  const value = controlledValue ?? uncontrolledValue;
 
   return (
     <select
       name={name}
-      value={internalValue}
+      value={value}
       onChange={(e) => handleChange(e.target.value)}
       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
     >

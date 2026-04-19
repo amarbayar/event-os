@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Strip sensitive fields
-  const { llmApiKey, ...safeOrg } = org;
+  const safeOrg = { ...org };
+  delete safeOrg.llmApiKey;
   return NextResponse.json({ data: safeOrg });
 }
 
@@ -88,6 +89,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   // Strip sensitive fields
-  const { llmApiKey: _, ...safeUpdated } = updated;
+  const safeUpdated = { ...updated };
+  delete safeUpdated.llmApiKey;
   return NextResponse.json({ data: safeUpdated });
 }

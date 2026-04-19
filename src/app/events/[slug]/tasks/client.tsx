@@ -1,20 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AssignedToSelect } from "@/components/assigned-to-select";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Plus, Calendar, User, X, Pencil, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { toast } from "sonner";
@@ -57,7 +49,6 @@ type Task = {
 export function TasksClient({ initialTasks, initialTeams }: { initialTasks: Task[]; initialTeams: Team[] }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [teamFilter, setTeamFilter] = useState<string | "all">("all");
-  const [view, setView] = useState<"board">("board");
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -464,7 +455,7 @@ function CreateTaskDialog({
             <Input
               autoFocus
               value={form.title}
-              onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((prev) => { const { title: _, ...rest } = prev; return rest; }); }}
+              onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((prev) => { const next = { ...prev }; delete next.title; return next; }); }}
               placeholder="What needs to be done?"
               aria-invalid={!!errors.title}
             />

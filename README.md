@@ -253,6 +253,8 @@ Open `localhost:3000`. Log in with `admin@devsummit.mn` / `admin123`.
 | `SQLITE_PATH`           | No            | SQLite file path (default: `local.db`)                                                  |
 | `AUTH_SECRET`           | Yes           | Random string — `openssl rand -base64 32`                                               |
 | `NEXTAUTH_URL`          | No            | `http://localhost:3000` for dev (auto-detected)                                         |
+| `NEXT_PUBLIC_APP_URL`   | No            | Public app base URL for browser redirects and payment flows                              |
+| `APP_URL`               | No            | Optional server-side base URL fallback for absolute links in emails and invites          |
 | `SERVICE_TOKEN`         | No            | Random token for API service auth                                                       |
 | `LLM_PROVIDER`          | No            | `gemini` (default), `xai`, `zai`, or `ollama`                                           |
 | `GEMINI_API_KEY`        | No            | Free at [ai.google.dev](https://ai.google.dev)                                          |
@@ -267,6 +269,21 @@ Open `localhost:3000`. Log in with `admin@devsummit.mn` / `admin123`.
 | `POSTMARK_SERVER_TOKEN` | Postmark only | Postmark API token                                                                      |
 | `MAILGUN_API_KEY`       | Mailgun only  | Mailgun API key                                                                         |
 | `MAILGUN_DOMAIN`        | Mailgun only  | Mailgun sending domain                                                                  |
+| `FILE_STORAGE_DRIVER`   | No            | `local` (default) or `gcs`                                                              |
+| `GCS_BUCKET_NAME`       | GCS only      | Bucket used for stakeholder file uploads                                                |
+| `GCS_UPLOAD_PREFIX`     | No            | Object prefix inside the bucket (default: `uploads`)                                    |
+| `GCS_PUBLIC_BASE_URL`   | No            | Optional CDN/custom public base URL for uploaded files                                  |
+| `UPSTASH_REDIS_REST_URL`| No            | Upstash Redis REST URL; omit if Redis is not configured                                 |
+| `UPSTASH_REDIS_REST_TOKEN` | No         | Upstash Redis REST token; omit if Redis is not configured                               |
+
+### Upload storage
+
+Stakeholder uploads support images (`jpg`, `png`, `webp`, `gif`) and documents (`pdf`, `ppt`, `pptx`, `doc`, `docx`) up to 20 MB.
+
+- `FILE_STORAGE_DRIVER=local`: stores files on the app VM under `public/uploads`
+- `FILE_STORAGE_DRIVER=gcs`: stores files in GCS and serves them from `GCS_PUBLIC_BASE_URL` or the bucket's public URL
+
+For GCP VM deployments, prefer the VM's attached service account with bucket IAM permissions. Do not commit service-account JSON keys to the repo.
 
 ## Job Queue & Background Workers
 
@@ -312,6 +329,48 @@ npm run queue:work -- --queues=high             # only high-priority queue
 ### Production deployment
 
 The worker is a long-running Node.js process. How you run it depends on your deployment:
+
+### App service on a GCP VM
+
+For a single-VM deployment, run the Next.js app under `systemd` and keep uploads either on the VM disk (`FILE_STORAGE_DRIVER=local`) or in GCS (`FILE_STORAGE_DRIVER=gcs`).
+
+Typical deploy flow:
+
+```bash
+cd /opt/event-os
+git status
+git pull --ff-only
+npm ci --include=dev
+npm run build
+sudo systemctl restart event-os
+sudo systemctl status event-os --no-pager
+```
+
+Recommended `event-os.service` shape:
+
+```ini
+[Unit]
+Description=Event OS (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/opt/event-os
+EnvironmentFile=/opt/event-os/.env
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Notes:
+
+- Keep real secrets in `/opt/event-os/.env`, not in tracked files
+- On GCP, use the VM service account for GCS access instead of a JSON key file
+- If `git pull --ff-only` fails, inspect local modifications first; do not deploy over a dirty working tree blindly
 
 **Forge (DigitalOcean/AWS)**
 

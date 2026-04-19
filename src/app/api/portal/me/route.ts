@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { users, userOrganizations, checklistItems, checklistTemplates, eventEditions } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
+import { findStakeholderEntity } from "@/lib/stakeholder-entities";
+import { syncChecklistItemsFromTemplates } from "@/lib/checklist";
 
 // GET — stakeholder portal data (their entity + checklist + event info)
 export async function GET() {
@@ -33,35 +35,30 @@ export async function GET() {
   });
 
   // Look up the linked entity
-  const entityQueryMap: Record<string, string> = {
-    speaker: "speakerApplications",
-    sponsor: "sponsorApplications",
-    venue: "venues",
-    booth: "booths",
-    volunteer: "volunteerApplications",
-    media: "mediaPartners",
-  };
-
-  const queryName = entityQueryMap[membership.linkedEntityType];
-  if (!queryName) {
-    return NextResponse.json({ error: "Unknown entity type" }, { status: 400 });
-  }
-
-  // Dynamic query by entity type name — Drizzle's query API doesn't support string-based table lookup
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const queryFn = (db.query as Record<string, any>)[queryName];
-  const entity = await queryFn.findFirst({
-    where: (t: Record<string, unknown>, { eq: eqFn }: { eq: typeof eq }) => eqFn(t.id as Parameters<typeof eq>[0], membership.linkedEntityId!),
-  }) as Record<string, unknown> | undefined;
+  const entity = await findStakeholderEntity(
+    membership.linkedEntityType,
+    membership.linkedEntityId
+  );
 
   if (!entity) {
-    return NextResponse.json({ error: "Linked entity not found" }, { status: 404 });
+    return NextResponse.json({ error: "Unknown entity type" }, { status: 400 });
   }
 
   // Get edition info
   const edition = await db.query.eventEditions.findFirst({
     where: eq(eventEditions.id, entity.editionId as string),
   });
+
+  if (!edition) {
+    return NextResponse.json({ error: "Linked event edition not found" }, { status: 404 });
+  }
+
+  await syncChecklistItemsFromTemplates(
+    membership.linkedEntityType,
+    membership.linkedEntityId,
+    edition.id,
+    orgId
+  );
 
   // Get checklist items with template info
   const items = await db

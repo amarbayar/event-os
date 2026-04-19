@@ -303,7 +303,7 @@ export function BoothsClient({ initialBooths }: { initialBooths: Booth[] }) {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
-                  <Input name="name" placeholder="e.g., Booth A1" aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const { name: _, ...rest } = prev; return rest; })} />
+                  <Input name="name" placeholder="e.g., Booth A1" aria-invalid={!!errors.name} onChange={() => setErrors((prev) => { const next = { ...prev }; delete next.name; return next; })} />
                   {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div className="space-y-1.5">

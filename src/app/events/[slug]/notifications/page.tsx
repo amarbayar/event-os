@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Bell, Check, Trash2, ExternalLink } from "lucide-react";
@@ -18,32 +18,31 @@ type Notification = {
   createdAt: string;
 };
 
-const TYPE_ICONS: Record<string, string> = {
-  assignment: "You were assigned",
-  checklist_submitted: "Checklist item submitted",
-  stage_change: "Stage changed",
-  comment: "New comment",
-  team_added: "Added to team",
-  entity_created: "New entity in your scope",
-};
-
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const { confirm: confirmDialog } = useConfirm();
 
-  const fetchNotifications = () => {
+  const fetchNotifications = useCallback(async () => {
     setLoading(true);
     const params = filter === "unread" ? "?unread=true" : "";
-    fetch(`/api/notifications${params}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.data) setNotifications(d.data); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
+    try {
+      const response = await fetch(`/api/notifications${params}`);
+      const data = await response.json();
+      if (data.data) setNotifications(data.data);
+    } catch {}
+    finally {
+      setLoading(false);
+    }
+  }, [filter]);
 
-  useEffect(() => { fetchNotifications(); }, [filter]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetchNotifications();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchNotifications]);
 
   const markRead = async (id: string) => {
     await fetch(`/api/notifications/${id}`, { method: "PATCH" });
@@ -82,16 +81,11 @@ export default function NotificationsPage() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const timeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-  };
+  const formatTimestamp = (dateStr: string) =>
+    new Date(dateStr).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
 
   return (
     <div>
@@ -166,7 +160,7 @@ export default function NotificationsPage() {
                 <p className={`text-sm ${!n.read ? "font-medium" : ""}`}>{n.title}</p>
                 {n.message && <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>}
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] text-muted-foreground">{timeAgo(n.createdAt)}</span>
+                  <span className="text-[10px] text-muted-foreground">{formatTimestamp(n.createdAt)}</span>
                   {n.actorName && <span className="text-[10px] text-stone-400">by {n.actorName}</span>}
                 </div>
               </div>

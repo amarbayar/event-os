@@ -87,7 +87,12 @@ function buildLogEntry(
 export async function mail(
   to: MailAddress | MailAddress[],
   mailable: Mailable,
-  options?: { orgId?: string; entityType?: string; entityId?: string }
+  options?: {
+    orgId?: string;
+    entityType?: string;
+    entityId?: string;
+    disableDeduplication?: boolean;
+  }
 ): Promise<SendResult> {
   try {
     if (process.env.QUEUE_ENABLED === "true") {
@@ -113,7 +118,12 @@ export async function mail(
 export async function mailNow(
   to: MailAddress | MailAddress[],
   mailable: Mailable,
-  options?: { orgId?: string; entityType?: string; entityId?: string }
+  options?: {
+    orgId?: string;
+    entityType?: string;
+    entityId?: string;
+    disableDeduplication?: boolean;
+  }
 ): Promise<SendResult> {
   try {
     const config = getMailConfig();
@@ -121,11 +131,13 @@ export async function mailNow(
     const recipients = Array.isArray(to) ? to : [to];
     const toEmails = recipients.map((r) => r.email);
 
-    const duplicate = await isDuplicate(
-      toEmails[0],
-      mailable.subject,
-      options?.entityId
-    );
+    const duplicate = options?.disableDeduplication
+      ? false
+      : await isDuplicate(
+          toEmails[0],
+          mailable.subject,
+          options?.entityId
+        );
 
     if (duplicate) {
       try {

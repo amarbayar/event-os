@@ -5,6 +5,7 @@ import { InputType, AgentResponse, LLMProvider } from "@/lib/agent/types";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
 import { getActiveIds } from "@/lib/queries";
 import { gateMention, sanitizeInput, isOffTopic } from "@/lib/agent/input-guard";
+import { getAgentProcessFailure } from "@/lib/agent/process-error";
 import { validateServiceToken } from "@/lib/service-token";
 
 // Rate limiter
@@ -214,15 +215,22 @@ async function handleRequest(
       inputLength: input.length,
     }, error);
     const message = error instanceof Error ? error.message : "Agent processing failed";
-    return NextResponse.json({
+    const failure = getAgentProcessFailure(error);
+    const response = NextResponse.json({
       data: {
-        message: "Agent temporarily unavailable. Try again or use manual add.",
+        message: failure.userMessage,
         entities: [],
         actions: [],
         questions: [],
       },
       error: message,
-    }, { status: 502 });
+    }, { status: failure.status });
+
+    if (failure.retryAfterSeconds) {
+      response.headers.set("Retry-After", String(failure.retryAfterSeconds));
+    }
+
+    return response;
   }
 }
 
