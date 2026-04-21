@@ -1,10 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { db } from "@/db";
+import { userOrganizations } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import {
   MAX_UPLOAD_SIZE_BYTES,
   isAllowedUploadMimeType,
+  sanitizeUploadFolder,
 } from "@/lib/upload-config";
 import { storeUploadedFile } from "@/lib/uploads";
+
+async function stakeholderCanUploadToFolder(params: {
+  userId: string;
+  organizationId: string;
+  folder: string;
+}) {
+  const membership = await db.query.userOrganizations.findFirst({
+    where: and(
+      eq(userOrganizations.userId, params.userId),
+      eq(userOrganizations.organizationId, params.organizationId),
+      eq(userOrganizations.role, "stakeholder")
+    ),
+    columns: {
+      linkedEntityType: true,
+      linkedEntityId: true,
+    },
+  });
+
+  if (!membership?.linkedEntityType || !membership.linkedEntityId) {
+    return false;
+  }
+
+  const entityFolder = sanitizeUploadFolder(
+    `${membership.linkedEntityType}/${membership.linkedEntityId}`
+  );
+
+  return params.folder === entityFolder || params.folder.startsWith(`${entityFolder}/`);
+}
 
 export async function POST(req: NextRequest) {
   // Auth check — uploads require login
@@ -14,10 +46,27 @@ export async function POST(req: NextRequest) {
   }
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
-  const folder = (formData.get("folder") as string) || "general";
+  const folder = sanitizeUploadFolder((formData.get("folder") as string) || "general");
 
   if (!file) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+
+  if (session.user.role === "stakeholder") {
+    const organizationId = session.user.organizationId;
+    if (
+      !organizationId ||
+      !(await stakeholderCanUploadToFolder({
+        userId: session.user.id,
+        organizationId,
+        folder,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Stakeholder uploads must target your portal entity." },
+        { status: 403 }
+      );
+    }
   }
 
   if (file.size > MAX_UPLOAD_SIZE_BYTES) {

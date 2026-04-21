@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { formatDate } from "@/lib/i18n/date";
 import { Button } from "@/components/ui/button";
@@ -295,20 +296,39 @@ function PortalItemInput({
 export default function PortalPage() {
   const t = useTranslations("Portal");
   const locale = useLocale();
+  const router = useRouter();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+    let redirecting = false;
+
     fetch("/api/portal/me")
       .then((r) => {
+        if (r.status === 401) {
+          redirecting = true;
+          router.replace("/login?callbackUrl=%2Fportal");
+          return null;
+        }
         if (!r.ok) throw new Error("Not authorized");
         return r.json();
       })
-      .then((d) => setData(d.data))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+      .then((d) => {
+        if (!cancelled && d) setData(d.data);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled && !redirecting) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const handleSubmitItem = async (itemId: string, value: string) => {
     const res = await fetch(`/api/checklist-items/${itemId}`, {
@@ -344,7 +364,7 @@ export default function PortalPage() {
           <p className="text-sm text-stone-400">{t("pleaseSignIn")}</p>
           <div className="flex justify-center gap-2">
             <Button variant="outline" onClick={() => window.location.reload()}>{t("tryAgain")}</Button>
-            <Button onClick={() => window.location.href = "/login"}>{t("signIn")}</Button>
+            <Button onClick={() => window.location.href = "/login?callbackUrl=%2Fportal"}>{t("signIn")}</Button>
           </div>
         </div>
       </div>

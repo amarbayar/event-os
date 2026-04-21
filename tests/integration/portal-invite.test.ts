@@ -77,7 +77,7 @@ describe("portal invite route", () => {
     }
   });
 
-  it("creates a stakeholder account with forcePasswordChange and an absolute portal URL", async () => {
+  it("creates a stakeholder account with forcePasswordChange and an absolute portal sign-in URL", async () => {
     process.env.MAIL_DRIVER = "postmark";
     const { POST } = await import("@/app/api/portal/invite/route");
 
@@ -90,7 +90,7 @@ describe("portal invite route", () => {
 
     expect(res.status).toBe(201);
     const payload = await res.json();
-    expect(payload.data.portalUrl).toBe("https://events.example.com/portal");
+    expect(payload.data.portalUrl).toBe("https://events.example.com/login?callbackUrl=%2Fportal");
     expect(payload.data.tempPassword).toBeUndefined();
 
     const speakerEmail = await getSpeakerEmail(f.speakerId);
@@ -136,7 +136,7 @@ describe("portal invite route", () => {
     const payload = await resend.json();
     expect(payload.data.alreadyInvited).toBe(true);
     expect(payload.data.resent).toBe(true);
-    expect(payload.data.portalUrl).toBe("https://events.example.com/portal");
+    expect(payload.data.portalUrl).toBe("https://events.example.com/login?callbackUrl=%2Fportal");
     expect(typeof payload.data.tempPassword).toBe("string");
     expect(payload.data.tempPassword.length).toBeGreaterThan(0);
 

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   const entityName = (entity[config.nameField] as string) || "";
   const entityEmail = (entity[config.emailField] as string) || "";
   const entityStage = (entity.stage as string | undefined) || null;
-  const portalUrl = absoluteAppUrl("/portal", req);
+  const portalUrl = absoluteAppUrl("/login?callbackUrl=%2Fportal", req);
   const shouldExposeTempPassword = (process.env.MAIL_DRIVER || "log") === "log";
 
   if (!entityEmail) {
