@@ -3,6 +3,21 @@ const TEAM_SCOPE_EXEMPT_ENTITIES = new Set([
   "task",
 ]);
 
+const ORGANIZER_MANAGED_ENTITIES = new Set([
+  // Organizers are cross-functional event operators. They can manage the
+  // normal event-data entities without needing explicit org-wide team rows.
+  "speaker",
+  "session",
+  "sponsor",
+  "outreach",
+  "venue",
+  "booth",
+  "volunteer",
+  "media",
+  "attendee",
+  "campaign",
+]);
+
 export function resolveEffectiveRole(
   sessionRole: string | null | undefined,
   membershipRole: string | null | undefined,
@@ -12,4 +27,9 @@ export function resolveEffectiveRole(
 
 export function requiresTeamScope(entityType: string): boolean {
   return !TEAM_SCOPE_EXEMPT_ENTITIES.has(entityType);
+}
+
+export function canManageEntityByRoleAlone(role: string, entityType: string): boolean {
+  if (!requiresTeamScope(entityType)) return true;
+  return role === "organizer" && ORGANIZER_MANAGED_ENTITIES.has(entityType);
 }

@@ -4,6 +4,7 @@ import { handleManage } from "./manage-handler";
 import { db } from "@/db";
 import { teamMembers, teams, teamEntityTypes } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
+import { canManageEntityByRoleAlone } from "@/lib/rbac-utils";
 
 // ─── Agent Dispatcher ────────────────────────────────
 //
@@ -133,13 +134,15 @@ async function checkAgentPermission(
     return null;
   }
 
-  // Organizer/coordinator: check team scope for the entity type
-  // Tasks are internal to-dos — any authenticated role above viewer can manage them
-  if (intent.intent === "manage" && intent.entityType && intent.entityType !== "task") {
+  // Coordinators are team-scoped. Organizers can manage the normal
+  // event-data entities across the org without explicit team rows.
+  if (intent.intent === "manage" && intent.entityType && !canManageEntityByRoleAlone(ctx.userRole, intent.entityType)) {
     const hasScope = await userOwnsEntityType(ctx.userId, intent.entityType, ctx.orgId);
     if (!hasScope) {
       return {
-        message: `You don't have permission to manage ${intent.entityType}s. Your team doesn't cover this entity type. Ask an admin to update your team assignments.`,
+        message: ctx.userRole === "coordinator"
+          ? `You don't have permission to manage ${intent.entityType}s. Your team doesn't cover this entity type. Ask an admin to update your team assignments.`
+          : "You don't have permission to modify this resource. Contact an admin.",
         success: false,
       };
     }

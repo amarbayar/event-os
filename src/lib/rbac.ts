@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { users, organizations, userOrganizations, teamMembers, teamEntityTypes, teams, eventEditions } from "@/db/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { getActiveIds } from "@/lib/queries";
-import { requiresTeamScope, resolveEffectiveRole } from "@/lib/rbac-utils";
+import { canManageEntityByRoleAlone, requiresTeamScope, resolveEffectiveRole } from "@/lib/rbac-utils";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -158,13 +158,19 @@ export async function requirePermission(
       return forbidden("You don't have permission to modify this resource. Contact an admin.");
     }
 
-    // Organizer/coordinator — check team scope when the entity is owned by an RBAC team.
+    // Coordinators are team-scoped. Organizers can manage the normal
+    // event-data entities across the org without explicit team rows.
     if (requiresTeamScope(entityType)) {
-      const hasScope = await userOwnsEntityType(userId, entityType, orgId);
-      if (!hasScope) {
-        return forbidden(
-          `You don't have permission to edit ${entityType}s. Ask an admin to add you to a team that manages ${entityType}s.`
-        );
+      if (!canManageEntityByRoleAlone(effectiveRole, entityType)) {
+        const hasScope = await userOwnsEntityType(userId, entityType, orgId);
+        if (!hasScope) {
+          if (effectiveRole === "coordinator") {
+            return forbidden(
+              `You don't have permission to edit ${entityType}s. Ask an admin to add you to a team that manages ${entityType}s.`
+            );
+          }
+          return forbidden("You don't have permission to modify this resource. Contact an admin.");
+        }
       }
     }
 

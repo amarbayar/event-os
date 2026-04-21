@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { eq, and, sql, isNull } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { ilikeFn as ilike, getDialect } from "@/db/dialect";
 import { dispatch, AgentContext } from "@/lib/agent/dispatcher";
 import { AgentIntent, DrizzleTable, EntityType, LLMProvider } from "@/lib/agent/types";
@@ -690,31 +690,18 @@ describe("Agent RBAC enforcement", () => {
       }
     });
 
-    it("CANNOT create entity outside their team scope", async () => {
-      // Find an entity type this organizer does NOT have scope for
-      const scopedTypes = await db
-        .select({ entityType: schema.teamEntityTypes.entityType })
-        .from(schema.teamMembers)
-        .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
-        .innerJoin(schema.teamEntityTypes, eq(schema.teams.id, schema.teamEntityTypes.teamId))
-        .where(and(
-          eq(schema.teamMembers.userId, organizerUserId),
-          eq(schema.teams.organizationId, orgId),
-          isNull(schema.teams.editionId)
-        ));
-      const scopedSet = new Set(
-        scopedTypes.map((row: (typeof scopedTypes)[number]) => row.entityType as EntityType)
-      );
-      const manageable: EntityType[] = ["speaker", "sponsor", "venue", "booth", "volunteer", "media", "task", "campaign"];
-      const outOfScope = manageable.find((t) => !scopedSet.has(t));
-      if (!outOfScope) return; // organizer has scope for everything — skip test
-
+    it("can create entity outside their explicit team memberships", async () => {
       const result = await dispatch(
-        intent({ intent: "manage", action: "create", entityType: outOfScope, params: { name: "AgentTest OrgNoScope" } }),
+        intent({
+          intent: "manage",
+          action: "create",
+          entityType: "campaign",
+          params: { title: "AgentTest OrgWide Campaign" },
+        }),
         ctx("organizer", organizerUserId)
       );
-      expect(result.success).toBe(false);
-      expect(result.message).toContain("permission");
+      expect(result.success).toBe(true);
+      await cleanup(schema.campaigns, "title", "AgentTest OrgWide Campaign");
     });
 
     it("can initiate delete within scope (gets confirmation)", async () => {
@@ -1272,15 +1259,13 @@ describe("Destructive action prevention", () => {
 
   // ─── Team scope in agent ───────────────────────────
   describe("team scope enforcement", () => {
-    it("organizer without team scope gets denied", async () => {
-      // Use a user ID that exists but has no team assignments for this entity type
-      // We test with a fake userId that won't match any team membership
+    it("organizer without explicit team rows can still manage event entities", async () => {
       const result = await dispatch(
-        intent({ intent: "manage", action: "create", entityType: "speaker", params: { name: "Test" } }),
+        intent({ intent: "manage", action: "create", entityType: "speaker", params: { name: "AgentTest OrgNoScope" } }),
         { ...ctx("organizer"), userId: "00000000-0000-0000-0000-000000000099" },
       );
-      expect(result.success).toBe(false);
-      expect(result.message).toContain("permission");
+      expect(result.success).toBe(true);
+      await cleanup(schema.speakerApplications, "name", "AgentTest OrgNoScope");
     });
 
     it("admin bypasses team scope", async () => {
