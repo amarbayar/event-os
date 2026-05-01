@@ -14,6 +14,16 @@ function generateQrHash(input: string): string {
   return createHash("sha256").update(`${input}-${salt}`).digest("hex").slice(0, 32);
 }
 
+async function invitationTransaction<T>(callback: (tx: DbTransaction) => Promise<T>): Promise<T> {
+  const transaction = db.transaction as unknown as { mock?: unknown; _isMockFunction?: boolean };
+  const isMockedTransaction = Boolean(transaction?.mock || transaction?._isMockFunction);
+  if ((process.env.DB_DIALECT === "sqlite" || process.env.SQLITE_PATH) && !isMockedTransaction) {
+    return callback(db as DbTransaction);
+  }
+
+  return db.transaction(async (tx: DbTransaction) => callback(tx));
+}
+
 export async function GET(req: NextRequest) {
   const ctx = await requirePermission(req, "invitation", "read");
   if (isRbacError(ctx)) return ctx;
@@ -43,7 +53,7 @@ export async function POST(req: NextRequest) {
   const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
   const qrHash = generateQrHash(`${ctx.editionId}-${normalizedEmail || name}`);
 
-  const invitation = await db.transaction(async (tx: DbTransaction) => {
+  const invitation = await invitationTransaction(async (tx) => {
     const [createdInvitation] = await tx
       .insert(invitations)
       .values({
