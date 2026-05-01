@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
+const DEVSUMMIT_PUBLIC_ORIGINS = [
+  "https://devsummit.dev",
+  "https://www.devsummit.dev",
+  "https://devsummit-mn-conference.web.app",
+  "https://devsummit-mn-conference.firebaseapp.com",
+];
 
 function allowedOrigins(): string[] {
   const configured = (process.env.PUBLIC_API_ALLOWED_ORIGINS || "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
-  if (process.env.NODE_ENV === "production") return configured;
+  if (process.env.NODE_ENV === "production") {
+    return [...configured, ...DEVSUMMIT_PUBLIC_ORIGINS];
+  }
   return [
     ...configured,
+    ...DEVSUMMIT_PUBLIC_ORIGINS,
     "http://localhost:5173",
     "http://127.0.0.1:5173",
   ];
