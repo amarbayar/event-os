@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,6 @@ import { validateRequired, getApiError } from "@/lib/validation";
 import {
   agendaTimeLabel,
   agendaTimestamp,
-  agendaTimestampFromMinutes,
   formatHHMM,
   minutesSinceMidnight,
   parseHHMM,
@@ -119,9 +119,8 @@ type AgendaIssue = {
 
 // ─── Constants ──────────────────────────────────────────
 
-const SLOT_HEIGHT = 48; // px per 15-min slot
-const TIME_COL_WIDTH = 60; // px
-const MIN_TRACK_WIDTH = 180; // px
+const TIME_COL_WIDTH = 96; // px
+const MIN_AGENDA_WIDTH = 760; // px
 
 const SESSION_TYPES: { value: SessionType; label: string }[] = [
   { value: "talk", label: "Talk" },
@@ -143,33 +142,48 @@ const PANEL_SESSION_TYPES: SessionType[] = ["panel"];
 const HOST_SESSION_TYPES: SessionType[] = ["opening", "closing"];
 
 const typeColors: Record<SessionType, string> = {
-  keynote: "bg-yellow-50 border-yellow-300",
-  talk: "bg-sky-50 border-sky-200",
-  workshop: "bg-emerald-50 border-emerald-200",
-  panel: "bg-violet-50 border-violet-200",
-  lightning: "bg-orange-50 border-orange-200",
-  fireside: "bg-amber-50 border-amber-200",
-  opening: "bg-indigo-50 border-indigo-200",
-  closing: "bg-indigo-50 border-indigo-200",
-  break: "bg-stone-50 border-stone-300 border-dashed",
-  coffee: "bg-stone-50 border-stone-300 border-dashed",
-  lunch: "bg-stone-50 border-stone-300 border-dashed",
-  networking: "bg-stone-50 border-stone-300 border-dashed",
+  keynote: "border-amber-200 bg-gradient-to-br from-amber-50 via-white to-yellow-50",
+  talk: "border-sky-200 bg-gradient-to-br from-sky-50 via-white to-cyan-50",
+  workshop: "border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50",
+  panel: "border-violet-200 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50",
+  lightning: "border-rose-200 bg-gradient-to-br from-rose-50 via-white to-orange-50",
+  fireside: "border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50",
+  opening: "border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-sky-50",
+  closing: "border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-sky-50",
+  break: "border-stone-200 bg-gradient-to-br from-stone-50 via-white to-slate-50 border-dashed",
+  coffee: "border-stone-200 bg-gradient-to-br from-stone-50 via-white to-slate-50 border-dashed",
+  lunch: "border-stone-200 bg-gradient-to-br from-stone-50 via-white to-slate-50 border-dashed",
+  networking: "border-stone-200 bg-gradient-to-br from-stone-50 via-white to-slate-50 border-dashed",
 };
 
 const typeBadgeColors: Record<SessionType, string> = {
-  keynote: "bg-yellow-100 text-yellow-800",
-  talk: "bg-sky-100 text-sky-800",
-  workshop: "bg-emerald-100 text-emerald-800",
-  panel: "bg-violet-100 text-violet-800",
-  lightning: "bg-orange-100 text-orange-800",
-  fireside: "bg-amber-100 text-amber-800",
-  opening: "bg-indigo-100 text-indigo-800",
-  closing: "bg-indigo-100 text-indigo-800",
+  keynote: "bg-amber-500 text-white shadow-sm shadow-amber-500/20",
+  talk: "bg-sky-600 text-white shadow-sm shadow-sky-600/20",
+  workshop: "bg-emerald-600 text-white shadow-sm shadow-emerald-600/20",
+  panel: "bg-violet-600 text-white shadow-sm shadow-violet-600/20",
+  lightning: "bg-rose-500 text-white shadow-sm shadow-rose-500/20",
+  fireside: "bg-orange-500 text-white shadow-sm shadow-orange-500/20",
+  opening: "bg-indigo-600 text-white shadow-sm shadow-indigo-600/20",
+  closing: "bg-indigo-600 text-white shadow-sm shadow-indigo-600/20",
   break: "bg-stone-100 text-stone-600",
   coffee: "bg-stone-100 text-stone-600",
   lunch: "bg-stone-100 text-stone-600",
   networking: "bg-stone-100 text-stone-600",
+};
+
+const typeAccentColors: Record<SessionType, string> = {
+  keynote: "#f59e0b",
+  talk: "#0284c7",
+  workshop: "#059669",
+  panel: "#7c3aed",
+  lightning: "#f43f5e",
+  fireside: "#f97316",
+  opening: "#4f46e5",
+  closing: "#4f46e5",
+  break: "#78716c",
+  coffee: "#78716c",
+  lunch: "#78716c",
+  networking: "#78716c",
 };
 
 const typeIcons: Partial<Record<SessionType, React.ReactNode>> = {
@@ -179,23 +193,12 @@ const typeIcons: Partial<Record<SessionType, React.ReactNode>> = {
   lunch: <Utensils className="h-3 w-3" />,
 };
 
-// ─── Helpers ────────────────────────────────────────────
-
-function generateTimeSlots(startTime: string, endTime: string): string[] {
-  const start = parseHHMM(startTime);
-  const end = parseHHMM(endTime);
-  const slots: string[] = [];
-  for (let m = start; m < end; m += 15) {
-    slots.push(formatHHMM(m));
-  }
-  return slots;
-}
-
 // ─── Component Props ────────────────────────────────────
 
 type AgendaClientProps = {
   initialSessions: Session[];
   tracks: Track[];
+  eventSlug: string;
   editionId: string;
   editionName: string;
   totalDays: number;
@@ -210,6 +213,7 @@ type AgendaClientProps = {
 export function AgendaClient({
   initialSessions,
   tracks,
+  eventSlug,
   editionId,
   editionName,
   totalDays,
@@ -247,20 +251,12 @@ export function AgendaClient({
   const [formDescription, setFormDescription] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-
-  // Drag state
   const [dragSessionId, setDragSessionId] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ trackId: string; slotIndex: number } | null>(null);
+  const [dropTargetSessionId, setDropTargetSessionId] = useState<string | null>(null);
+  const [swapping, setSwapping] = useState(false);
 
   const { confirm } = useConfirm();
   const gridRef = useRef<HTMLDivElement>(null);
-
-  // ── Time grid slots ──
-  const timeSlots = useMemo(
-    () => generateTimeSlots(agendaStartTime, agendaEndTime),
-    [agendaStartTime, agendaEndTime]
-  );
-  const gridStartMinutes = parseHHMM(agendaStartTime);
 
   // ── Fetch speakers + team members + validation on mount ──
   useEffect(() => {
@@ -321,6 +317,27 @@ export function AgendaClient({
     [sessions, selectedDay]
   );
 
+  const trackMap = useMemo(
+    () => new Map(tracks.map((track) => [track.id, track])),
+    [tracks]
+  );
+
+  const selectedSpeakerLabel = useMemo(() => {
+    if (!formSpeakerId) return "None";
+    const speaker = speakers.find((s) => s.id === formSpeakerId);
+    return speaker ? `${speaker.name}${speaker.company ? ` (${speaker.company})` : ""}` : "Select speaker...";
+  }, [formSpeakerId, speakers]);
+
+  const selectedHostLabel = useMemo(() => {
+    if (!formHostId) return "None";
+    return teamMembers.find((m) => m.id === formHostId)?.name ?? "Select host...";
+  }, [formHostId, teamMembers]);
+
+  const selectedTrackLabel = useMemo(() => {
+    if (!formTrackId) return "No track";
+    return tracks.find((track) => track.id === formTrackId)?.name ?? "Select track...";
+  }, [formTrackId, tracks]);
+
   // ── Issue counts ──
   const errorCount = issues.filter((i) => i.severity === "error").length;
   const warningCount = issues.filter((i) => i.severity === "warning").length;
@@ -339,18 +356,18 @@ export function AgendaClient({
     return map;
   }, [issues]);
 
-  // ── Get the position and height for a session in the grid ──
-  const getSessionPosition = useCallback(
-    (session: Session) => {
-      const start = toAgendaDate(session.startTime);
-      if (!start) return null;
-      const startMin = minutesSinceMidnight(start);
-      const topOffset = ((startMin - gridStartMinutes) / 15) * SLOT_HEIGHT;
-      const heightPx = (session.durationMinutes / 15) * SLOT_HEIGHT;
-      return { top: topOffset, height: Math.max(heightPx, SLOT_HEIGHT) };
-    },
-    [gridStartMinutes]
-  );
+  // ── Sort scheduled sessions chronologically ──
+  const scheduledSessions = useMemo(() => {
+    return daySessions
+      .filter((session) => session.startTime)
+      .sort((a, b) => {
+        const aStart = toAgendaDate(a.startTime);
+        const bStart = toAgendaDate(b.startTime);
+        const aMinutes = aStart ? minutesSinceMidnight(aStart) : Number.MAX_SAFE_INTEGER;
+        const bMinutes = bStart ? minutesSinceMidnight(bStart) : Number.MAX_SAFE_INTEGER;
+        return aMinutes - bMinutes || a.title.localeCompare(b.title);
+      });
+  }, [daySessions]);
 
   // ── Drawer helpers ──
   const resetForm = useCallback(() => {
@@ -402,6 +419,12 @@ export function AgendaClient({
     const startMin = parseHHMM(formStartTime);
     return formatHHMM(startMin + formDuration);
   }, [formStartTime, formDuration]);
+
+  const updateDuration = useCallback((value: string) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    setFormDuration(Math.min(60, Math.max(1, Math.round(parsed))));
+  }, []);
 
   // ── Save session (create or update) ──
   const handleSave = useCallback(async () => {
@@ -534,75 +557,71 @@ export function AgendaClient({
     [confirm, fetchSessions, fetchValidation]
   );
 
-  // ── Drag & Drop ──
-  const handleDragStart = useCallback(
-    (e: React.DragEvent, sessionId: string) => {
-      setDragSessionId(sessionId);
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", sessionId);
-    },
-    []
-  );
-
-  const handleDragOver = useCallback(
-    (e: React.DragEvent, trackId: string, slotIndex: number) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      setDropTarget({ trackId, slotIndex });
-    },
-    []
-  );
-
-  const handleDragLeave = useCallback(() => {
-    setDropTarget(null);
+  // ── Drag-to-swap sessions ──
+  const handleSessionDragStart = useCallback((e: React.DragEvent, sessionId: string) => {
+    setDragSessionId(sessionId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", sessionId);
   }, []);
 
-  const handleDrop = useCallback(
-    async (e: React.DragEvent, trackId: string, slotIndex: number) => {
+  const handleSessionDragEnd = useCallback(() => {
+    setDragSessionId(null);
+    setDropTargetSessionId(null);
+  }, []);
+
+  const handleSessionDragOver = useCallback(
+    (e: React.DragEvent, targetId: string) => {
+      if (!dragSessionId || dragSessionId === targetId || swapping) return;
       e.preventDefault();
-      setDropTarget(null);
-
-      const sessionId = e.dataTransfer.getData("text/plain");
-      if (!sessionId) return;
-
-      const session = sessions.find((s) => s.id === sessionId);
-      if (!session) return;
-
-      const newStartMinutes = gridStartMinutes + slotIndex * 15;
-      const newEndMinutes = newStartMinutes + session.durationMinutes;
-      const newStartISO = agendaTimestampFromMinutes(newStartMinutes);
-      const newEndISO = agendaTimestampFromMinutes(newEndMinutes);
-
-      const res = await fetch(`/api/sessions/${sessionId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session.version != null
-            ? { "If-Match": String(session.version) }
-            : {}),
-        },
-        body: JSON.stringify({
-          trackId: trackId || null,
-          startTime: newStartISO,
-          endTime: newEndISO,
-          day: selectedDay,
-        }),
-      });
-
-      if (!res.ok) {
-        toast.error(await getApiError(res, "Failed to move session"));
-        return;
-      }
-
-      const json = await res.json();
-      if (json.issues) setIssues(json.issues);
-
-      toast.success("Session moved");
-      await fetchSessions();
-      await fetchValidation();
-      setDragSessionId(null);
+      e.dataTransfer.dropEffect = "move";
+      setDropTargetSessionId(targetId);
     },
-    [sessions, gridStartMinutes, selectedDay, fetchSessions, fetchValidation]
+    [dragSessionId, swapping]
+  );
+
+  const handleSessionDrop = useCallback(
+    async (e: React.DragEvent, target: Session) => {
+      e.preventDefault();
+      const sourceId = e.dataTransfer.getData("text/plain") || dragSessionId;
+      setDropTargetSessionId(null);
+
+      if (!sourceId || sourceId === target.id || swapping) return;
+      const source = sessions.find((session) => session.id === sourceId);
+      if (!source) return;
+
+      setSwapping(true);
+      try {
+        const res = await fetch("/api/sessions/swap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceId,
+            targetId: target.id,
+            sourceVersion: source.version,
+            targetVersion: target.version,
+          }),
+        });
+
+        if (!res.ok) {
+          toast.error(await getApiError(res, "Failed to swap sessions"));
+          return;
+        }
+
+        const json = await res.json();
+        if (json.issues) setIssues(json.issues);
+
+        toast.success(`Swapped ${source.type} with ${target.type}`);
+        await fetchSessions();
+        await fetchValidation();
+      } catch {
+        toast.error("Network error — could not swap sessions");
+      } finally {
+        setSwapping(false);
+        setDragSessionId(null);
+        setDropTargetSessionId(null);
+      }
+    },
+    [dragSessionId, fetchSessions, fetchValidation, sessions, swapping]
   );
 
   // ── Gap lock/save ──
@@ -664,8 +683,10 @@ export function AgendaClient({
         <div className="space-y-1.5">
           <Label>Speaker</Label>
           <Select value={formSpeakerId} onValueChange={(v) => setFormSpeakerId(v ?? "")}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select speaker..." />
+            <SelectTrigger className="w-full">
+              <span className="min-w-0 flex-1 truncate text-left">
+                {selectedSpeakerLabel}
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">None</SelectItem>
@@ -742,8 +763,10 @@ export function AgendaClient({
         <div className="space-y-1.5">
           <Label>Host</Label>
           <Select value={formHostId} onValueChange={(v) => setFormHostId(v ?? "")}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select host..." />
+            <SelectTrigger className="w-full">
+              <span className="min-w-0 flex-1 truncate text-left">
+                {selectedHostLabel}
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">None</SelectItem>
@@ -761,8 +784,10 @@ export function AgendaClient({
       <div className="space-y-1.5">
         <Label>Track</Label>
         <Select value={formTrackId} onValueChange={(v) => setFormTrackId(v ?? "")}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select track..." />
+          <SelectTrigger className="w-full">
+            <span className="min-w-0 flex-1 truncate text-left">
+              {selectedTrackLabel}
+            </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">No track</SelectItem>
@@ -806,23 +831,19 @@ export function AgendaClient({
             type="time"
             value={formStartTime}
             onChange={(e) => setFormStartTime(e.target.value)}
-            step={900}
+            step={60}
           />
         </div>
         <div className="space-y-1.5">
           <Label>Duration</Label>
-          <Select value={String(formDuration)} onValueChange={(v) => setFormDuration(Number(v))}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[15, 20, 25, 30, 45, 60, 90, 120, 180].map((d) => (
-                <SelectItem key={d} value={String(d)}>
-                  {d} min
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            type="number"
+            min={1}
+            max={60}
+            step={1}
+            value={formDuration}
+            onChange={(e) => updateDuration(e.target.value)}
+          />
         </div>
       </div>
 
@@ -911,21 +932,6 @@ export function AgendaClient({
       </div>
     );
   }
-
-  // ── Determine display tracks ──
-  // If no tracks exist, create a virtual "All Sessions" column
-  const displayTracks: Track[] =
-    tracks.length > 0
-      ? tracks
-      : [{ id: "__all__", name: "All Sessions", color: null, sortOrder: 0 }];
-
-  // ── Assign sessions to track columns ──
-  const getSessionsForTrack = (trackId: string) => {
-    return daySessions.filter((s) => {
-      if (trackId === "__all__") return true;
-      return s.trackId === trackId;
-    });
-  };
 
   return (
     <div>
@@ -1092,212 +1098,205 @@ export function AgendaClient({
         id={`day-${selectedDay}-panel`}
         role="tabpanel"
         aria-label={`Day ${selectedDay} schedule`}
-        className="rounded-lg border border-stone-200 bg-white overflow-x-auto"
+        className="overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/80 shadow-sm"
         ref={gridRef}
       >
-        {/* Track headers */}
-        <div
-          className="flex border-b border-stone-200 sticky top-0 z-10 bg-white"
-          style={{ minWidth: `${TIME_COL_WIDTH + displayTracks.length * MIN_TRACK_WIDTH}px` }}
-        >
-          {/* Time column header */}
-          <div
-            className="shrink-0 border-r border-stone-200 px-2 py-2.5 text-xs font-medium text-muted-foreground"
-            style={{ width: TIME_COL_WIDTH }}
-          >
-            Time
-          </div>
-          {/* Track column headers */}
-          {displayTracks.map((track) => (
-            <div
-              key={track.id}
-              className="flex-1 border-r border-stone-100 last:border-r-0 px-3 py-2.5 text-xs font-medium truncate"
-              style={{ minWidth: MIN_TRACK_WIDTH }}
-            >
-              <span className="flex items-center gap-1.5">
+        {tracks.length > 0 && (
+          <div className="flex flex-wrap gap-2 border-b border-slate-200/80 bg-white/80 px-3 py-2 backdrop-blur">
+            {tracks.map((track) => (
+              <span
+                key={track.id}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm"
+              >
                 {track.color && (
                   <span
-                    className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                    className="h-2.5 w-2.5 rounded-full shadow-sm"
                     style={{ backgroundColor: track.color }}
                   />
                 )}
                 {track.name}
               </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Grid body */}
-        <div
-          className="flex relative"
-          style={{ minWidth: `${TIME_COL_WIDTH + displayTracks.length * MIN_TRACK_WIDTH}px` }}
-        >
-          {/* Time labels column */}
-          <div className="shrink-0 border-r border-stone-200" style={{ width: TIME_COL_WIDTH }}>
-            {timeSlots.map((slot, i) => (
-              <div
-                key={slot}
-                className={cn(
-                  "flex items-start justify-end pr-2 text-[11px] font-mono text-muted-foreground select-none",
-                  i % 4 === 0 ? "font-medium text-stone-600" : ""
-                )}
-                style={{ height: SLOT_HEIGHT }}
-              >
-                <span className="-mt-1.5">{slot}</span>
-              </div>
             ))}
           </div>
+        )}
 
-          {/* Track columns */}
-          {displayTracks.map((track) => {
-            const trackSessions = getSessionsForTrack(track.id);
+        {/* Schedule header */}
+        <div
+          className="sticky top-0 z-10 flex border-b border-slate-200/80 bg-white/90 backdrop-blur"
+          style={{ minWidth: MIN_AGENDA_WIDTH }}
+        >
+          <div
+            className="shrink-0 border-r border-slate-200 px-2 py-2.5 text-xs font-medium text-muted-foreground"
+            style={{ width: TIME_COL_WIDTH }}
+          >
+            Time
+          </div>
+          <div className="flex-1 px-3 py-2.5 text-xs font-medium text-muted-foreground">
+            Schedule
+          </div>
+        </div>
+
+        {/* Schedule body */}
+        <div className="divide-y divide-slate-100 overflow-x-auto" style={{ minWidth: MIN_AGENDA_WIDTH }}>
+          {scheduledSessions.map((session) => {
+            const sessionIssues = sessionIssueMap.get(session.id) || [];
+            const hasError = sessionIssues.some((i) => i.severity === "error");
+            const isUnconfirmed = session.speaker && session.speaker.stage !== "confirmed";
+            const track = session.trackId ? trackMap.get(session.trackId) : null;
+            const typeAccent = typeAccentColors[session.type] || "#64748b";
+            const trackAccent = track?.color || typeAccent;
+            const isDragging = dragSessionId === session.id;
+            const isDropTarget = dropTargetSessionId === session.id && dragSessionId !== session.id;
+            const startStr = agendaTimeLabel(session.startTime) ?? "--:--";
+            const endStr = agendaTimeLabel(session.endTime) ?? "--:--";
 
             return (
-              <div
-                key={track.id}
-                className="flex-1 relative border-r border-stone-100 last:border-r-0"
-                style={{
-                  minWidth: MIN_TRACK_WIDTH,
-                  height: timeSlots.length * SLOT_HEIGHT,
-                }}
-              >
-                {/* Grid lines (slot backgrounds) */}
-                {timeSlots.map((slot, slotIndex) => (
+              <div key={session.id} className="flex bg-white/70">
+                <div
+                  className="shrink-0 border-r border-slate-200 px-2 py-3 text-right"
+                  style={{ width: TIME_COL_WIDTH }}
+                >
+                  <div className="font-mono text-xs font-semibold text-slate-800">{startStr}</div>
+                  <div className="font-mono text-xs text-slate-500">{endStr}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{session.durationMinutes} min</div>
+                </div>
+                <div className="flex-1 p-2">
                   <div
-                    key={slot}
                     className={cn(
-                      "absolute left-0 right-0 border-b",
-                      slotIndex % 4 === 3
-                        ? "border-stone-200"
-                        : "border-stone-100 border-dashed",
-                      dropTarget?.trackId === track.id &&
-                        dropTarget?.slotIndex === slotIndex &&
-                        "bg-sky-50 border-sky-300 border-dashed border-2"
+                      "group relative min-h-[92px] overflow-hidden rounded-lg border px-3 py-2.5 shadow-sm transition-all duration-200",
+                      "cursor-grab hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing",
+                      typeColors[session.type] || "border-stone-200",
+                      hasError && "!border-red-400 ring-1 ring-red-300",
+                      !hasError && isUnconfirmed && "!border-amber-400 ring-1 ring-amber-300",
+                      isDragging && "scale-[0.99] opacity-45",
+                      isDropTarget && "ring-2 ring-sky-400 ring-offset-2 ring-offset-slate-50"
                     )}
                     style={{
-                      top: slotIndex * SLOT_HEIGHT,
-                      height: SLOT_HEIGHT,
+                      background: `linear-gradient(135deg, color-mix(in srgb, ${trackAccent} 12%, white), white 46%, color-mix(in srgb, ${typeAccent} 12%, white))`,
+                      borderLeftColor: trackAccent,
+                      borderLeftWidth: 5,
                     }}
-                    onDragOver={(e) => handleDragOver(e, track.id, slotIndex)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, track.id, slotIndex)}
-                    onClick={() => openAddDrawer(track.id, slot)}
+                    draggable
+                    onDragStart={(e) => handleSessionDragStart(e, session.id)}
+                    onDragEnd={handleSessionDragEnd}
+                    onDragOver={(e) => handleSessionDragOver(e, session.id)}
+                    onDragLeave={() => setDropTargetSessionId(null)}
+                    onDrop={(e) => handleSessionDrop(e, session)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditDrawer(session);
+                    }}
                     role="button"
-                    aria-label={`Add session at ${slot} in ${track.name}`}
+                    aria-label={`${session.title}, ${startStr} to ${endStr}`}
                     tabIndex={0}
-                  />
-                ))}
-
-                {/* Session cards */}
-                {trackSessions.map((session) => {
-                  const pos = getSessionPosition(session);
-                  if (!pos) return null;
-
-                  const sessionIssues = sessionIssueMap.get(session.id) || [];
-                  const hasError = sessionIssues.some((i) => i.severity === "error");
-                  const isUnconfirmed =
-                    session.speaker && session.speaker.stage !== "confirmed";
-                  const isDragging = dragSessionId === session.id;
-
-                  const startStr = agendaTimeLabel(session.startTime) ?? "--:--";
-                  const endStr = agendaTimeLabel(session.endTime) ?? "--:--";
-
-                  return (
+                  >
                     <div
-                      key={session.id}
-                      className={cn(
-                        "absolute left-1 right-1 rounded-md border px-2 py-1.5 cursor-pointer transition-shadow",
-                        "hover:shadow-md hover:z-20 overflow-hidden group",
-                        typeColors[session.type] || "bg-white border-stone-200",
-                        hasError && "!border-red-400 ring-1 ring-red-300",
-                        !hasError && isUnconfirmed && "!border-amber-400 ring-1 ring-amber-300",
-                        isDragging && "opacity-40"
-                      )}
-                      style={{
-                        top: pos.top + 1,
-                        height: pos.height - 2,
-                        zIndex: 10,
-                      }}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, session.id)}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditDrawer(session);
-                      }}
-                      role="button"
-                      aria-label={`${session.title}, ${startStr} to ${endStr}`}
-                      tabIndex={0}
-                    >
-                      {/* Drag handle */}
-                      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-60 transition-opacity">
-                        <GripVertical className="h-3 w-3 text-stone-400" />
+                      className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full opacity-20 blur-2xl transition-opacity duration-300 group-hover:opacity-35"
+                      style={{ backgroundColor: typeAccent }}
+                    />
+                    {isDropTarget && (
+                      <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-white/60 backdrop-blur-[1px]">
+                        <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold text-white shadow-lg">
+                          Drop to swap
+                        </span>
                       </div>
-
-                      {/* Content */}
-                      <div className="flex flex-col h-full min-h-0">
-                        {/* Title + type badge */}
-                        <div className="flex items-center gap-1 min-w-0">
-                          <span className="font-medium text-xs truncate leading-tight">
-                            {session.title}
-                          </span>
+                    )}
+                    <div className="absolute right-2 top-2 rounded-full border border-slate-200/70 bg-white/80 p-1 text-slate-400 opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                      <GripVertical className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="relative min-h-[76px] pr-8 md:pr-52">
+                      <div className="session-card-main min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {track && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 ring-1 ring-slate-200/80">
+                              {track.color && (
+                                <span
+                                  className="h-2 w-2 rounded-full"
+                                  style={{ backgroundColor: track.color }}
+                                />
+                              )}
+                              {track.name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 text-base font-semibold leading-snug text-slate-950">
+                          {session.title}
                         </div>
 
-                        {/* Speaker */}
                         {session.speaker && (
-                          <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                             {session.speaker.headshotUrl && (
                               <img
                                 src={session.speaker.headshotUrl}
                                 alt=""
-                                className="h-3.5 w-3.5 rounded-full object-cover shrink-0"
+                                className="h-5 w-5 rounded-full object-cover shrink-0"
                               />
                             )}
-                            <span className="text-[10px] text-stone-600 truncate">
-                              {session.speaker.name}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Meta row (only if enough height) */}
-                        {pos.height >= SLOT_HEIGHT * 1.5 && (
-                          <div className="flex items-center gap-1 mt-auto pt-0.5">
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0 text-[9px] font-medium",
-                                typeBadgeColors[session.type] || "bg-stone-100 text-stone-600"
-                              )}
+                            <Link
+                              href={`/events/${eventSlug}/speakers?speakerId=${session.speaker.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-sm font-semibold text-sky-800 hover:underline"
                             >
-                              {typeIcons[session.type]}
-                              {session.type}
-                            </span>
-                            <span className="text-[10px] text-stone-400 font-mono">
-                              {startStr}–{endStr}
-                            </span>
+                              {session.speaker.name}
+                            </Link>
+                            {session.speaker.company && (
+                              <span className="text-xs text-stone-500">
+                                {session.speaker.company}
+                              </span>
+                            )}
                           </div>
                         )}
 
-                        {/* Warning badges */}
-                        {isUnconfirmed && pos.height >= SLOT_HEIGHT && (
-                          <div className="mt-0.5">
-                            <span className="inline-flex items-center gap-0.5 rounded px-1 py-0 text-[9px] font-medium bg-amber-200 text-amber-800">
+                        {session.description && (
+                          <p className="mt-1 line-clamp-2 text-xs leading-snug text-slate-600">
+                            {session.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="session-card-meta mt-3 flex flex-wrap items-center gap-2 rounded-md border border-white/70 bg-white/70 p-2 text-left shadow-sm backdrop-blur md:absolute md:right-0 md:top-0 md:mt-0 md:w-44 md:flex-col md:items-end md:text-right">
+                        <div className="flex md:justify-end">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                              typeBadgeColors[session.type] || "bg-stone-100 text-stone-600"
+                            )}
+                          >
+                            {typeIcons[session.type]}
+                            {session.type}
+                          </span>
+                        </div>
+                        <div className="md:order-2">
+                          <div className="font-mono text-sm font-semibold text-slate-900">
+                            {startStr}–{endStr}
+                          </div>
+                          <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                            {session.durationMinutes} min
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1 md:order-3 md:justify-end">
+                          {session.room && (
+                            <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] text-stone-600 ring-1 ring-stone-200">
+                              {session.room}
+                            </span>
+                          )}
+                          {isUnconfirmed && (
+                            <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium bg-amber-200 text-amber-800">
                               <AlertTriangle className="h-2.5 w-2.5" />
                               NOT CONFIRMED
                             </span>
-                          </div>
-                        )}
-
-                        {hasError && pos.height >= SLOT_HEIGHT && (
-                          <div className="mt-0.5">
-                            <span className="inline-flex items-center gap-0.5 rounded px-1 py-0 text-[9px] font-medium bg-red-200 text-red-800">
+                          )}
+                          {hasError && (
+                            <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium bg-red-200 text-red-800">
                               <AlertCircle className="h-2.5 w-2.5" />
                               OVERLAP
                             </span>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -1321,15 +1320,12 @@ export function AgendaClient({
                     "rounded-md border px-3 py-2 cursor-pointer hover:shadow-sm transition-shadow",
                     typeColors[session.type] || "bg-white border-stone-200"
                   )}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, session.id)}
                   onClick={() => openEditDrawer(session)}
                   role="button"
                   tabIndex={0}
                   aria-label={`Unscheduled: ${session.title}`}
                 >
                   <div className="flex items-center gap-2">
-                    <GripVertical className="h-3 w-3 text-stone-400" />
                     <span className="text-xs font-medium">{session.title}</span>
                     <span
                       className={cn(

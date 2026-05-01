@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,7 +101,7 @@ export function SpeakersClient({
   }, []);
 
   // Drawer
-  const openDrawer = (speaker: Speaker) => {
+  const openDrawer = useCallback((speaker: Speaker) => {
     setSelectedSpeaker(speaker);
     setDrawerForm({
       name: speaker.name || "",
@@ -125,7 +125,16 @@ export function SpeakersClient({
       assignedTo: speaker.assignedTo || "",
       reviewNotes: speaker.reviewNotes || "",
     });
-  };
+  }, []);
+
+  useEffect(() => {
+    const speakerId = new URLSearchParams(window.location.search).get("speakerId");
+    if (!speakerId) return;
+    const speaker = speakers.find((s) => s.id === speakerId);
+    if (!speaker) return;
+    const timeout = window.setTimeout(() => openDrawer(speaker), 0);
+    return () => window.clearTimeout(timeout);
+  }, [speakers, openDrawer]);
 
   const updateField = (field: string, value: string | string[] | null) => {
     setDrawerForm((prev) => ({ ...prev, [field]: value || "" }));

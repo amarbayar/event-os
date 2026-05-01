@@ -6,7 +6,12 @@ import { AgendaClient } from "./client";
 
 export const dynamic = "force-dynamic";
 
-export default async function AgendaPage() {
+export default async function AgendaPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
   const [sessions, edition] = await Promise.all([
     getSessions(),
     getEdition(),
@@ -38,6 +43,7 @@ export default async function AgendaPage() {
     <AgendaClient
       initialSessions={sessions}
       tracks={tracks}
+      eventSlug={slug}
       editionId={edition?.id ?? ""}
       editionName={edition?.name ?? "Event"}
       totalDays={totalDays}
