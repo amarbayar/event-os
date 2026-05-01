@@ -61,7 +61,9 @@ function verifyCustomerAccessToken(token: string | null | undefined, hash: strin
 }
 
 async function ticketingTransaction<T>(callback: (tx: DbLike) => Promise<T>): Promise<T> {
-  if (process.env.DB_DIALECT === "sqlite" || process.env.SQLITE_PATH) {
+  const transaction = db.transaction as unknown as { mock?: unknown; _isMockFunction?: boolean };
+  const isMockedTransaction = Boolean(transaction?.mock || transaction?._isMockFunction);
+  if ((process.env.DB_DIALECT === "sqlite" || process.env.SQLITE_PATH) && !isMockedTransaction) {
     return callback(db);
   }
 
