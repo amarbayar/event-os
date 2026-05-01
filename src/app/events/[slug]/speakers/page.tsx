@@ -28,7 +28,12 @@ export default async function SpeakersPage() {
   return (
     <SpeakersClient
       initialSpeakers={speakers}
-      tracks={allTracks.map((t: typeof allTracks[number]) => ({ id: t.id, name: t.name }))}
+      tracks={allTracks.map((t: typeof allTracks[number]) => ({
+        id: t.id,
+        name: t.name,
+        color: t.color,
+        sortOrder: t.sortOrder,
+      }))}
       sessions={allSessions.map((s: typeof allSessions[number]) => ({
         id: s.id,
         title: s.title,

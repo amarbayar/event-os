@@ -9,9 +9,10 @@ import { BrandingTab } from "./branding-tab";
 import { TeamTab } from "./team-tab";
 import { AiModelTab } from "./ai-model-tab";
 import { MessagingTab } from "./messaging-tab";
+import { TracksTab } from "./tracks-tab";
 import { DangerZoneTab } from "./danger-zone-tab";
 
-type Tab = "general" | "branding" | "team" | "ai" | "messaging" | "danger";
+type Tab = "general" | "branding" | "team" | "tracks" | "ai" | "messaging" | "danger";
 
 export default function OrgSettingsPage() {
   const [tab, setTab] = useState<Tab>("general");
@@ -20,6 +21,7 @@ export default function OrgSettingsPage() {
     { key: "general", label: "General" },
     { key: "branding", label: "Branding" },
     { key: "team", label: "Team" },
+    { key: "tracks", label: "Tracks" },
     { key: "ai", label: "AI Model" },
     { key: "messaging", label: "Messaging" },
     { key: "danger", label: "Danger Zone" },
@@ -60,6 +62,7 @@ export default function OrgSettingsPage() {
       {tab === "general" && <GeneralTab />}
       {tab === "branding" && <BrandingTab />}
       {tab === "team" && <TeamTab />}
+      {tab === "tracks" && <TracksTab />}
       {tab === "ai" && <AiModelTab />}
       {tab === "messaging" && <MessagingTab />}
       {tab === "danger" && <DangerZoneTab />}

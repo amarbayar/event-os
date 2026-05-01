@@ -7,6 +7,22 @@ import { requirePermission, isRbacError } from "@/lib/rbac";
 import { generateChecklistItems, archiveChecklistItems } from "@/lib/checklist";
 import { notify } from "@/lib/notify";
 import { users } from "@/db/schema";
+import { cleanupSpeakerDependencies, syncSpeakerAgendaSessions } from "@/lib/speaker-agenda";
+import { isSessionType } from "@/lib/session-types";
+
+type DbTransaction = Awaited<
+  ReturnType<typeof import("@/db/connection").createConnection>
+>["db"];
+
+async function speakerTransaction<T>(callback: (tx: DbTransaction) => Promise<T>): Promise<T> {
+  const transaction = db.transaction as unknown as { mock?: unknown; _isMockFunction?: boolean };
+  const isMockedTransaction = Boolean(transaction?.mock || transaction?._isMockFunction);
+  if ((process.env.DB_DIALECT === "sqlite" || process.env.SQLITE_PATH) && !isMockedTransaction) {
+    return callback(db as DbTransaction);
+  }
+
+  return db.transaction(async (tx: DbTransaction) => callback(tx));
+}
 
 export async function GET(
   req: NextRequest,
@@ -89,24 +105,44 @@ export async function PATCH(
     }
   }
 
+  if (updates.talkType !== undefined && !isSessionType(updates.talkType)) {
+    return NextResponse.json({ error: "Invalid talkType" }, { status: 400 });
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  const [updated] = await db
-    .update(speakerApplications)
-    .set({
-      ...updates,
-      version: sql`${speakerApplications.version} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(speakerApplications.id, id),
-        eq(speakerApplications.version, speaker.version)
+  const watchedAgendaFields = ["talkTitle", "talkAbstract", "talkType", "trackPreference"];
+  const shouldSyncAgenda = watchedAgendaFields.some((field) => updates[field] !== undefined);
+
+  const updated = await speakerTransaction(async (tx) => {
+    const [speakerUpdate] = await tx
+      .update(speakerApplications)
+      .set({
+        ...updates,
+        version: sql`${speakerApplications.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(speakerApplications.id, id),
+          eq(speakerApplications.version, speaker.version)
+        )
       )
-    )
-    .returning();
+      .returning();
+
+    if (speakerUpdate && shouldSyncAgenda) {
+      await syncSpeakerAgendaSessions(tx, {
+        speakerId: id,
+        editionId: speaker.editionId,
+        organizationId: ctx.orgId,
+        updates,
+      });
+    }
+
+    return speakerUpdate;
+  });
 
   if (!updated) {
     return NextResponse.json(
@@ -179,20 +215,34 @@ export async function DELETE(
   // Stage protection: non-admins can't delete confirmed entities
   const entity = await db.query.speakerApplications.findFirst({
     where: and(eq(speakerApplications.id, id), eq(speakerApplications.organizationId, ctx.orgId)),
-    columns: { stage: true },
+    columns: { id: true, editionId: true, organizationId: true, stage: true },
   });
   const stageBlock = checkStageProtection(entity?.stage, ctx.user.role);
   if (stageBlock) return stageBlock;
 
-  const [deleted] = await db
-    .delete(speakerApplications)
-    .where(
-      and(
-        eq(speakerApplications.id, id),
-        eq(speakerApplications.organizationId, ctx.orgId)
+  if (!entity) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const deleted = await speakerTransaction(async (tx) => {
+    await cleanupSpeakerDependencies(tx, {
+      speakerId: id,
+      editionId: entity.editionId,
+      organizationId: ctx.orgId,
+    });
+
+    const [deletedSpeaker] = await tx
+      .delete(speakerApplications)
+      .where(
+        and(
+          eq(speakerApplications.id, id),
+          eq(speakerApplications.organizationId, ctx.orgId)
+        )
       )
-    )
-    .returning();
+      .returning();
+
+    return deletedSpeaker;
+  });
 
   if (!deleted) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -4,6 +4,7 @@ import { speakerApplications, eventQueue } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { paginationParams } from "@/lib/api-utils";
 import { requirePermission, isRbacError } from "@/lib/rbac";
+import { isSessionType } from "@/lib/session-types";
 
 export async function GET(req: NextRequest) {
   const ctx = await requirePermission(req, "speaker", "read");
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
       title: title || null,
       talkTitle: talkTitle || "TBD",
       talkAbstract: talkAbstract || null,
-      talkType: ["talk", "workshop", "panel", "keynote", "break", "networking"].includes(talkType) ? talkType : "talk",
+      talkType: isSessionType(talkType) ? talkType : "talk",
       trackPreference: trackPreference || null,
       source: source || "intake",
       assignedTo: assignedTo || null,

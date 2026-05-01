@@ -46,22 +46,15 @@ import {
   parseHHMM,
   toAgendaDate,
 } from "@/lib/agenda-time";
+import {
+  HOST_SESSION_TYPES,
+  PANEL_SESSION_TYPES,
+  SESSION_TYPES,
+  SPEAKER_SESSION_TYPES,
+  type SessionType,
+} from "@/lib/session-types";
 
 // ─── Types ──────────────────────────────────────────────
-
-type SessionType =
-  | "talk"
-  | "workshop"
-  | "panel"
-  | "keynote"
-  | "break"
-  | "networking"
-  | "opening"
-  | "closing"
-  | "coffee"
-  | "lunch"
-  | "fireside"
-  | "lightning";
 
 type Session = {
   id: string;
@@ -121,25 +114,6 @@ type AgendaIssue = {
 
 const TIME_COL_WIDTH = 96; // px
 const MIN_AGENDA_WIDTH = 760; // px
-
-const SESSION_TYPES: { value: SessionType; label: string }[] = [
-  { value: "talk", label: "Talk" },
-  { value: "keynote", label: "Keynote" },
-  { value: "panel", label: "Panel" },
-  { value: "workshop", label: "Workshop" },
-  { value: "lightning", label: "Lightning" },
-  { value: "fireside", label: "Fireside" },
-  { value: "opening", label: "Opening" },
-  { value: "closing", label: "Closing" },
-  { value: "break", label: "Break" },
-  { value: "coffee", label: "Coffee" },
-  { value: "lunch", label: "Lunch" },
-  { value: "networking", label: "Networking" },
-];
-
-const SPEAKER_SESSION_TYPES: SessionType[] = ["talk", "keynote", "lightning", "fireside"];
-const PANEL_SESSION_TYPES: SessionType[] = ["panel"];
-const HOST_SESSION_TYPES: SessionType[] = ["opening", "closing"];
 
 const typeColors: Record<SessionType, string> = {
   keynote: "border-amber-200 bg-gradient-to-br from-amber-50 via-white to-yellow-50",

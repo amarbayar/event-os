@@ -25,6 +25,7 @@ import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock } from "lucid
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 import { agendaTimeLabel } from "@/lib/agenda-time";
+import { SESSION_TYPES } from "@/lib/session-types";
 
 type Speaker = {
   id: string;
@@ -53,7 +54,7 @@ type Speaker = {
   createdAt: Date;
 };
 
-type Track = { id: string; name: string };
+type Track = { id: string; name: string; color: string | null; sortOrder: number };
 type SessionSlot = {
   id: string;
   title: string;
@@ -305,7 +306,15 @@ export function SpeakersClient({
                     <SelectTrigger><SelectValue className="capitalize" placeholder="Select track" /></SelectTrigger>
                     <SelectContent>
                       {tracks.map((t) => (
-                        <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                        <SelectItem key={t.id} value={t.name}>
+                          <span className="inline-flex items-center gap-2">
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: t.color || "#a8a29e" }}
+                            />
+                            {t.name}
+                          </span>
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -315,10 +324,11 @@ export function SpeakersClient({
                   <Select value={String(drawerForm.talkType || "talk")} onValueChange={(v) => updateField("talkType", v)}>
                     <SelectTrigger><SelectValue className="capitalize" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="talk">Talk</SelectItem>
-                      <SelectItem value="keynote">Keynote</SelectItem>
-                      <SelectItem value="workshop">Workshop</SelectItem>
-                      <SelectItem value="panel">Panel</SelectItem>
+                      {SESSION_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

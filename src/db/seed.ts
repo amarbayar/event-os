@@ -62,7 +62,11 @@ async function seed() {
     .insert(schema.tracks)
     .values({ editionId: edition.id, name: "Workshop Room", color: "#047857", sortOrder: 1 })
     .returning();
-  console.log("  Tracks: Main Stage, Workshop Room");
+  await db
+    .insert(schema.tracks)
+    .values({ editionId: edition.id, name: "Sponsor", color: "#f59e0b", sortOrder: 2 })
+    .returning();
+  console.log("  Tracks: Main Stage, Workshop Room, Sponsor");
 
   // Speakers
   const speakerData = [

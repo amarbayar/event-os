@@ -5,6 +5,7 @@ import { eq, and, asc } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { validateAgenda } from "@/lib/agenda-validator";
 import { toAgendaDate } from "@/lib/agenda-time";
+import { isSessionType } from "@/lib/session-types";
 
 // Public endpoint — no auth required
 export async function GET(
@@ -75,11 +76,6 @@ export async function GET(
   });
 }
 
-const VALID_SESSION_TYPES = [
-  "talk", "workshop", "panel", "keynote", "break", "networking",
-  "opening", "closing", "coffee", "lunch", "fireside", "lightning",
-] as const;
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ editionId: string }> }
@@ -111,7 +107,7 @@ export async function POST(
     return NextResponse.json({ error: "title is required" }, { status: 400 });
   }
 
-  const sessionType = VALID_SESSION_TYPES.includes(type) ? type : "talk";
+  const sessionType = isSessionType(type) ? type : "talk";
 
   const [created] = await db
     .insert(sessions)

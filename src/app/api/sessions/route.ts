@@ -5,6 +5,7 @@ import { eq, and, asc } from "drizzle-orm";
 import { paginationParams } from "@/lib/api-utils";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { toAgendaDate } from "@/lib/agenda-time";
+import { isSessionType } from "@/lib/session-types";
 
 export async function GET(req: NextRequest) {
   const ctx = await requirePermission(req, "session", "read");
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
       speakerId: speakerId || null,
       title,
       description: description || null,
-      type: type || "talk",
+      type: isSessionType(type) ? type : "talk",
       startTime: startTime ? toAgendaDate(String(startTime)) : null,
       endTime: endTime ? toAgendaDate(String(endTime)) : null,
       room: room || null,

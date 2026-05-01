@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
   await db.insert(tracks).values([
     { editionId: edition.id, name: "Main Stage", color: "#eab308", sortOrder: 0 },
     { editionId: edition.id, name: "Workshop Room", color: "#047857", sortOrder: 1 },
+    { editionId: edition.id, name: "Sponsor", color: "#f59e0b", sortOrder: 2 },
   ]);
 
   return NextResponse.json({ data: edition }, { status: 201 });
