@@ -24,6 +24,7 @@ import { PortalInviteSection } from "@/components/portal-invite-section";
 import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
+import { agendaTimeLabel } from "@/lib/agenda-time";
 
 type Speaker = {
   id: string;
@@ -340,8 +341,8 @@ export function SpeakersClient({
                       <>
                         <Clock className="h-3.5 w-3.5 text-emerald-600" />
                         <span>
-                          {new Date(speakerSession.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
-                          {speakerSession.endTime && ` — ${new Date(speakerSession.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}`}
+                          {agendaTimeLabel(speakerSession.startTime) ?? "--:--"}
+                          {speakerSession.endTime && ` — ${agendaTimeLabel(speakerSession.endTime) ?? "--:--"}`}
                         </span>
                       </>
                     )}

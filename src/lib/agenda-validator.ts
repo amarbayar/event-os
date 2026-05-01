@@ -1,3 +1,5 @@
+import { agendaTimeLabel, minutesSinceMidnight, toAgendaDate } from "@/lib/agenda-time";
+
 export type AgendaIssue = {
   type: "overlap" | "speaker_conflict" | "out_of_bounds" | "gap_violation" | "unconfirmed_speaker";
   severity: "error" | "warning";
@@ -48,22 +50,10 @@ export function getSessionSpeakerIds(session: Pick<SessionForValidation, "speake
   return ids;
 }
 
-function toDate(value: Date | string | null): Date | null {
-  if (value == null) return null;
-  if (value instanceof Date) return value;
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? null : d;
-}
-
 /** Parse "HH:MM" into total minutes since midnight. */
 function parseHHMM(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + (m || 0);
-}
-
-/** Get minutes since midnight for a Date. */
-function minutesSinceMidnight(d: Date): number {
-  return d.getHours() * 60 + d.getMinutes();
 }
 
 /** Check if two time ranges overlap: (a.start < b.end && b.start < a.end) */
@@ -84,8 +74,8 @@ export function validateAgenda(
   const scheduled: ResolvedSession[] = [];
 
   for (const session of sessions) {
-    const start = toDate(session.startTime);
-    const end = toDate(session.endTime);
+    const start = toAgendaDate(session.startTime);
+    const end = toAgendaDate(session.endTime);
     if (start && end) {
       scheduled.push({ ...session, start, end });
     }
@@ -167,7 +157,7 @@ export function validateAgenda(
         type: "out_of_bounds",
         severity: "warning",
         sessionIds: [s.id],
-        message: `"${s.title}" starts at ${s.start.toTimeString().slice(0, 5)}, before event start time ${config.startTime}`,
+        message: `"${s.title}" starts at ${agendaTimeLabel(s.start) ?? "--:--"}, before event start time ${config.startTime}`,
       });
     }
     if (sessionEndMinutes > dayEndMinutes) {
@@ -175,7 +165,7 @@ export function validateAgenda(
         type: "out_of_bounds",
         severity: "warning",
         sessionIds: [s.id],
-        message: `"${s.title}" ends at ${s.end.toTimeString().slice(0, 5)}, after event end time ${config.endTime}`,
+        message: `"${s.title}" ends at ${agendaTimeLabel(s.end) ?? "--:--"}, after event end time ${config.endTime}`,
       });
     }
   }

@@ -5,6 +5,7 @@ import { ilikeFn as ilike } from "@/db/dialect";
 import { AgentIntent, DispatchResult, DrizzleTable, col } from "./types";
 import { AgentContext } from "./dispatcher";
 import { validateAgenda } from "@/lib/agenda-validator";
+import { toAgendaDate } from "@/lib/agenda-time";
 
 // ─── Manage Handler ──────────────────────────────────
 //
@@ -147,15 +148,17 @@ function coerceDateFields(values: Record<string, unknown>): void {
   for (const field of DATE_FIELDS) {
     if (field in values && typeof values[field] === "string") {
       const raw = values[field] as string;
-      let parsed = new Date(raw);
+      let parsed = field === "startTime" || field === "endTime"
+        ? toAgendaDate(raw)
+        : new Date(raw);
 
       // Handle partial dates like "04/01" (no year) → assume current year
-      if (isNaN(parsed.getTime()) || raw.match(/^\d{1,2}\/\d{1,2}$/)) {
+      if (!parsed || isNaN(parsed.getTime()) || raw.match(/^\d{1,2}\/\d{1,2}$/)) {
         const year = new Date().getFullYear();
         parsed = new Date(`${year}-${raw.replace("/", "-")}`);
       }
 
-      if (!isNaN(parsed.getTime())) {
+      if (parsed && !isNaN(parsed.getTime())) {
         values[field] = parsed;
       } else {
         // Can't parse — remove rather than crash

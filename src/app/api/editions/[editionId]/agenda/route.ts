@@ -4,6 +4,7 @@ import { sessions, eventEditions, speakerApplications } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { validateAgenda } from "@/lib/agenda-validator";
+import { toAgendaDate } from "@/lib/agenda-time";
 
 // Public endpoint — no auth required
 export async function GET(
@@ -123,8 +124,8 @@ export async function POST(
       speakerId: speakerId || null,
       panelSpeakerIds: panelSpeakerIds || null,
       hostId: hostId || null,
-      startTime: startTime ? new Date(startTime) : null,
-      endTime: endTime ? new Date(endTime) : null,
+      startTime: startTime ? toAgendaDate(String(startTime)) : null,
+      endTime: endTime ? toAgendaDate(String(endTime)) : null,
       day: day ?? 1,
       durationMinutes: durationMinutes ?? 30,
       room: room || null,

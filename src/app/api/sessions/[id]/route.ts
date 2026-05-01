@@ -5,6 +5,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { checkVersion } from "@/lib/api-utils";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { validateAgenda } from "@/lib/agenda-validator";
+import { toAgendaDate } from "@/lib/agenda-time";
 
 export async function PATCH(
   req: NextRequest,
@@ -43,7 +44,7 @@ export async function PATCH(
   for (const field of allowedFields) {
     if (body[field] !== undefined) {
       if (field === "startTime" || field === "endTime") {
-        updates[field] = body[field] ? new Date(body[field]) : null;
+        updates[field] = body[field] ? toAgendaDate(String(body[field])) : null;
       } else {
         updates[field] = body[field];
       }

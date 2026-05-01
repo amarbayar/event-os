@@ -37,6 +37,15 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { EntityDrawer } from "@/components/entity-drawer";
 import { cn } from "@/lib/utils";
 import { validateRequired, getApiError } from "@/lib/validation";
+import {
+  agendaTimeLabel,
+  agendaTimestamp,
+  agendaTimestampFromMinutes,
+  formatHHMM,
+  minutesSinceMidnight,
+  parseHHMM,
+  toAgendaDate,
+} from "@/lib/agenda-time";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -171,28 +180,6 @@ const typeIcons: Partial<Record<SessionType, React.ReactNode>> = {
 };
 
 // ─── Helpers ────────────────────────────────────────────
-
-function parseHHMM(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + (m || 0);
-}
-
-function formatHHMM(totalMinutes: number): string {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-function toDate(value: string | Date | null): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function minutesSinceMidnight(d: Date): number {
-  return d.getHours() * 60 + d.getMinutes();
-}
 
 function generateTimeSlots(startTime: string, endTime: string): string[] {
   const start = parseHHMM(startTime);
@@ -355,7 +342,7 @@ export function AgendaClient({
   // ── Get the position and height for a session in the grid ──
   const getSessionPosition = useCallback(
     (session: Session) => {
-      const start = toDate(session.startTime);
+      const start = toAgendaDate(session.startTime);
       if (!start) return null;
       const startMin = minutesSinceMidnight(start);
       const topOffset = ((startMin - gridStartMinutes) / 15) * SLOT_HEIGHT;
@@ -402,8 +389,7 @@ export function AgendaClient({
     setFormPanelSpeakerIds(session.panelSpeakerIds || []);
     setFormHostId(session.hostId || "");
     setFormDay(session.day);
-    const start = toDate(session.startTime);
-    setFormStartTime(start ? formatHHMM(minutesSinceMidnight(start)) : "09:00");
+    setFormStartTime(agendaTimeLabel(session.startTime) ?? "09:00");
     setFormDuration(session.durationMinutes);
     setFormRoom(session.room || "");
     setFormDescription(session.description || "");
@@ -427,10 +413,8 @@ export function AgendaClient({
     setFormErrors({});
     setSaving(true);
 
-    // Build ISO timestamps: use a reference date for the time
-    const refDate = "2026-01-01";
-    const startISO = `${refDate}T${formStartTime}:00`;
-    const endISO = `${refDate}T${computedEndTime}:00`;
+    const startISO = agendaTimestamp(formStartTime);
+    const endISO = agendaTimestamp(computedEndTime);
 
     const payload: Record<string, unknown> = {
       title: formTitle,
@@ -586,9 +570,8 @@ export function AgendaClient({
 
       const newStartMinutes = gridStartMinutes + slotIndex * 15;
       const newEndMinutes = newStartMinutes + session.durationMinutes;
-      const refDate = "2026-01-01";
-      const newStartISO = `${refDate}T${formatHHMM(newStartMinutes)}:00`;
-      const newEndISO = `${refDate}T${formatHHMM(newEndMinutes)}:00`;
+      const newStartISO = agendaTimestampFromMinutes(newStartMinutes);
+      const newEndISO = agendaTimestampFromMinutes(newEndMinutes);
 
       const res = await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
@@ -1216,14 +1199,8 @@ export function AgendaClient({
                     session.speaker && session.speaker.stage !== "confirmed";
                   const isDragging = dragSessionId === session.id;
 
-                  const startDate = toDate(session.startTime);
-                  const endDate = toDate(session.endTime);
-                  const startStr = startDate
-                    ? formatHHMM(minutesSinceMidnight(startDate))
-                    : "--:--";
-                  const endStr = endDate
-                    ? formatHHMM(minutesSinceMidnight(endDate))
-                    : "--:--";
+                  const startStr = agendaTimeLabel(session.startTime) ?? "--:--";
+                  const endStr = agendaTimeLabel(session.endTime) ?? "--:--";
 
                   return (
                     <div
