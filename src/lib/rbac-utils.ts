@@ -15,6 +15,7 @@ const ORGANIZER_MANAGED_ENTITIES = new Set([
   "volunteer",
   "media",
   "attendee",
+  "ticket",
   "campaign",
 ]);
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { Html5Qrcode } from "html5-qrcode";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,27 +38,61 @@ type CheckInStats = {
 type Attendee = {
   id: string;
   name: string;
+  email: string;
   ticketType: string;
+  qrHash: string;
   checkedIn: boolean;
-  checkedInAt: Date | null;
+  checkedInAt: Date | string | null;
 };
 
-export function CheckInClient({ initialStats, initialAttendees }: { initialStats: CheckInStats; initialAttendees: Attendee[] }) {
+export function CheckInClient({
+  editionId,
+  initialStats,
+  initialAttendees,
+}: {
+  editionId: string | null;
+  initialStats: CheckInStats;
+  initialAttendees: Attendee[];
+}) {
   const [mode, setMode] = useState<CheckInMode>("dashboard");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isOnline, setIsOnline] = useState(true);
   const [stats, setStats] = useState(initialStats);
+  const [attendeeList, setAttendeeList] = useState(initialAttendees);
+  const [scannerError, setScannerError] = useState<string | null>(null);
+  const scanLockedRef = useRef(false);
+  const clearResultRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stationId = useCallback(() => {
+    const storageKey = "devsummit-checkin-station-id";
+    const existing = window.localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const next =
+      globalThis.crypto?.randomUUID?.() || `station-${Date.now().toString(36)}`;
+    window.localStorage.setItem(storageKey, next);
+    return next;
+  }, []);
+
+  const clearScanResultLater = useCallback(() => {
+    if (clearResultRef.current) clearTimeout(clearResultRef.current);
+    clearResultRef.current = setTimeout(() => setScanResult(null), 3500);
+  }, []);
 
   // 5-second polling for stats
   useEffect(() => {
     if (mode !== "dashboard") return;
     const interval = setInterval(() => {
-      // In production: fetch("/api/check-in/stats?editionId=...")
-      setStats((prev) => ({ ...prev })); // re-render
+      if (!editionId) return;
+      fetch(`/api/check-in/stats?editionId=${encodeURIComponent(editionId)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json) => {
+          if (json?.data) setStats(json.data as CheckInStats);
+        })
+        .catch(() => undefined);
     }, 5000);
     return () => clearInterval(interval);
-  }, [mode]);
+  }, [editionId, mode]);
 
   // Online/offline detection
   useEffect(() => {
@@ -71,29 +106,152 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
     };
   }, []);
 
-  const handleScan = useCallback((qrData: string) => {
-    void qrData;
-    // Simulate scan result
-    const isKnown = Math.random() > 0.2;
-    if (!isKnown) {
-      setScanResult({
-        status: "not_found",
-        message: "Attendee not found. Try searching by name.",
-      });
-    } else {
-      setScanResult({
-        status: "success",
-        attendee: { name: "Oyungerel B.", ticketType: "VIP / Speaker" },
-        message: "Checked in successfully!",
-      });
-    }
-    // Clear result after 3 seconds
-    setTimeout(() => setScanResult(null), 3000);
+  useEffect(() => {
+    return () => {
+      if (clearResultRef.current) clearTimeout(clearResultRef.current);
+    };
   }, []);
 
-  const filteredAttendees = initialAttendees.filter((a) =>
-    a.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    if (mode === "scanner" || !clearResultRef.current) return;
+    clearTimeout(clearResultRef.current);
+    clearResultRef.current = null;
+  }, [mode]);
+
+  const handleScan = useCallback(async (qrData: string) => {
+    if (scanLockedRef.current) return;
+    scanLockedRef.current = true;
+
+    if (!editionId) {
+      setScanResult({
+        status: "error",
+        message: "No active event edition is selected.",
+      });
+      clearScanResultLater();
+      scanLockedRef.current = false;
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/check-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          editionId,
+          qrHash: qrData.trim(),
+          stationId: stationId(),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (res.status === 404) {
+        setScanResult({
+          status: "not_found",
+          message: "Ticket not found. Search by name or email.",
+        });
+        clearScanResultLater();
+        return;
+      }
+
+      if (!res.ok) {
+        setScanResult({
+          status: "error",
+          message: json?.error || "Check-in failed. Try again.",
+        });
+        clearScanResultLater();
+        return;
+      }
+
+      const attendee = json.data as Attendee;
+      const already = Boolean(json.warning);
+      setAttendeeList((current) =>
+        current.map((item) => (item.id === attendee.id ? { ...item, ...attendee } : item)),
+      );
+      if (!already) {
+        setStats((current) => {
+          const checkedIn = Math.min(current.checkedIn + 1, current.total);
+          const remaining = Math.max(current.total - checkedIn, 0);
+          return {
+            ...current,
+            checkedIn,
+            remaining,
+            percentage: current.total > 0 ? Math.round((checkedIn / current.total) * 100) : 0,
+          };
+        });
+      }
+      setScanResult({
+        status: already ? "already" : "success",
+        attendee: {
+          name: attendee.name,
+          ticketType: attendee.ticketType,
+          checkedInAt: attendee.checkedInAt ? String(attendee.checkedInAt) : undefined,
+        },
+        message: already ? "Already checked in" : "Checked in successfully",
+      });
+      clearScanResultLater();
+    } catch {
+      setScanResult({
+        status: "error",
+        message: "Network error. Try manual lookup if the connection is unstable.",
+      });
+      clearScanResultLater();
+    } finally {
+      setTimeout(() => {
+        scanLockedRef.current = false;
+      }, 1200);
+    }
+  }, [clearScanResultLater, editionId, stationId]);
+
+  useEffect(() => {
+    if (mode !== "scanner") return;
+    let scanner: Html5Qrcode | null = null;
+    let disposed = false;
+
+    void import("html5-qrcode")
+      .then(({ Html5Qrcode }) => {
+        if (disposed) return;
+        scanner = new Html5Qrcode("check-in-qr-reader");
+        return scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 260, height: 260 } },
+          (decodedText: string) => {
+            void handleScan(decodedText);
+          },
+          undefined,
+        );
+      })
+      .then(() => {
+        if (!disposed) setScannerError(null);
+      })
+      .catch(() => {
+        if (!disposed) {
+          setScannerError("Camera unavailable. Search by name or use manual check-in.");
+        }
+      });
+
+    return () => {
+      disposed = true;
+      if (scanner) {
+        void scanner.stop().catch(() => undefined).finally(() => {
+          void scanner?.clear();
+        });
+      }
+    };
+  }, [handleScan, mode]);
+
+  const filteredAttendees = attendeeList.filter((a) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      a.name.toLowerCase().includes(query) ||
+      a.email.toLowerCase().includes(query) ||
+      a.ticketType.toLowerCase().includes(query)
+    );
+  });
+
+  const manualCheckIn = useCallback((attendee: Attendee) => {
+    if (!attendee.qrHash || attendee.checkedIn) return;
+    void handleScan(attendee.qrHash);
+  }, [handleScan]);
 
   // Scanner Mode
   if (mode === "scanner") {
@@ -133,8 +291,13 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
 
         {/* Camera area — larger */}
         <div className="flex-1 flex items-center justify-center relative">
-          <div className="w-[90vw] max-w-lg aspect-square border-2 border-dashed border-stone-600 rounded-2xl flex items-center justify-center">
-            <p className="text-stone-500 text-sm">Point camera at QR code</p>
+          <div className="w-[90vw] max-w-lg aspect-square border-2 border-dashed border-stone-600 rounded-2xl flex items-center justify-center overflow-hidden">
+            <div id="check-in-qr-reader" className="h-full w-full" />
+            {scannerError && (
+              <p className="absolute max-w-xs text-center text-sm text-stone-400">
+                {scannerError}
+              </p>
+            )}
             <div className="absolute inset-[15%] border-2 border-yellow-500/40 rounded-lg" />
           </div>
 
@@ -169,25 +332,20 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
           )}
         </div>
 
-        {/* Bottom bar — search + simulate */}
+        {/* Bottom bar — search fallback */}
         <div className="bg-stone-950 border-t border-stone-800 p-3 space-y-2">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-500" />
-            <Input
-              placeholder="Search by name if QR fails..."
+              <Input
+              placeholder="Search attendees by name, email, or ticket type..."
               className="pl-9 bg-stone-800 border-stone-700 text-white placeholder:text-stone-500"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button
-            className="w-full"
-            variant="outline"
-            size="sm"
-            onClick={() => handleScan("test-qr-hash")}
-          >
-            <ScanLine className="mr-2 h-4 w-4" /> Simulate Scan (Demo)
-          </Button>
+          <p className="text-center text-xs text-stone-500">
+            Camera scanner is live. Use dashboard search for manual fallback.
+          </p>
         </div>
       </div>
     );
@@ -246,7 +404,7 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
       <div className="relative mb-4">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search attendees by name..."
+          placeholder="Search attendees by name, email, or ticket type..."
           className="pl-9"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -261,12 +419,17 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
             className="flex items-center justify-between rounded-md border px-4 py-3 hover:bg-accent/50 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium">{attendee.name}</span>
-              <Badge variant="outline" className="text-[10px]">
-                {attendee.ticketType}
-              </Badge>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{attendee.name}</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {attendee.ticketType}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">{attendee.email}</p>
+              </div>
             </div>
-            <div>
+            <div className="flex items-center gap-2">
               {attendee.checkedIn ? (
                 <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">
                   <CheckCircle2 className="mr-1 h-3 w-3" />
@@ -278,6 +441,15 @@ export function CheckInClient({ initialStats, initialAttendees }: { initialStats
                 <span className="text-xs text-muted-foreground">
                   Not checked in
                 </span>
+              )}
+              {!attendee.checkedIn && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => manualCheckIn(attendee)}
+                >
+                  Manual check-in
+                </Button>
               )}
             </div>
           </div>

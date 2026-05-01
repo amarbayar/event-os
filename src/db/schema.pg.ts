@@ -63,6 +63,15 @@ export const paymentProviderEnum = pgEnum("payment_provider", [
   "stripe",
   "qpay",
   "bank",
+  "bonum",
+]);
+
+export const ticketOrderStatusEnum = pgEnum("ticket_order_status", [
+  "pending",
+  "paid",
+  "failed",
+  "cancelled",
+  "expired",
 ]);
 
 // ─── Organizations ───────────────────────────────────────
@@ -292,6 +301,13 @@ export const attendees = pgTable(
     contactId: uuid("contact_id").references(() => contacts.id, {
       onDelete: "set null",
     }),
+    ticketOrderId: uuid("ticket_order_id").references(() => ticketOrders.id, {
+      onDelete: "set null",
+    }),
+    ticketOrderItemId: uuid("ticket_order_item_id").references(
+      () => ticketOrderItems.id,
+      { onDelete: "set null" },
+    ),
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     ticketType: varchar("ticket_type", { length: 100 })
@@ -313,6 +329,121 @@ export const attendees = pgTable(
   (table) => [
     index("attendee_edition_qr_idx").on(table.editionId, table.qrHash),
     index("attendee_org_idx").on(table.organizationId),
+  ],
+);
+
+// ─── Ticketing ───────────────────────────────────────────
+
+export const ticketTypes = pgTable(
+  "ticket_types",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => eventEditions.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 100 }).notNull(),
+    description: text("description"),
+    price: integer("price").notNull(),
+    currency: varchar("currency", { length: 3 }).default("MNT").notNull(),
+    capacity: integer("capacity"),
+    soldCount: integer("sold_count").default(0).notNull(),
+    reservedCount: integer("reserved_count").default(0).notNull(),
+    maxPerOrder: integer("max_per_order").default(10).notNull(),
+    saleStartsAt: timestamp("sale_starts_at"),
+    saleEndsAt: timestamp("sale_ends_at"),
+    active: boolean("active").default(true).notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("ticket_type_edition_idx").on(table.editionId),
+    uniqueIndex("ticket_type_edition_slug_idx").on(
+      table.editionId,
+      table.slug,
+    ),
+  ],
+);
+
+export const ticketOrders = pgTable(
+  "ticket_orders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => eventEditions.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    purchaserName: varchar("purchaser_name", { length: 255 }).notNull(),
+    purchaserEmail: varchar("purchaser_email", { length: 255 }).notNull(),
+    purchaserPhone: varchar("purchaser_phone", { length: 50 }),
+    purchaserCompany: varchar("purchaser_company", { length: 255 }),
+    status: ticketOrderStatusEnum("status").default("pending").notNull(),
+    totalAmount: integer("total_amount").notNull(),
+    currency: varchar("currency", { length: 3 }).default("MNT").notNull(),
+    provider: paymentProviderEnum("provider").notNull(),
+    providerInvoiceId: varchar("provider_invoice_id", { length: 255 }),
+    providerTransactionId: varchar("provider_transaction_id", {
+      length: 100,
+    }).notNull(),
+    checkoutUrl: text("checkout_url"),
+    quantity: integer("quantity").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 255 }),
+    customerAccessTokenHash: varchar("customer_access_token_hash", {
+      length: 64,
+    }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    expiresAt: timestamp("expires_at"),
+    paidAt: timestamp("paid_at"),
+    fulfilledAt: timestamp("fulfilled_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("ticket_order_edition_idx").on(table.editionId),
+    index("ticket_order_org_status_idx").on(table.organizationId, table.status),
+    uniqueIndex("ticket_order_provider_invoice_idx").on(
+      table.provider,
+      table.providerInvoiceId,
+    ),
+    uniqueIndex("ticket_order_provider_transaction_idx").on(
+      table.provider,
+      table.providerTransactionId,
+    ),
+    uniqueIndex("ticket_order_idempotency_idx").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
+  ],
+);
+
+export const ticketOrderItems = pgTable(
+  "ticket_order_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => ticketOrders.id, { onDelete: "cascade" }),
+    ticketTypeId: uuid("ticket_type_id")
+      .notNull()
+      .references(() => ticketTypes.id, { onDelete: "restrict" }),
+    ticketTypeName: varchar("ticket_type_name", { length: 255 }).notNull(),
+    ticketTypeSlug: varchar("ticket_type_slug", { length: 100 }).notNull(),
+    unitAmount: integer("unit_amount").notNull(),
+    totalAmount: integer("total_amount").notNull(),
+    currency: varchar("currency", { length: 3 }).default("MNT").notNull(),
+    quantity: integer("quantity").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("ticket_order_item_order_idx").on(table.orderId),
+    index("ticket_order_item_type_idx").on(table.ticketTypeId),
   ],
 );
 

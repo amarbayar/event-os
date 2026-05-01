@@ -24,6 +24,7 @@ import {
   Bell,
   Mail,
   ArrowLeft,
+  Ticket,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -59,6 +60,7 @@ const navGroups: NavGroup[] = [
   {
     key: "attendees", labelKey: "attendees",
     items: [
+      { href: "/tickets", labelKey: "tickets", icon: Ticket },
       { href: "/attendees", labelKey: "registration", icon: Users },
       { href: "/invitations", labelKey: "invitations", icon: Mail },
       { href: "/check-in", labelKey: "checkIn", icon: ScanLine },

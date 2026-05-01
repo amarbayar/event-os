@@ -243,6 +243,13 @@ export const attendees = sqliteTable(
     contactId: uuidCol("contact_id").references(() => contacts.id, {
       onDelete: "set null",
     }),
+    ticketOrderId: uuidCol("ticket_order_id").references(() => ticketOrders.id, {
+      onDelete: "set null",
+    }),
+    ticketOrderItemId: uuidCol("ticket_order_item_id").references(
+      () => ticketOrderItems.id,
+      { onDelete: "set null" },
+    ),
     name: text("name").notNull(),
     email: text("email").notNull(),
     ticketType: text("ticket_type").default("general").notNull(),
@@ -262,6 +269,117 @@ export const attendees = sqliteTable(
   (table) => [
     index("attendee_edition_qr_idx").on(table.editionId, table.qrHash),
     index("attendee_org_idx").on(table.organizationId),
+  ],
+);
+
+// ─── Ticketing ───────────────────────────────────────────
+
+export const ticketTypes = sqliteTable(
+  "ticket_types",
+  {
+    id: uuidPk(),
+    editionId: uuidCol("edition_id")
+      .notNull()
+      .references(() => eventEditions.id, { onDelete: "cascade" }),
+    organizationId: uuidCol("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description"),
+    price: integer("price").notNull(),
+    currency: text("currency").default("MNT").notNull(),
+    capacity: integer("capacity"),
+    soldCount: integer("sold_count").default(0).notNull(),
+    reservedCount: integer("reserved_count").default(0).notNull(),
+    maxPerOrder: integer("max_per_order").default(10).notNull(),
+    saleStartsAt: ts("sale_starts_at"),
+    saleEndsAt: ts("sale_ends_at"),
+    active: bool("active").default(true).notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    metadata: json("metadata").$type<Record<string, unknown>>(),
+    createdAt: tsNow("created_at"),
+    updatedAt: tsNow("updated_at"),
+  },
+  (table) => [
+    index("ticket_type_edition_idx").on(table.editionId),
+    uniqueIndex("ticket_type_edition_slug_idx").on(
+      table.editionId,
+      table.slug,
+    ),
+  ],
+);
+
+export const ticketOrders = sqliteTable(
+  "ticket_orders",
+  {
+    id: uuidPk(),
+    editionId: uuidCol("edition_id")
+      .notNull()
+      .references(() => eventEditions.id, { onDelete: "cascade" }),
+    organizationId: uuidCol("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    purchaserName: text("purchaser_name").notNull(),
+    purchaserEmail: text("purchaser_email").notNull(),
+    purchaserPhone: text("purchaser_phone"),
+    purchaserCompany: text("purchaser_company"),
+    status: text("status").default("pending").notNull(),
+    totalAmount: integer("total_amount").notNull(),
+    currency: text("currency").default("MNT").notNull(),
+    provider: text("provider").notNull(),
+    providerInvoiceId: text("provider_invoice_id"),
+    providerTransactionId: text("provider_transaction_id").notNull(),
+    checkoutUrl: text("checkout_url"),
+    quantity: integer("quantity").notNull(),
+    idempotencyKey: text("idempotency_key"),
+    customerAccessTokenHash: text("customer_access_token_hash"),
+    metadata: json("metadata").$type<Record<string, unknown>>(),
+    expiresAt: ts("expires_at"),
+    paidAt: ts("paid_at"),
+    fulfilledAt: ts("fulfilled_at"),
+    createdAt: tsNow("created_at"),
+    updatedAt: tsNow("updated_at"),
+  },
+  (table) => [
+    index("ticket_order_edition_idx").on(table.editionId),
+    index("ticket_order_org_status_idx").on(table.organizationId, table.status),
+    uniqueIndex("ticket_order_provider_invoice_idx").on(
+      table.provider,
+      table.providerInvoiceId,
+    ),
+    uniqueIndex("ticket_order_provider_transaction_idx").on(
+      table.provider,
+      table.providerTransactionId,
+    ),
+    uniqueIndex("ticket_order_idempotency_idx").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
+  ],
+);
+
+export const ticketOrderItems = sqliteTable(
+  "ticket_order_items",
+  {
+    id: uuidPk(),
+    orderId: uuidCol("order_id")
+      .notNull()
+      .references(() => ticketOrders.id, { onDelete: "cascade" }),
+    ticketTypeId: uuidCol("ticket_type_id")
+      .notNull()
+      .references(() => ticketTypes.id, { onDelete: "restrict" }),
+    ticketTypeName: text("ticket_type_name").notNull(),
+    ticketTypeSlug: text("ticket_type_slug").notNull(),
+    unitAmount: integer("unit_amount").notNull(),
+    totalAmount: integer("total_amount").notNull(),
+    currency: text("currency").default("MNT").notNull(),
+    quantity: integer("quantity").notNull(),
+    createdAt: tsNow("created_at"),
+  },
+  (table) => [
+    index("ticket_order_item_order_idx").on(table.orderId),
+    index("ticket_order_item_type_idx").on(table.ticketTypeId),
   ],
 );
 

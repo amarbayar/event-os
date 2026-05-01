@@ -20,6 +20,7 @@ export const editionStatusEnum = pg.editionStatusEnum;
 export const agendaStatusEnum = pg.agendaStatusEnum;
 export const queueStatusEnum = pg.queueStatusEnum;
 export const jobStatusEnum = pg.jobStatusEnum;
+export const ticketOrderStatusEnum = pg.ticketOrderStatusEnum;
 
 // ─── Tables ─────────────────────────────────────────────────
 export const organizations = s.organizations as typeof pg.organizations;
@@ -30,6 +31,9 @@ export const speakerApplications = s.speakerApplications as typeof pg.speakerApp
 export const sessions = s.sessions as typeof pg.sessions;
 export const sponsorApplications = s.sponsorApplications as typeof pg.sponsorApplications;
 export const attendees = s.attendees as typeof pg.attendees;
+export const ticketTypes = s.ticketTypes as typeof pg.ticketTypes;
+export const ticketOrders = s.ticketOrders as typeof pg.ticketOrders;
+export const ticketOrderItems = s.ticketOrderItems as typeof pg.ticketOrderItems;
 export const eventQueue = s.eventQueue as typeof pg.eventQueue;
 export const venues = s.venues as typeof pg.venues;
 export const outreach = s.outreach as typeof pg.outreach;

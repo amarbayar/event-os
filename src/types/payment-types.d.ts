@@ -7,6 +7,6 @@ export const PAYMENT_STATUS = [
 
 export type PaymentStatus = (typeof PAYMENT_STATUS)[number];
 
-export const PAYMENT_PROVIDER = ["stripe", "qpay", "bank"] as const;
+export const PAYMENT_PROVIDER = ["stripe", "qpay", "bank", "bonum"] as const;
 
 export type PaymentProvider = (typeof PAYMENT_PROVIDER)[number];

@@ -4,18 +4,50 @@ import { attendees } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 
+function isValidQrHash(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length >= 6 &&
+    value.length <= 128 &&
+    /^[A-Za-z0-9_-]+$/.test(value)
+  );
+}
+
+function isValidStationId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 80 &&
+    /^[A-Za-z0-9_.:-]+$/.test(value)
+  );
+}
+
 export async function POST(req: NextRequest) {
   const ctx = await requirePermission(req, "attendee", "update");
   if (isRbacError(ctx)) return ctx;
+  if (ctx.user.role === "stakeholder") {
+    return NextResponse.json(
+      { error: "Forbidden", message: "Stakeholder accounts cannot perform check-in scans." },
+      { status: 403 }
+    );
+  }
 
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const { editionId, qrHash, stationId } = body;
 
-  if (!editionId || !qrHash) {
+  if (typeof editionId !== "string" || !isValidQrHash(qrHash)) {
     return NextResponse.json(
-      { error: "editionId and qrHash are required" },
+      { error: "editionId and a valid qrHash are required" },
       { status: 400 }
     );
+  }
+  if (stationId !== undefined && !isValidStationId(stationId)) {
+    return NextResponse.json({ error: "stationId is invalid" }, { status: 400 });
   }
 
   const attendee = await db.query.attendees.findFirst({
@@ -76,6 +108,12 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const ctx = await requirePermission(req, "attendee", "update");
   if (isRbacError(ctx)) return ctx;
+  if (ctx.user.role === "stakeholder") {
+    return NextResponse.json(
+      { error: "Forbidden", message: "Stakeholder accounts cannot perform check-in scans." },
+      { status: 403 }
+    );
+  }
 
   const body = await req.json();
   const { editionId, checkIns } = body as {

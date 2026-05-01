@@ -10,6 +10,8 @@ const publicPaths = [
   "/change-password",
   "/api/auth",
   "/api/onboarding",
+  "/api/public",
+  "/api/payments/bonum/webhook",
   "/api/payments/stripe/webhook",
   "/apply",
   "/agenda",
