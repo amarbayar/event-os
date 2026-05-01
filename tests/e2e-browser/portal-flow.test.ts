@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
 const BASE_URL = "http://localhost:3100";
 const SERVICE_TOKEN = "test-token";
@@ -10,40 +10,70 @@ const TINY_PNG = Buffer.from(
   "base64"
 );
 
-function getSeedSpeaker() {
+function getSeedOrg() {
   const db = new Database(SQLITE_PATH, { readonly: true });
   try {
     const row = db
       .prepare(
         `
           select
-            o.id as orgId,
-            s.id as speakerId,
-            s.email as email,
-            s.stage as stage
-          from speaker_applications s
-          join organizations o on o.id = s.organization_id
-          order by s.created_at asc
+            id as orgId
+          from organizations
+          order by created_at asc
           limit 1
         `
       )
       .get() as
       | {
           orgId: string;
-          speakerId: string;
-          email: string;
-          stage: string | null;
         }
       | undefined;
 
     if (!row) {
-      throw new Error("No seeded speaker available for portal e2e test");
+      throw new Error("No seeded organization available for portal e2e test");
     }
 
     return row;
   } finally {
     db.close();
   }
+}
+
+async function createConfirmedSpeaker(
+  request: APIRequestContext,
+  orgId: string,
+  email: string
+) {
+  const created = await apiCall(orgId, "/api/speakers", {
+    method: "POST",
+    body: {
+      name: "Portal E2E Speaker",
+      email,
+      company: "Portal Test Co",
+      title: "Test Speaker",
+      talkTitle: "Portal E2E Talk",
+      talkAbstract: "Created by the browser portal flow test.",
+      source: "intake",
+    },
+  });
+  expect(created.status).toBe(201);
+
+  const speakerId = created.json.data.id as string;
+  const confirmed = await apiCall(orgId, `/api/speakers/${speakerId}`, {
+    method: "PATCH",
+    body: { status: "accepted", stage: "confirmed" },
+  });
+  expect(confirmed.status).toBe(200);
+
+  // Compile this route before credentials login redirects there. Next dev can
+  // otherwise race the first browser navigation in CI.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const res = await request.get(`${BASE_URL}/change-password?callbackUrl=%2Fportal`);
+    if (res.ok()) break;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  return { speakerId, email };
 }
 
 function getHeadshotData(speakerId: string) {
@@ -127,20 +157,18 @@ async function apiCall(
 
 test("speaker portal invite flow forces password change and persists uploaded checklist data", async ({
   page,
-}) => {
-  const seed = getSeedSpeaker();
-
-  if (seed.stage !== "confirmed") {
-    const stageUpdate = await apiCall(seed.orgId, `/api/speakers/${seed.speakerId}`, {
-      method: "PATCH",
-      body: { stage: "confirmed" },
-    });
-    expect(stageUpdate.status).toBe(200);
-  }
+  request,
+}, testInfo) => {
+  const seed = getSeedOrg();
+  const speaker = await createConfirmedSpeaker(
+    request,
+    seed.orgId,
+    `portal-e2e-${testInfo.workerIndex}-${testInfo.retry}-${Date.now()}@example.test`
+  );
 
   const invite = await apiCall(seed.orgId, "/api/portal/invite", {
     method: "POST",
-    body: { entityType: "speaker", entityId: seed.speakerId },
+    body: { entityType: "speaker", entityId: speaker.speakerId, resend: true },
   });
   expect(invite.status).toBe(201);
 
@@ -148,7 +176,7 @@ test("speaker portal invite flow forces password change and persists uploaded ch
   expect(tempPassword).toBeTruthy();
 
   await page.goto("/login?callbackUrl=%2Fportal");
-  await page.getByRole("textbox", { name: /email/i }).fill(seed.email);
+  await page.getByRole("textbox", { name: /email/i }).fill(speaker.email);
   await page.getByRole("textbox", { name: /password/i }).fill(tempPassword);
   await page.getByRole("button", { name: /sign in/i }).click();
 
@@ -160,11 +188,11 @@ test("speaker portal invite flow forces password change and persists uploaded ch
 
   await expect(page).toHaveURL(/\/login\?passwordChanged=1/);
 
-  const authState = getUserAuthState(seed.email);
+  const authState = getUserAuthState(speaker.email);
   expect(authState?.forcePasswordChange).toBe(0);
   expect(authState?.passwordHash).toBeTruthy();
 
-  await page.getByRole("textbox", { name: /email/i }).fill(seed.email);
+  await page.getByRole("textbox", { name: /email/i }).fill(speaker.email);
   await page.getByRole("textbox", { name: /password/i }).fill("speaker1234");
   await page.getByRole("button", { name: /sign in/i }).click();
 
@@ -182,7 +210,7 @@ test("speaker portal invite flow forces password change and persists uploaded ch
     timeout: 10_000,
   });
 
-  const stored = getHeadshotData(seed.speakerId);
+  const stored = getHeadshotData(speaker.speakerId);
   expect(stored?.checklistStatus).toBe("submitted");
   expect(stored?.checklistValue).toMatch(/^\/uploads\/speaker\//);
   expect(stored?.headshotUrl).toBe(stored?.checklistValue);
