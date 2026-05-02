@@ -21,6 +21,7 @@ import { FileUpload } from "@/components/file-upload";
 import { ChecklistPanel } from "@/components/checklist-panel";
 import { AssignedToSelect } from "@/components/assigned-to-select";
 import { PortalInviteSection } from "@/components/portal-invite-section";
+import { UploadedAssetPreview } from "@/components/uploaded-asset-preview";
 import { Mic2, Copy, Check, ExternalLink, Plus, X, Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
@@ -257,6 +258,7 @@ export function SpeakersClient({
                     onChange={(url) => updateField("headshotUrl", url)}
                     folder="headshots"
                     label="Photo"
+                    preview={false}
                   />
                 </div>
                 <div className="flex-1 space-y-2">
@@ -269,6 +271,13 @@ export function SpeakersClient({
                   </div>
                 </div>
               </div>
+              {(drawerForm.headshotUrl as string) && (
+                <UploadedAssetPreview
+                  url={drawerForm.headshotUrl as string}
+                  label="Speaker headshot"
+                  imageClassName="h-56 w-full rounded-md border bg-white object-contain"
+                />
+              )}
 
               {/* Contact info */}
               <div className="space-y-1.5">

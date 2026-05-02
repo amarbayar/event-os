@@ -36,6 +36,8 @@ import {
 import { toast } from "sonner";
 import { useConfirm } from "@/components/confirm-dialog";
 import { EntityDrawer } from "@/components/entity-drawer";
+import { UploadedAssetPreview } from "@/components/uploaded-asset-preview";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { validateRequired, getApiError } from "@/lib/validation";
 import {
@@ -94,6 +96,7 @@ type Speaker = {
   company: string | null;
   stage: string;
   talkTitle: string;
+  headshotUrl: string | null;
 };
 
 type TeamMember = {
@@ -246,6 +249,7 @@ export function AgendaClient({
             company: (s.company as string) || null,
             stage: s.stage as string,
             talkTitle: (s.talkTitle as string) || "TBD",
+            headshotUrl: (s.headshotUrl as string) || null,
           }))
         );
       }
@@ -301,6 +305,11 @@ export function AgendaClient({
     const speaker = speakers.find((s) => s.id === formSpeakerId);
     return speaker ? `${speaker.name}${speaker.company ? ` (${speaker.company})` : ""}` : "Select speaker...";
   }, [formSpeakerId, speakers]);
+
+  const selectedFormSpeaker = useMemo(
+    () => speakers.find((s) => s.id === formSpeakerId) || null,
+    [formSpeakerId, speakers]
+  );
 
   const selectedHostLabel = useMemo(() => {
     if (!formHostId) return "None";
@@ -687,6 +696,22 @@ export function AgendaClient({
               ))}
             </SelectContent>
           </Select>
+          {selectedFormSpeaker?.headshotUrl && (
+            <div className="mt-2 space-y-2 rounded-md border bg-stone-50 p-2">
+              <UploadedAssetPreview
+                url={selectedFormSpeaker.headshotUrl}
+                label={`${selectedFormSpeaker.name} headshot`}
+                compact
+                imageClassName="speaker-headshot-large h-24 w-24 rounded-md border bg-white object-cover"
+              />
+              <Link
+                href={`/events/${eventSlug}/speakers?speakerId=${selectedFormSpeaker.id}`}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-7 text-xs")}
+              >
+                Open speaker sheet
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

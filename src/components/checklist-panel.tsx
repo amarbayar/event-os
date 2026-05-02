@@ -16,6 +16,7 @@ import {
   Check,
   Clock,
 } from "lucide-react";
+import { UploadedAssetPreview } from "@/components/uploaded-asset-preview";
 
 // ─── Inline item actions (no system alerts) ─────────────
 
@@ -292,7 +293,17 @@ export function ChecklistPanel({
                   <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
                 )}
                 {item.value && (
-                  <p className="text-xs text-sky-600 mt-1 truncate">{item.value}</p>
+                  item.itemType === "file_upload" ? (
+                    <div className="mt-2">
+                      <UploadedAssetPreview
+                        url={item.value}
+                        label={item.name}
+                        compact
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-sky-600 mt-1 truncate">{item.value}</p>
+                  )
                 )}
                 {item.notes && item.status === "needs_revision" && (
                   <p className="text-xs text-orange-600 mt-1">{t("feedback", { notes: item.notes })}</p>
