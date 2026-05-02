@@ -10,6 +10,9 @@ vi.mock("@/lib/ticketing", () => ({
 
 describe("Bonum browser return", () => {
   beforeEach(() => {
+    delete process.env.BONUM_RETURN_URL;
+    delete process.env.PUBLIC_TICKET_RETURN_URL;
+    delete process.env.NEXT_PUBLIC_TICKET_RETURN_URL;
     syncBonumTicketOrderFromProviderMock.mockReset();
   });
 
@@ -21,6 +24,18 @@ describe("Bonum browser return", () => {
 
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://localhost:5173/tickets?payment=return");
+  });
+
+  it("uses the Bonum-specific return URL when configured", async () => {
+    delete process.env.PUBLIC_TICKET_RETURN_URL;
+    delete process.env.NEXT_PUBLIC_TICKET_RETURN_URL;
+    process.env.BONUM_RETURN_URL = "https://devsummit.dev/tickets";
+    const { GET } = await import("@/app/api/payments/bonum/webhook/route");
+
+    const res = await GET(new Request("http://localhost/api/payments/bonum/webhook"));
+
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("https://devsummit.dev/tickets?payment=return");
   });
 
   it("preserves order context without leaking Bonum transaction id on browser returns", async () => {

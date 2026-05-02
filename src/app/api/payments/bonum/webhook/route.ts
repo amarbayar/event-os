@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const returnUrl =
+    process.env.BONUM_RETURN_URL ||
     process.env.PUBLIC_TICKET_RETURN_URL ||
     process.env.NEXT_PUBLIC_TICKET_RETURN_URL ||
     "http://localhost:5173/tickets";
