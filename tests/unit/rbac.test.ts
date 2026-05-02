@@ -1,8 +1,16 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { NextRequest } from "next/server";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { testDb } from "../setup";
 import * as schema from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { createTestFixtures, type TestFixtures } from "../fixtures";
+import { isRbacError, requirePermission } from "@/lib/rbac";
+
+const authMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/auth", () => ({
+  auth: authMock,
+}));
 
 // ════════════════════════════════════════════════════════
 // RBAC PERMISSION TESTS
@@ -17,6 +25,10 @@ let fixtures: TestFixtures;
 
 beforeAll(async () => {
   fixtures = await createTestFixtures();
+});
+
+beforeEach(() => {
+  authMock.mockReset();
 });
 
 afterAll(async () => {
@@ -171,5 +183,49 @@ describe("Permission scope checks", () => {
 
   it("Stakeholder has no team scope", async () => {
     expect(await userOwnsEntityType(fixtures.users["TestStakeholder"].id, "speaker")).toBe(false);
+  });
+});
+
+describe("Stakeholder portal confinement", () => {
+  function mockStakeholderSession() {
+    authMock.mockResolvedValue({
+      user: {
+        id: fixtures.users["TestStakeholder"].id,
+        role: "stakeholder",
+        organizationId: fixtures.orgId,
+      },
+    });
+  }
+
+  it("denies stakeholders broad reads to organizer APIs", async () => {
+    mockStakeholderSession();
+
+    const res = await requirePermission(
+      new NextRequest("https://platform.devsummit.dev/api/speakers"),
+      "speaker",
+      "read"
+    );
+
+    expect(isRbacError(res)).toBe(true);
+    if (!isRbacError(res)) throw new Error("Expected RBAC error response");
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({
+      error: "Forbidden",
+      message: "Stakeholder accounts can only access the portal.",
+    });
+  });
+
+  it("allows stakeholder checklist reads and updates for route-level ownership checks", async () => {
+    mockStakeholderSession();
+
+    for (const action of ["read", "update"] as const) {
+      const res = await requirePermission(
+        new NextRequest("https://platform.devsummit.dev/api/checklist-items/checklist-1"),
+        "speaker",
+        action
+      );
+
+      expect(isRbacError(res)).toBe(false);
+    }
   });
 });

@@ -137,15 +137,18 @@ export async function requirePermission(
       return ctx;
     }
 
-    // Stakeholder: can only read/update their own linked entity + checklist items
+    // Stakeholder accounts are portal-only. Checklist item routes do their
+    // own linked-entity ownership checks before returning or mutating data.
     if (effectiveRole === "stakeholder") {
-      if (action === "read") return ctx;
-      if (action === "delete") return forbidden("You don't have permission to delete records.");
-      // Stakeholders can't create new entities
-      if (action === "create" && entityType !== "checklist") {
-        return forbidden("You don't have permission to create records.");
+      const pathname = req.nextUrl.pathname;
+      if (
+        pathname.startsWith("/api/checklist-items") &&
+        (action === "read" || action === "update")
+      ) {
+        return ctx;
       }
-      return ctx; // update allowed — route-level checks verify entity ownership
+
+      return forbidden("Stakeholder accounts can only access the portal.");
     }
 
     // Everyone else can read

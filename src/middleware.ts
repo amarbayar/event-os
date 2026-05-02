@@ -19,6 +19,23 @@ const publicPaths = [
   "/favicon.ico",
 ];
 
+const stakeholderAllowedApiPaths = [
+  "/api/auth",
+  "/api/checklist-items",
+  "/api/portal/me",
+  "/api/portal/update-profile",
+  "/api/upload",
+];
+
+function isStakeholderAllowedPath(pathname: string): boolean {
+  return (
+    pathname === "/portal" ||
+    pathname.startsWith("/portal/") ||
+    pathname === "/change-password" ||
+    stakeholderAllowedApiPaths.some((path) => pathname.startsWith(path))
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -51,8 +68,9 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check forcePasswordChange flag in JWT
+  let token: Awaited<ReturnType<typeof getToken>> | null = null;
   try {
-    const token = await getToken({ req: request });
+    token = await getToken({ req: request });
     if (token?.forcePasswordChange && pathname !== "/change-password") {
       const changePasswordUrl = new URL("/change-password", request.url);
       changePasswordUrl.searchParams.set(
@@ -63,6 +81,17 @@ export async function middleware(request: NextRequest) {
     }
   } catch {
     // JWT decode failed — let the request through, auth() will handle it
+  }
+
+  if (token?.role === "stakeholder" && !isStakeholderAllowedPath(pathname)) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Forbidden", message: "Stakeholder accounts can only access the portal." },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.redirect(new URL("/portal", request.url));
   }
 
   return NextResponse.next();
