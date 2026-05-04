@@ -4,6 +4,7 @@ const mockFindOrder = vi.fn();
 const mockTxFindOrder = vi.fn();
 const mockTxFindItems = vi.fn();
 const getBonumInvoiceStatusMock = vi.fn();
+const postTicketSaleDiscordMessageMock = vi.fn();
 const updateSets: Record<string, unknown>[] = [];
 const txInserts: unknown[] = [];
 const txUpdates: unknown[] = [];
@@ -47,7 +48,7 @@ const dbMock = {
         };
       }),
     };
-    await callback(tx);
+    return callback(tx);
   }),
 };
 
@@ -61,12 +62,18 @@ vi.mock("@/lib/payments/bonum", () => ({
   getBonumInvoiceStatus: (...args: unknown[]) => getBonumInvoiceStatusMock(...args),
 }));
 
+vi.mock("@/lib/ticket-sales-discord", () => ({
+  postTicketSaleDiscordMessage: (...args: unknown[]) =>
+    postTicketSaleDiscordMessageMock(...args),
+}));
+
 describe("Bonum ticket webhook fulfillment", () => {
   beforeEach(() => {
     mockFindOrder.mockReset();
     mockTxFindOrder.mockReset();
     mockTxFindItems.mockReset();
     getBonumInvoiceStatusMock.mockReset();
+    postTicketSaleDiscordMessageMock.mockReset().mockResolvedValue(undefined);
     dbMock.update.mockClear();
     dbMock.transaction.mockClear();
     updateSets.length = 0;
@@ -145,6 +152,7 @@ describe("Bonum ticket webhook fulfillment", () => {
     expect(mockTxFindItems).not.toHaveBeenCalled();
     expect(txInserts).toHaveLength(0);
     expect(txUpdates).toHaveLength(0);
+    expect(postTicketSaleDiscordMessageMock).not.toHaveBeenCalled();
   });
 
   it("reconciles a paid Bonum invoice status into normal fulfillment", async () => {
@@ -181,13 +189,18 @@ describe("Bonum ticket webhook fulfillment", () => {
       organizationId: "org-1",
       purchaserName: "Buyer",
       purchaserEmail: "buyer@example.com",
+      totalAmount: 100_000,
+      currency: "MNT",
     });
     mockTxFindItems.mockResolvedValue([
       {
         id: "item-1",
         ticketTypeId: "ticket-1",
+        ticketTypeName: "Regular",
         ticketTypeSlug: "regular",
         quantity: 1,
+        totalAmount: 100_000,
+        currency: "MNT",
       },
     ]);
 
@@ -201,5 +214,21 @@ describe("Bonum ticket webhook fulfillment", () => {
     expect(result).toEqual({ ok: true, orderId: "order-1" });
     expect(dbMock.transaction).toHaveBeenCalledOnce();
     expect(txInserts).toHaveLength(1);
+    expect(postTicketSaleDiscordMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: "order-1",
+        purchaserName: "Buyer",
+        purchaserEmail: "buyer@example.com",
+        totalAmount: 100_000,
+        currency: "MNT",
+        items: [
+          expect.objectContaining({
+            ticketTypeName: "Regular",
+            quantity: 1,
+            totalAmount: 100_000,
+          }),
+        ],
+      }),
+    );
   });
 });

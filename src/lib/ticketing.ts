@@ -15,6 +15,7 @@ import {
   getBonumTerminalId,
 } from "@/lib/payments/bonum";
 import { resolveEvent } from "@/lib/resolve-event";
+import { postTicketSaleDiscordMessage } from "@/lib/ticket-sales-discord";
 
 const DEFAULT_INVOICE_EXPIRY_SECONDS = 20 * 60;
 
@@ -465,13 +466,13 @@ export async function getPublicTicketOrder(
 }
 
 async function fulfillPaidOrder(orderId: string, paidAt: Date) {
-  await ticketingTransaction(async (tx) => {
+  const fulfilled = await ticketingTransaction(async (tx) => {
     const order = await tx.query.ticketOrders.findFirst({
       where: eq(ticketOrders.id, orderId),
     });
 
-    if (!order || order.fulfilledAt) return;
-    if (order.status !== "pending" && order.status !== "paid") return;
+    if (!order || order.fulfilledAt) return null;
+    if (order.status !== "pending" && order.status !== "paid") return null;
 
     const items = await tx.query.ticketOrderItems.findMany({
       where: eq(ticketOrderItems.orderId, order.id),
@@ -512,7 +513,26 @@ async function fulfillPaidOrder(orderId: string, paidAt: Date) {
         updatedAt: new Date(),
       })
       .where(eq(ticketOrders.id, order.id));
+
+    return { order, items: items as TicketOrderItemRow[] };
   });
+
+  if (fulfilled) {
+    await postTicketSaleDiscordMessage({
+      orderId: fulfilled.order.id,
+      purchaserName: fulfilled.order.purchaserName,
+      purchaserEmail: fulfilled.order.purchaserEmail,
+      totalAmount: fulfilled.order.totalAmount,
+      currency: fulfilled.order.currency,
+      paidAt,
+      items: fulfilled.items.map((item) => ({
+        ticketTypeName: item.ticketTypeName,
+        quantity: item.quantity,
+        totalAmount: item.totalAmount,
+        currency: item.currency,
+      })),
+    });
+  }
 }
 
 async function failPendingOrder(orderId: string, status: "failed" | "expired") {
