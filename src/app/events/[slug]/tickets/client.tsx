@@ -6,10 +6,14 @@ import {
   Banknote,
   CheckCircle2,
   Clock,
+  Pencil,
   Loader2,
   Plus,
   RefreshCcw,
+  Save,
   Ticket,
+  Trash2,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { getApiError } from "@/lib/validation";
 
 type TicketType = {
@@ -35,6 +40,15 @@ type TicketType = {
   reservedCount: number;
   maxPerOrder: number;
   active: boolean;
+};
+
+type TicketEditForm = {
+  name: string;
+  slug: string;
+  description: string;
+  price: string;
+  capacity: string;
+  maxPerOrder: string;
 };
 
 type TicketSalesSummary = {
@@ -97,6 +111,10 @@ export function TicketsClient() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [capacity, setCapacity] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<TicketEditForm | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const currency = summary.currency || ticketTypes[0]?.currency || "MNT";
 
@@ -170,6 +188,119 @@ export function TicketsClient() {
       toast.error(error instanceof Error ? error.message : "Failed to create ticket type");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startEditing = (ticket: TicketType) => {
+    setEditingId(ticket.id);
+    setEditForm({
+      name: ticket.name,
+      slug: ticket.slug,
+      description: ticket.description || "",
+      price: String(ticket.price),
+      capacity: ticket.capacity === null ? "" : String(ticket.capacity),
+      maxPerOrder: String(ticket.maxPerOrder),
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditForm(null);
+  };
+
+  const updateEditField = (field: keyof TicketEditForm, value: string) => {
+    setEditForm((current) => (current ? { ...current, [field]: value } : current));
+  };
+
+  const saveTicketType = async (ticket: TicketType) => {
+    if (!editForm) return;
+    const trimmedName = editForm.name.trim();
+    const trimmedSlug = editForm.slug.trim().toLowerCase();
+    const amount = Number(editForm.price);
+    const capacityValue = editForm.capacity.trim() ? Number(editForm.capacity) : null;
+    const maxPerOrder = Number(editForm.maxPerOrder);
+
+    if (!trimmedName || !trimmedSlug || !/^[a-z0-9-]{1,100}$/.test(trimmedSlug)) {
+      toast.error("Enter a ticket name and a lowercase URL slug");
+      return;
+    }
+    if (!Number.isInteger(amount) || amount < 0) {
+      toast.error("Price must be a whole number");
+      return;
+    }
+    if (capacityValue !== null && (!Number.isInteger(capacityValue) || capacityValue < 0)) {
+      toast.error("Capacity must be a whole number");
+      return;
+    }
+    if (!Number.isInteger(maxPerOrder) || maxPerOrder < 1 || maxPerOrder > 50) {
+      toast.error("Max per order must be between 1 and 50");
+      return;
+    }
+
+    setUpdatingId(ticket.id);
+    try {
+      const res = await fetch(`/api/ticket-types/${ticket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trimmedName,
+          slug: trimmedSlug,
+          description: editForm.description.trim() || null,
+          price: amount,
+          capacity: capacityValue,
+          maxPerOrder,
+        }),
+      });
+      if (!res.ok) throw new Error(await getApiError(res, "Failed to update ticket type"));
+
+      toast.success("Ticket type updated");
+      cancelEditing();
+      await loadTickets();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update ticket type");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const setTicketActive = async (ticket: TicketType, active: boolean) => {
+    setUpdatingId(ticket.id);
+    try {
+      const res = await fetch(`/api/ticket-types/${ticket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active }),
+      });
+      if (!res.ok) throw new Error(await getApiError(res, "Failed to update ticket status"));
+
+      toast.success(active ? "Ticket type activated" : "Ticket type deactivated");
+      await loadTickets();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update ticket status");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const deleteTicketType = async (ticket: TicketType) => {
+    if (!window.confirm(`Delete "${ticket.name}"? This only works for ticket types with no sales or reservations.`)) {
+      return;
+    }
+
+    setDeletingId(ticket.id);
+    try {
+      const res = await fetch(`/api/ticket-types/${ticket.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(await getApiError(res, "Failed to delete ticket type"));
+
+      toast.success("Ticket type deleted");
+      if (editingId === ticket.id) cancelEditing();
+      await loadTickets();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete ticket type");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -322,7 +453,122 @@ export function TicketsClient() {
                           {formatMoney(progress?.paidAmount || 0, ticket.currency)}
                         </div>
                       </div>
+                      <div className="flex flex-wrap gap-2 sm:justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEditing(ticket)}
+                          disabled={updatingId === ticket.id || deletingId === ticket.id}
+                        >
+                          <Pencil />
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setTicketActive(ticket, !ticket.active)}
+                          disabled={updatingId === ticket.id || deletingId === ticket.id}
+                        >
+                          {updatingId === ticket.id ? <Loader2 className="animate-spin" /> : null}
+                          {ticket.active ? "Deactivate" : "Activate"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteTicketType(ticket)}
+                          disabled={
+                            deletingId === ticket.id ||
+                            updatingId === ticket.id ||
+                            ticket.soldCount > 0 ||
+                            ticket.reservedCount > 0
+                          }
+                          title={
+                            ticket.soldCount > 0 || ticket.reservedCount > 0
+                              ? "Deactivate ticket types that already have sales or reservations"
+                              : "Delete ticket type"
+                          }
+                        >
+                          {deletingId === ticket.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                          Delete
+                        </Button>
+                      </div>
                     </div>
+                    {editingId === ticket.id && editForm && (
+                      <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 md:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`ticket-edit-name-${ticket.id}`}>Name</Label>
+                          <Input
+                            id={`ticket-edit-name-${ticket.id}`}
+                            value={editForm.name}
+                            onChange={(event) => updateEditField("name", event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`ticket-edit-slug-${ticket.id}`}>Slug</Label>
+                          <Input
+                            id={`ticket-edit-slug-${ticket.id}`}
+                            value={editForm.slug}
+                            onChange={(event) => updateEditField("slug", slugify(event.target.value))}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`ticket-edit-price-${ticket.id}`}>Price</Label>
+                          <Input
+                            id={`ticket-edit-price-${ticket.id}`}
+                            inputMode="numeric"
+                            value={editForm.price}
+                            onChange={(event) => updateEditField("price", event.target.value)}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`ticket-edit-capacity-${ticket.id}`}>Capacity</Label>
+                            <Input
+                              id={`ticket-edit-capacity-${ticket.id}`}
+                              inputMode="numeric"
+                              value={editForm.capacity}
+                              onChange={(event) => updateEditField("capacity", event.target.value)}
+                              placeholder="Unlimited"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`ticket-edit-max-${ticket.id}`}>Max / order</Label>
+                            <Input
+                              id={`ticket-edit-max-${ticket.id}`}
+                              inputMode="numeric"
+                              value={editForm.maxPerOrder}
+                              onChange={(event) => updateEditField("maxPerOrder", event.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 md:col-span-2">
+                          <Label htmlFor={`ticket-edit-description-${ticket.id}`}>Description</Label>
+                          <Textarea
+                            id={`ticket-edit-description-${ticket.id}`}
+                            value={editForm.description}
+                            onChange={(event) => updateEditField("description", event.target.value)}
+                            placeholder="Optional public description"
+                          />
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-2 md:col-span-2">
+                          <Button type="button" variant="outline" onClick={cancelEditing}>
+                            <X />
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={() => saveTicketType(ticket)}
+                            disabled={updatingId === ticket.id}
+                          >
+                            {updatingId === ticket.id ? <Loader2 className="animate-spin" /> : <Save />}
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     {ticket.capacity !== null && (
                       <div className="h-2 overflow-hidden rounded-full bg-muted">
                         <div
