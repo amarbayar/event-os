@@ -143,4 +143,22 @@ describe("portal invite route", () => {
     const secondCallOptions = mailMock.mock.calls[1]?.[2];
     expect(secondCallOptions?.disableDeduplication).toBe(true);
   });
+
+  it("returns a JSON error when invite email dispatch throws", async () => {
+    process.env.MAIL_DRIVER = "postmark";
+    mailMock.mockRejectedValueOnce(new Error("smtp unavailable"));
+    const { POST } = await import("@/app/api/portal/invite/route");
+
+    const res = await POST(
+      buildInviteRequest({
+        entityType: "speaker",
+        entityId: f.speakerId,
+      })
+    );
+
+    expect(res.status).toBe(502);
+    await expect(res.json()).resolves.toEqual({
+      error: "Failed to send portal invite email",
+    });
+  });
 });

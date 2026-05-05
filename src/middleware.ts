@@ -17,6 +17,7 @@ const publicPaths = [
   "/agenda",
   "/_next",
   "/favicon.ico",
+  "/site.webmanifest",
 ];
 
 const stakeholderAllowedApiPaths = [

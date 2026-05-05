@@ -13,58 +13,75 @@ import {
   getStakeholderEntityConfig,
 } from "@/lib/stakeholder-entities";
 
+async function sendPortalMail(
+  to: Parameters<typeof mail>[0],
+  mailable: Parameters<typeof mail>[1],
+  options: Parameters<typeof mail>[2],
+  errorMessage: string
+) {
+  try {
+    const mailResult = await mail(to, mailable, options);
+    if (mailResult.success) return null;
+  } catch (error) {
+    console.error("Portal invite email failed:", error);
+  }
+
+  return NextResponse.json({ error: errorMessage }, { status: 502 });
+}
+
 // POST — invite a confirmed entity to the stakeholder portal
 // Creates a user with role="stakeholder" linked to the entity
 export async function POST(req: NextRequest) {
-  const ctx = await requirePermission(req, "checklist", "create");
-  if (isRbacError(ctx)) return ctx;
+  try {
+    const ctx = await requirePermission(req, "checklist", "create");
+    if (isRbacError(ctx)) return ctx;
 
-  const body = await req.json();
-  const { entityType, entityId, resend } = body;
+    const body = await req.json();
+    const { entityType, entityId, resend } = body;
 
-  if (!entityType || !entityId) {
-    return NextResponse.json({ error: "entityType and entityId required" }, { status: 400 });
-  }
+    if (!entityType || !entityId) {
+      return NextResponse.json({ error: "entityType and entityId required" }, { status: 400 });
+    }
 
-  const config = getStakeholderEntityConfig(entityType);
-  if (!config) {
-    return NextResponse.json({ error: `Unsupported entity type: ${entityType}` }, { status: 400 });
-  }
+    const config = getStakeholderEntityConfig(entityType);
+    if (!config) {
+      return NextResponse.json({ error: `Unsupported entity type: ${entityType}` }, { status: 400 });
+    }
 
-  const entity = await findStakeholderEntity(entityType, entityId);
+    const entity = await findStakeholderEntity(entityType, entityId);
 
-  if (!entity) {
-    return NextResponse.json({ error: "Entity not found" }, { status: 404 });
-  }
+    if (!entity) {
+      return NextResponse.json({ error: "Entity not found" }, { status: 404 });
+    }
 
-  const entityName = (entity[config.nameField] as string) || "";
-  const entityEmail = (entity[config.emailField] as string) || "";
-  const entityStage = (entity.stage as string | undefined) || null;
-  const portalUrl = absoluteAppUrl("/login?callbackUrl=%2Fportal", req);
-  const shouldExposeTempPassword = (process.env.MAIL_DRIVER || "log") === "log";
+    const entityName = (entity[config.nameField] as string) || "";
+    const entityEmail = (entity[config.emailField] as string) || "";
+    const entityStage = (entity.stage as string | undefined) || null;
+    const portalUrl = absoluteAppUrl("/login?callbackUrl=%2Fportal", req);
+    const shouldExposeTempPassword = (process.env.MAIL_DRIVER || "log") === "log";
 
-  if (!entityEmail) {
-    return NextResponse.json({ error: "Entity has no email address — cannot create portal account" }, { status: 400 });
-  }
+    if (!entityEmail) {
+      return NextResponse.json({ error: "Entity has no email address — cannot create portal account" }, { status: 400 });
+    }
 
-  if (entityStage && entityStage !== "confirmed") {
-    return NextResponse.json(
-      { error: "Entity must be confirmed before portal access can be granted" },
-      { status: 400 }
-    );
-  }
+    if (entityStage && entityStage !== "confirmed") {
+      return NextResponse.json(
+        { error: "Entity must be confirmed before portal access can be granted" },
+        { status: 400 }
+      );
+    }
 
   // Get org name (for email templates) and check for existing user in parallel
-  const [org, existing] = await Promise.all([
-    db.query.organizations.findFirst({
-      where: eq(organizations.id, ctx.orgId),
-      columns: { name: true },
-    }),
-    db.query.users.findFirst({
-      where: eq(users.email, entityEmail),
-    }),
-  ]);
-  const orgName = org?.name || "your organization";
+    const [org, existing] = await Promise.all([
+      db.query.organizations.findFirst({
+        where: eq(organizations.id, ctx.orgId),
+        columns: { name: true },
+      }),
+      db.query.users.findFirst({
+        where: eq(users.email, entityEmail),
+      }),
+    ]);
+    const orgName = org?.name || "your organization";
 
   if (existing) {
     // Check if already a stakeholder for this entity in this org
@@ -103,7 +120,7 @@ export async function POST(req: NextRequest) {
           })
           .where(eq(users.id, existing.id));
 
-        const mailResult = await mail(
+        const mailError = await sendPortalMail(
           { email: existing.email, name: existing.name || entityName || undefined },
           portalInvite({
             name: existing.name || entityName,
@@ -116,15 +133,11 @@ export async function POST(req: NextRequest) {
             entityType,
             entityId,
             disableDeduplication: true,
-          }
+          },
+          "Failed to send portal invite email"
         );
 
-        if (!mailResult.success) {
-          return NextResponse.json(
-            { error: "Failed to send portal invite email" },
-            { status: 502 }
-          );
-        }
+        if (mailError) return mailError;
 
         return NextResponse.json({
           data: {
@@ -138,7 +151,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const mailResult = await mail(
+      const mailError = await sendPortalMail(
         { email: existing.email, name: existing.name || entityName || undefined },
         portalAdded({ name: existing.name || entityName, portalUrl, organizationName: orgName }),
         {
@@ -146,15 +159,11 @@ export async function POST(req: NextRequest) {
           entityType,
           entityId,
           disableDeduplication: true,
-        }
+        },
+        "Failed to send portal access email"
       );
 
-      if (!mailResult.success) {
-        return NextResponse.json(
-          { error: "Failed to send portal access email" },
-          { status: 502 }
-        );
-      }
+      if (mailError) return mailError;
 
       return NextResponse.json({
         data: {
@@ -177,18 +186,14 @@ export async function POST(req: NextRequest) {
     });
 
     // Notify existing user they've been added to a new org
-    const mailResult = await mail(
+    const mailError = await sendPortalMail(
       { email: existing.email, name: existing.name || undefined },
       portalAdded({ name: existing.name || entityName, portalUrl, organizationName: orgName }),
-      { orgId: ctx.orgId, entityType, entityId }
+      { orgId: ctx.orgId, entityType, entityId },
+      "Failed to send portal access email"
     );
 
-    if (!mailResult.success) {
-      return NextResponse.json(
-        { error: "Failed to send portal access email" },
-        { status: 502 }
-      );
-    }
+    if (mailError) return mailError;
 
     return NextResponse.json({
       data: { id: existing.id, name: existing.name, email: existing.email, role: "stakeholder", portalUrl },
@@ -219,25 +224,25 @@ export async function POST(req: NextRequest) {
   });
 
   // Send portal invite email with temp password
-  const mailResult = await mail(
+  const mailError = await sendPortalMail(
     { email: entityEmail, name: entityName },
     portalInvite({ name: entityName, tempPassword: rawPassword, portalUrl, organizationName: orgName }),
-    { orgId: ctx.orgId, entityType, entityId }
+    { orgId: ctx.orgId, entityType, entityId },
+    "Failed to send portal invite email"
   );
 
-  if (!mailResult.success) {
-    return NextResponse.json(
-      { error: "Failed to send portal invite email" },
-      { status: 502 }
-    );
-  }
+  if (mailError) return mailError;
 
-  return NextResponse.json({
-    data: {
-      ...user,
-      role: "stakeholder",
-      ...(shouldExposeTempPassword ? { tempPassword: rawPassword } : {}),
-      portalUrl,
-    },
-  }, { status: 201 });
+    return NextResponse.json({
+      data: {
+        ...user,
+        role: "stakeholder",
+        ...(shouldExposeTempPassword ? { tempPassword: rawPassword } : {}),
+        portalUrl,
+      },
+    }, { status: 201 });
+  } catch (error) {
+    console.error("Portal invite failed:", error);
+    return NextResponse.json({ error: "Failed to create portal invite" }, { status: 500 });
+  }
 }

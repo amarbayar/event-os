@@ -6,6 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
 
+async function parseInviteResponse(res: Response) {
+  const text = await res.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text) as { data?: { alreadyInvited?: boolean; tempPassword?: string; resent?: boolean }; error?: string };
+  } catch {
+    return { error: "Invite request failed. Please try again." };
+  }
+}
+
 export function PortalInviteSection({
   entityType,
   entityId,
@@ -31,28 +42,39 @@ export function PortalInviteSection({
   const handleInvite = async () => {
     setStatus("loading");
     setErrorMessage("");
-    const res = await fetch("/api/portal/invite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entityType, entityId, resend: status === "already" }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      if (data.data.alreadyInvited && !data.data.resent) {
+    try {
+      const res = await fetch("/api/portal/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entityType, entityId, resend: status === "already" }),
+      });
+      const data = await parseInviteResponse(res);
+
+      if (!res.ok) {
+        setStatus("error");
+        setErrorMessage(data.error || t("inviteFailed"));
+        return;
+      }
+
+      if (data.data?.alreadyInvited && !data.data.resent) {
         setStatus("already");
-      } else {
+      } else if (data.data) {
         setInviteInfo({
           email: entityEmail,
           password: data.data.tempPassword,
           resent: !!data.data.resent,
         });
         setStatus("invited");
+      } else {
+        setStatus("error");
+        setErrorMessage(t("inviteFailed"));
       }
-    } else {
+    } catch {
       setStatus("error");
-      setErrorMessage(data.error || t("inviteFailed"));
+      setErrorMessage(t("inviteFailed"));
+    } finally {
+      setShowConfirm(false);
     }
-    setShowConfirm(false);
   };
   const t = useTranslations("Portal");
   const tC = useTranslations("Common");

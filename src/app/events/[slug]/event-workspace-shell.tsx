@@ -43,16 +43,16 @@ function OrgBranding() {
   return null;
 }
 
-function formatEventDates(startDate: string | null, endDate: string | null): string {
+export function formatEventDates(startDate: string | null, endDate: string | null): string {
   if (!startDate) return "Dates TBD";
   const start = new Date(startDate);
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" };
   if (!endDate) return start.toLocaleDateString("en-US", opts);
   const end = new Date(endDate);
-  if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
-    return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })}–${end.getDate()}, ${end.getFullYear()}`;
+  if (start.getUTCFullYear() === end.getUTCFullYear() && start.getUTCMonth() === end.getUTCMonth()) {
+    return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}–${end.getUTCDate()}, ${end.getUTCFullYear()}`;
   }
-  return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", opts)}`;
+  return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} – ${end.toLocaleDateString("en-US", opts)}`;
 }
 
 export function EventWorkspaceShell({
