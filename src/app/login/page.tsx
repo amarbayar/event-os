@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { isValidEmail } from "@/lib/validation";
+import { normalizeEmail } from "@/lib/email";
 
 const authProvider = process.env.NEXT_PUBLIC_AUTH_PROVIDER || "credentials";
 const showCredentials = authProvider !== "google";
@@ -30,7 +31,7 @@ export default function LoginPage() {
     setError("");
 
     const form = new FormData(e.currentTarget);
-    const email = (form.get("email") as string).trim();
+    const email = normalizeEmail(form.get("email"));
     const password = form.get("password") as string;
 
     const newErrors: Record<string, string> = {};

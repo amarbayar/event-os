@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, userOrganizations, organizations } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { requirePermission, isRbacError } from "@/lib/rbac";
 import { hash } from "@/lib/password";
 import { mail } from "@/lib/mail";
 import { portalInvite } from "@/lib/mail/mailables/portal-invite";
 import { portalAdded } from "@/lib/mail/mailables/portal-added";
 import { absoluteAppUrl } from "@/lib/app-url";
+import { normalizeEmail } from "@/lib/email";
 import {
   findStakeholderEntity,
   getStakeholderEntityConfig,
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     const entityName = (entity[config.nameField] as string) || "";
-    const entityEmail = (entity[config.emailField] as string) || "";
+    const entityEmail = normalizeEmail(entity[config.emailField]);
     const entityStage = (entity.stage as string | undefined) || null;
     const portalUrl = absoluteAppUrl("/login?callbackUrl=%2Fportal", req);
     const shouldExposeTempPassword = (process.env.MAIL_DRIVER || "log") === "log";
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
         columns: { name: true },
       }),
       db.query.users.findFirst({
-        where: eq(users.email, entityEmail),
+        where: sql`lower(trim(${users.email})) = ${entityEmail}`,
       }),
     ]);
     const orgName = org?.name || "your organization";

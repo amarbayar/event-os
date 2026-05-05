@@ -9,9 +9,10 @@ import {
   userOrganizations,
   orgInvites,
 } from "@/db/schema";
+import { normalizeEmail } from "@/lib/email";
 import * as pgSchema from "@/db/schema.pg";
 import * as sqliteSchema from "@/db/schema.sqlite";
-import { eq, desc, and, isNull, gt } from "drizzle-orm";
+import { eq, desc, and, isNull, gt, sql } from "drizzle-orm";
 
 // ─── Auth Provider Configuration ────────────────────────
 //
@@ -43,9 +44,10 @@ if (authProvider !== "google") {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+        const email = normalizeEmail(credentials.email);
 
         const user = await db.query.users.findFirst({
-          where: eq(users.email, credentials.email as string),
+          where: sql`lower(trim(${users.email})) = ${email}`,
         });
 
         if (!user || !user.passwordHash) return null;
@@ -124,9 +126,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (membership) return true; // Returning user with existing membership
 
         // Check if there's a pending invite for this email
+        const email = normalizeEmail(user.email);
         const invite = await db.query.orgInvites.findFirst({
           where: and(
-            eq(orgInvites.email, user.email!),
+            eq(orgInvites.email, email),
             isNull(orgInvites.claimedAt),
             isNull(orgInvites.revokedAt),
             gt(orgInvites.expiresAt, new Date())
