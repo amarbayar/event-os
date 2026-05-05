@@ -84,18 +84,28 @@ export async function POST(req: NextRequest) {
     const orgName = org?.name || "your organization";
 
   if (existing) {
-    // Check if already a stakeholder for this entity in this org
+    // user_organizations is unique per user/org. A user cannot also be invited
+    // as a different stakeholder assignment without changing the membership.
     const existingMembership = await db.query.userOrganizations.findFirst({
       where: and(
         eq(userOrganizations.userId, existing.id),
-        eq(userOrganizations.organizationId, ctx.orgId),
-        eq(userOrganizations.role, "stakeholder"),
-        eq(userOrganizations.linkedEntityType, entityType),
-        eq(userOrganizations.linkedEntityId, entityId),
+        eq(userOrganizations.organizationId, ctx.orgId)
       ),
     });
 
     if (existingMembership) {
+      const isSameStakeholderAssignment =
+        existingMembership.role === "stakeholder" &&
+        existingMembership.linkedEntityType === entityType &&
+        existingMembership.linkedEntityId === entityId;
+
+      if (!isSameStakeholderAssignment) {
+        return NextResponse.json(
+          { error: "This email already belongs to an organization member with another role or portal assignment." },
+          { status: 409 }
+        );
+      }
+
       if (!resend) {
         return NextResponse.json({
           data: {

@@ -161,4 +161,30 @@ describe("portal invite route", () => {
       error: "Failed to send portal invite email",
     });
   });
+
+  it("returns a clear conflict when the email is already an org member with another role", async () => {
+    process.env.MAIL_DRIVER = "postmark";
+    const speakerEmail = await getSpeakerEmail(f.speakerId);
+    const existingUser = f.users.TestOrganizer;
+
+    await testDb
+      .update(schema.users)
+      .set({ email: speakerEmail })
+      .where(eq(schema.users.id, existingUser.id));
+
+    const { POST } = await import("@/app/api/portal/invite/route");
+
+    const res = await POST(
+      buildInviteRequest({
+        entityType: "speaker",
+        entityId: f.speakerId,
+      })
+    );
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({
+      error: "This email already belongs to an organization member with another role or portal assignment.",
+    });
+    expect(mailMock).not.toHaveBeenCalled();
+  });
 });
