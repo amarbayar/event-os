@@ -2,6 +2,13 @@ import { db } from "@/db";
 import { eq, and, desc, asc, count, sql } from "drizzle-orm";
 import * as schema from "@/db/schema";
 
+type AttendeeRow = typeof schema.attendees.$inferSelect;
+type AttendeeWithTicketOrderRow = {
+  attendee: AttendeeRow;
+  purchaserCompany: string | null;
+  orderMetadata: Record<string, unknown> | null;
+};
+
 export async function getActiveIds(userOrgId?: string) {
   // 1. Resolve user's org — use passed value (from requirePermission) or fetch from session
   if (!userOrgId) {
@@ -120,9 +127,37 @@ export async function getAttendees() {
   const ids = await getActiveIds();
   if (!ids) return [];
 
-  return db.query.attendees.findMany({
-    where: eq(schema.attendees.editionId, ids.editionId),
-    orderBy: [asc(schema.attendees.name)],
+  const rows = await db
+    .select({
+      attendee: schema.attendees,
+      purchaserCompany: schema.ticketOrders.purchaserCompany,
+      orderMetadata: schema.ticketOrders.metadata,
+    })
+    .from(schema.attendees)
+    .leftJoin(
+      schema.ticketOrders,
+      eq(schema.attendees.ticketOrderId, schema.ticketOrders.id),
+    )
+    .where(eq(schema.attendees.editionId, ids.editionId))
+    .orderBy(asc(schema.attendees.name));
+
+  return rows.map((row: AttendeeWithTicketOrderRow) => {
+    const metadata = row.orderMetadata || {};
+    const purchaserType =
+      metadata.purchaserType === "company" || metadata.purchaserType === "individual"
+        ? metadata.purchaserType
+        : null;
+    const companyRegistrationNumber =
+      typeof metadata.companyRegistrationNumber === "string"
+        ? metadata.companyRegistrationNumber
+        : null;
+
+    return {
+      ...row.attendee,
+      purchaserCompany: row.purchaserCompany,
+      purchaserType,
+      companyRegistrationNumber,
+    };
   });
 }
 

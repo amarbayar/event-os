@@ -116,6 +116,9 @@ describe("public ticket checkout API", () => {
           name: "Buyer",
           email: "buyer@example.com",
           phone: "99119911",
+          purchaserType: "company",
+          company: "DevSummit LLC",
+          companyRegistrationNumber: "1234567",
         },
       }),
     });
@@ -134,6 +137,9 @@ describe("public ticket checkout API", () => {
         purchaser: expect.objectContaining({
           name: "Buyer",
           email: "buyer@example.com",
+          purchaserType: "company",
+          company: "DevSummit LLC",
+          companyRegistrationNumber: "1234567",
         }),
       }),
     );

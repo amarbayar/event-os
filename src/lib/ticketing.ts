@@ -33,6 +33,8 @@ export type CheckoutInput = {
     email: string;
     phone?: string;
     company?: string;
+    purchaserType?: "individual" | "company";
+    companyRegistrationNumber?: string;
   };
   request: Request;
   idempotencyKey?: string | null;
@@ -106,6 +108,21 @@ function validateCheckoutInput(input: CheckoutInput): string | null {
   if (input.purchaser.company && input.purchaser.company.length > 255) {
     return "purchaser.company is too long";
   }
+  if (
+    input.purchaser.purchaserType &&
+    input.purchaser.purchaserType !== "individual" &&
+    input.purchaser.purchaserType !== "company"
+  ) {
+    return "purchaser.purchaserType is invalid";
+  }
+  const purchaserType = input.purchaser.purchaserType || "individual";
+  const companyRegistrationNumber = input.purchaser.companyRegistrationNumber?.trim() || "";
+  if (purchaserType === "company" && companyRegistrationNumber.length < 2) {
+    return "purchaser.companyRegistrationNumber is required";
+  }
+  if (companyRegistrationNumber.length > 50) {
+    return "purchaser.companyRegistrationNumber is too long";
+  }
   return null;
 }
 
@@ -120,6 +137,8 @@ function checkoutFingerprint(input: CheckoutInput, ticketTypeId: string): string
         purchaserEmail: normalizeEmail(input.purchaser.email),
         purchaserPhone: input.purchaser.phone?.trim() || null,
         purchaserCompany: input.purchaser.company?.trim() || null,
+        purchaserType: input.purchaser.purchaserType || "individual",
+        companyRegistrationNumber: input.purchaser.companyRegistrationNumber?.trim() || null,
       }),
     )
     .digest("hex");
@@ -310,6 +329,11 @@ export async function createBonumTicketCheckout(input: CheckoutInput) {
 
     const totalAmount = ticket.price * input.quantity;
     const customerAccessToken = generateCustomerAccessToken();
+    const purchaserType = input.purchaser.purchaserType || "individual";
+    const companyRegistrationNumber =
+      purchaserType === "company"
+        ? input.purchaser.companyRegistrationNumber?.trim() || null
+        : null;
     const [order] = await tx
       .insert(ticketOrders)
       .values({
@@ -327,7 +351,11 @@ export async function createBonumTicketCheckout(input: CheckoutInput) {
         quantity: input.quantity,
         idempotencyKey: input.idempotencyKey || null,
         customerAccessTokenHash: hashCustomerAccessToken(customerAccessToken),
-        metadata: { checkoutFingerprint: fingerprint },
+        metadata: {
+          checkoutFingerprint: fingerprint,
+          purchaserType,
+          companyRegistrationNumber,
+        },
         expiresAt,
       })
       .returning();

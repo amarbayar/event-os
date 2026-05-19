@@ -81,6 +81,9 @@ describe("ticketing checkout and Bonum fulfillment", () => {
       purchaser: {
         name: "Buyer",
         email: "BUYER@example.com",
+        purchaserType: "company",
+        company: "DevSummit LLC",
+        companyRegistrationNumber: "1234567",
       },
       request: new Request("http://localhost/api/public/events/devsummit/checkout"),
     });
@@ -120,8 +123,13 @@ describe("ticketing checkout and Bonum fulfillment", () => {
       totalAmount: 200_000,
       currency: "MNT",
       purchaserEmail: "buyer@example.com",
+      purchaserCompany: "DevSummit LLC",
       providerInvoiceId: expect.stringMatching(/^bonum-invoice-test-/),
       status: "pending",
+    });
+    expect(order?.metadata).toMatchObject({
+      purchaserType: "company",
+      companyRegistrationNumber: "1234567",
     });
     expect(ticket?.reservedCount).toBe(2);
     expect(ticket?.soldCount).toBe(0);
@@ -169,6 +177,9 @@ describe("ticketing checkout and Bonum fulfillment", () => {
       purchaser: {
         name: "Buyer",
         email: "buyer@example.com",
+        purchaserType: "company",
+        company: "DevSummit LLC",
+        companyRegistrationNumber: "1234567",
       },
       request: new Request("http://localhost/api/public/events/devsummit/checkout"),
     });
@@ -244,6 +255,26 @@ describe("ticketing checkout and Bonum fulfillment", () => {
         checkedIn: false,
       }),
     );
+
+    const previousOrgId = process.env.DEFAULT_ORG_ID;
+    const previousEditionId = process.env.DEFAULT_EDITION_ID;
+    process.env.DEFAULT_ORG_ID = f.orgId;
+    process.env.DEFAULT_EDITION_ID = f.editionId;
+    try {
+      const { getAttendees } = await import("@/lib/queries");
+      const registrations = (await getAttendees()) as Array<Record<string, unknown>>;
+      const registration = registrations.find((row) => row.ticketOrderId === checkout.order.id);
+      expect(registration).toMatchObject({
+        purchaserType: "company",
+        purchaserCompany: "DevSummit LLC",
+        companyRegistrationNumber: "1234567",
+      });
+    } finally {
+      if (previousOrgId === undefined) delete process.env.DEFAULT_ORG_ID;
+      else process.env.DEFAULT_ORG_ID = previousOrgId;
+      if (previousEditionId === undefined) delete process.env.DEFAULT_EDITION_ID;
+      else process.env.DEFAULT_EDITION_ID = previousEditionId;
+    }
   });
 
   it("releases reserved capacity when Bonum reports an expired invoice", async () => {

@@ -12,7 +12,14 @@ export const dynamic = "force-dynamic";
 
 const FORBIDDEN_CLIENT_FIELDS = ["amount", "price", "total", "totalAmount", "currency"];
 const ALLOWED_FIELDS = new Set(["ticketTypeId", "ticketTypeSlug", "quantity", "purchaser"]);
-const ALLOWED_PURCHASER_FIELDS = new Set(["name", "email", "phone", "company"]);
+const ALLOWED_PURCHASER_FIELDS = new Set([
+  "name",
+  "email",
+  "phone",
+  "company",
+  "purchaserType",
+  "companyRegistrationNumber",
+]);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -59,6 +66,11 @@ function validatePublicCheckoutBody(body: Record<string, unknown>): string | nul
   const email = typeof purchaser.email === "string" ? purchaser.email.trim() : "";
   const phone = typeof purchaser.phone === "string" ? purchaser.phone.trim() : "";
   const company = typeof purchaser.company === "string" ? purchaser.company.trim() : "";
+  const purchaserType = purchaser.purchaserType === "company" ? "company" : "individual";
+  const companyRegistrationNumber =
+    typeof purchaser.companyRegistrationNumber === "string"
+      ? purchaser.companyRegistrationNumber.trim()
+      : "";
 
   if (name.length < 2 || name.length > 120 || hasUnsafeText(name)) return "purchaser.name is invalid";
   if (email.length > 255 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || hasUnsafeText(email)) {
@@ -66,6 +78,22 @@ function validatePublicCheckoutBody(body: Record<string, unknown>): string | nul
   }
   if (phone && (phone.length > 30 || !/^[0-9+\-() ]+$/.test(phone))) return "purchaser.phone is invalid";
   if (company && (company.length > 120 || hasUnsafeText(company))) return "purchaser.company is invalid";
+  if (
+    purchaser.purchaserType !== undefined &&
+    purchaser.purchaserType !== "individual" &&
+    purchaser.purchaserType !== "company"
+  ) {
+    return "purchaser.purchaserType is invalid";
+  }
+  if (purchaserType === "company" && companyRegistrationNumber.length < 2) {
+    return "purchaser.companyRegistrationNumber is required";
+  }
+  if (
+    companyRegistrationNumber &&
+    (companyRegistrationNumber.length > 50 || hasUnsafeText(companyRegistrationNumber))
+  ) {
+    return "purchaser.companyRegistrationNumber is invalid";
+  }
 
   return null;
 }
@@ -120,6 +148,8 @@ export async function POST(
         email?: string;
         phone?: string;
         company?: string;
+        purchaserType?: "individual" | "company";
+        companyRegistrationNumber?: string;
       }
     | undefined;
 
@@ -136,6 +166,8 @@ export async function POST(
         email: purchaser?.email || "",
         phone: purchaser?.phone,
         company: purchaser?.company,
+        purchaserType: purchaser?.purchaserType === "company" ? "company" : "individual",
+        companyRegistrationNumber: purchaser?.companyRegistrationNumber,
       },
       request: req,
       idempotencyKey: req.headers.get("idempotency-key"),

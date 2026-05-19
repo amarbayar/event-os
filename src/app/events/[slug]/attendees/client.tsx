@@ -29,10 +29,14 @@ type Attendee = {
   name: string;
   email: string;
   ticketType: string;
+  ticketOrderId?: string | null;
   qrHash: string;
   checkedIn: boolean;
   checkedInAt: Date | null;
   source: string;
+  purchaserType?: "individual" | "company" | null;
+  purchaserCompany?: string | null;
+  companyRegistrationNumber?: string | null;
 };
 
 type Stats = {
@@ -71,7 +75,9 @@ export function AttendeesClient({
     .filter(
       (a) =>
         a.name.toLowerCase().includes(search.toLowerCase()) ||
-        a.email.toLowerCase().includes(search.toLowerCase())
+        a.email.toLowerCase().includes(search.toLowerCase()) ||
+        (a.purchaserCompany || "").toLowerCase().includes(search.toLowerCase()) ||
+        (a.companyRegistrationNumber || "").toLowerCase().includes(search.toLowerCase())
     );
 
   const ticketCounts = {
@@ -91,6 +97,10 @@ export function AttendeesClient({
       ticketType: attendee.ticketType || "general",
       qrHash: attendee.qrHash || "",
       source: attendee.source || "online",
+      purchaserType: attendee.purchaserType || "individual",
+      purchaserCompany: attendee.purchaserCompany || "",
+      companyRegistrationNumber: attendee.companyRegistrationNumber || "",
+      ticketOrderId: attendee.ticketOrderId || "",
     });
   };
 
@@ -192,6 +202,26 @@ export function AttendeesClient({
                 <Label>QR Hash</Label>
                 <Input value={(drawerForm.qrHash as string) || ""} readOnly className="bg-muted font-mono text-xs" />
               </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Buyer Type</Label>
+                  <Input value={(drawerForm.purchaserType as string) || "individual"} readOnly className="bg-muted capitalize" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Company</Label>
+                  <Input value={(drawerForm.purchaserCompany as string) || ""} readOnly className="bg-muted" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Company Registration Number</Label>
+                  <Input value={(drawerForm.companyRegistrationNumber as string) || ""} readOnly className="bg-muted" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Order ID</Label>
+                  <Input value={(drawerForm.ticketOrderId as string) || ""} readOnly className="bg-muted font-mono text-xs" />
+                </div>
+              </div>
               {selectedAttendee.checkedIn && (
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
                   <p className="text-sm text-emerald-700 font-medium">
@@ -259,7 +289,7 @@ export function AttendeesClient({
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by name or email..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Search by name, email, company, or registration number..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         {(["all", "online", "offline", "internal"] as const).map((s) => (
           <Button key={s} variant={sourceFilter === s ? "default" : "outline"} size="sm" onClick={() => setSourceFilter(s)} className="capitalize">
@@ -291,6 +321,7 @@ export function AttendeesClient({
               <tr className="border-b bg-stone-50">
                 <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500">Name</th>
                 <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500">Email</th>
+                <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[190px]">Buyer</th>
                 <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[100px]">Ticket</th>
                 <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[80px]">Source</th>
                 <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[130px]">Check-in</th>
@@ -305,6 +336,21 @@ export function AttendeesClient({
                 >
                   <td className="px-3 py-2 font-medium">{a.name}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{a.email}</td>
+                  <td className="px-3 py-2">
+                    {a.purchaserType === "company" ? (
+                      <div className="space-y-1">
+                        <Badge variant="secondary" className="text-[10px]">Company</Badge>
+                        <div className="text-xs font-medium">{a.purchaserCompany || "Company"}</div>
+                        {a.companyRegistrationNumber && (
+                          <div className="font-mono text-[11px] text-muted-foreground">
+                            {a.companyRegistrationNumber}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">Individual</Badge>
+                    )}
+                  </td>
                   <td className="px-3 py-2"><Badge variant="outline" className="text-[10px] capitalize">{a.ticketType}</Badge></td>
                   <td className="px-3 py-2"><span className="text-xs capitalize text-muted-foreground">{a.source || "online"}</span></td>
                   <td className="px-3 py-2">
