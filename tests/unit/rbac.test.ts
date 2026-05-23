@@ -229,3 +229,25 @@ describe("Stakeholder portal confinement", () => {
     }
   });
 });
+
+describe("Invitation permissions", () => {
+  it("allows organizers to create guest invitations", async () => {
+    authMock.mockResolvedValue({
+      user: {
+        id: fixtures.users["TestOrganizer"].id,
+        role: "organizer",
+        organizationId: fixtures.orgId,
+      },
+    });
+
+    const res = await requirePermission(
+      new NextRequest("https://platform.devsummit.dev/api/invitations"),
+      "invitation",
+      "create",
+    );
+
+    expect(isRbacError(res)).toBe(false);
+    if (isRbacError(res)) throw new Error("Expected organizer invitation access");
+    expect(res.user.role).toBe("organizer");
+  });
+});

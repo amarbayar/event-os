@@ -31,7 +31,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getApiError } from "@/lib/validation";
@@ -133,6 +132,20 @@ const emptyDirectSale: DirectSaleForm = {
   notes: "",
 };
 
+const directSalePaymentLabels: Record<DirectSaleForm["paymentMethod"], string> = {
+  bank_transfer: "Bank transfer",
+  cash: "Cash",
+  invoice: "Invoice",
+  complimentary: "Complimentary",
+  sponsor: "Sponsor",
+  other: "Other",
+};
+
+const purchaserTypeLabels: Record<DirectSaleForm["purchaserType"], string> = {
+  individual: "Individual",
+  company: "Company",
+};
+
 function formatMoney(amount: number, currency: string) {
   return `${new Intl.NumberFormat("en-US").format(amount)} ${currency}`;
 }
@@ -209,6 +222,10 @@ export function TicketsClient() {
   const progressByType = useMemo(() => {
     return new Map(summary.byTicketType.map((item) => [item.ticketTypeId, item]));
   }, [summary.byTicketType]);
+  const selectedDirectSaleTicket = useMemo(
+    () => ticketTypes.find((ticket) => ticket.id === directSale.ticketTypeId),
+    [directSale.ticketTypeId, ticketTypes],
+  );
 
   const createTicketType = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -574,7 +591,11 @@ export function TicketsClient() {
                 onValueChange={(value) => updateDirectSale("ticketTypeId", value || "")}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose ticket type" />
+                  <span data-slot="select-value" className="flex flex-1 text-left">
+                    {selectedDirectSaleTicket
+                      ? `${selectedDirectSaleTicket.name} · ${formatMoney(selectedDirectSaleTicket.price, selectedDirectSaleTicket.currency)}`
+                      : "Choose ticket type"}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   {ticketTypes.map((ticket) => (
@@ -601,7 +622,9 @@ export function TicketsClient() {
                 onValueChange={(value) => updateDirectSale("paymentMethod", value || "bank_transfer")}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <span data-slot="select-value" className="flex flex-1 text-left">
+                    {directSalePaymentLabels[directSale.paymentMethod]}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="bank_transfer">Bank transfer</SelectItem>
@@ -646,7 +669,9 @@ export function TicketsClient() {
                 onValueChange={(value) => updateDirectSale("purchaserType", value || "individual")}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <span data-slot="select-value" className="flex flex-1 text-left">
+                    {purchaserTypeLabels[directSale.purchaserType]}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="individual">Individual</SelectItem>
