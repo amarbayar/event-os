@@ -1,4 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { TicketsClient } from "@/app/events/[slug]/tickets/client";
 
@@ -12,5 +14,16 @@ describe("TicketsClient", () => {
     expect(html).toContain("Add Direct Sale");
     expect(html).toContain("Company Registration Number");
     expect(html).toContain("Sales Progress");
+  });
+
+  it("keeps direct-sale QR tickets downloadable as branded PDFs", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/app/events/[slug]/tickets/client.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("downloadDirectSaleTicketPdf");
+    expect(source).toContain("import(\"jspdf\")");
+    expect(source).toContain("Download ticket PDF");
   });
 });

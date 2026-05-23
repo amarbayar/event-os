@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
           name: attendee.name,
           email: attendee.email,
           ticketType: attendee.ticketType,
+          ticketTypeName: result.item.ticketTypeName,
           qrHash: attendee.qrHash,
           checkedIn: attendee.checkedIn,
         })),

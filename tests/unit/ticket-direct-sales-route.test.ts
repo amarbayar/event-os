@@ -34,6 +34,9 @@ describe("direct ticket sales route", () => {
         totalAmount: 200000,
         currency: "MNT",
       },
+      item: {
+        ticketTypeName: "Regular",
+      },
       attendees: [
         { id: "attendee-1", name: "Buyer", email: "buyer@example.com", qrHash: "qr-1", ticketType: "regular" },
         { id: "attendee-2", name: "Buyer", email: "buyer@example.com", qrHash: "qr-2", ticketType: "regular" },
@@ -89,7 +92,7 @@ describe("direct ticket sales route", () => {
       }),
     );
     expect(json.data.attendees).toHaveLength(2);
-    expect(json.data.attendees[0]).toMatchObject({ qrHash: "qr-1" });
+    expect(json.data.attendees[0]).toMatchObject({ qrHash: "qr-1", ticketTypeName: "Regular" });
   });
 
   it("returns a clean error when direct sale validation fails", async () => {

@@ -84,6 +84,7 @@ type CreatedDirectSale = {
     name: string;
     email: string;
     ticketType: string;
+    ticketTypeName?: string;
     qrHash: string;
   }>;
 };
@@ -166,6 +167,124 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 100);
+}
+
+async function loadImageDataUrl(src: string): Promise<string | null> {
+  try {
+    const response = await fetch(src);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function downloadDirectSaleTicketPdf({
+  attendee,
+  order,
+  qrDataUrl,
+  ticketPrice,
+}: {
+  attendee: CreatedDirectSale["attendees"][number];
+  order: CreatedDirectSale["order"];
+  qrDataUrl: string;
+  ticketPrice: string;
+}) {
+  const logoDataUrl = await loadImageDataUrl("/logo.png");
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.setFillColor("#070A12");
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+  doc.setFillColor("#00D1B2");
+  doc.circle(pageWidth - 48, 58, 138, "F");
+  doc.setFillColor("#F5B642");
+  doc.circle(18, pageHeight - 28, 118, "F");
+
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, "PNG", 44, 38, 112, 40, undefined, "FAST");
+  } else {
+    doc.setTextColor("#ffffff");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.text("DevSummit", 44, 62);
+  }
+
+  doc.setTextColor("#B9C3D5");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text("May 30-31, 2026 - Ulaanbaatar", 44, 98);
+
+  doc.setFillColor("#ffffff");
+  doc.roundedRect(38, 132, pageWidth - 76, 560, 18, 18, "F");
+  doc.setDrawColor("#E5EAF3");
+  doc.roundedRect(38, 132, pageWidth - 76, 560, 18, 18);
+
+  doc.setTextColor("#0B1020");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(28);
+  doc.text("DevSummit 2026 Ticket", 70, 190);
+  doc.setFontSize(13);
+  doc.setTextColor("#556070");
+  doc.text("Show this QR code at registration for check-in.", 70, 214);
+
+  doc.setFillColor("#F7F9FC");
+  doc.roundedRect(70, 248, 220, 220, 12, 12, "F");
+  doc.addImage(qrDataUrl, "PNG", 88, 266, 184, 184, undefined, "FAST");
+
+  const detailsX = 324;
+  const detailRows = [
+    ["Ticket holder", attendee.name],
+    ["Ticket type", attendee.ticketTypeName || attendee.ticketType],
+    ["Price", ticketPrice],
+    ["Order number", order.id],
+    ["Ticket ID", attendee.id],
+  ];
+
+  detailRows.forEach(([label, value], index) => {
+    const y = 264 + index * 58;
+    doc.setTextColor("#7A8494");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text(label.toUpperCase(), detailsX, y);
+    doc.setTextColor("#0B1020");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(index >= 3 ? 9 : 14);
+    const lines = doc.splitTextToSize(value, 190);
+    doc.text(lines.slice(0, 2), detailsX, y + 20);
+  });
+
+  doc.setFillColor("#0B1020");
+  doc.roundedRect(70, 518, pageWidth - 140, 86, 12, 12, "F");
+  doc.setTextColor("#ffffff");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Registration note", 94, 548);
+  doc.setTextColor("#C9D3E3");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(
+    doc.splitTextToSize(
+      "If your QR code cannot be scanned, organizers can look up your ticket by name, email, order number, or ticket ID.",
+      pageWidth - 188,
+    ),
+    94,
+    572,
+  );
+
+  doc.setTextColor("#B9C3D5");
+  doc.setFontSize(10);
+  doc.text("devsummit.dev", 44, pageHeight - 42);
+  doc.text("Powered by DevSummit registration", pageWidth - 198, pageHeight - 42);
+  doc.save(`devsummit-2026-ticket-${attendee.id}.pdf`);
 }
 
 export function TicketsClient() {
@@ -757,14 +876,26 @@ export function TicketsClient() {
                       {attendee.qrHash}
                     </p>
                     {qrImages[attendee.id] && (
-                      <a
-                        href={qrImages[attendee.id]}
-                        download={`ticket-${attendee.id}.png`}
-                        className="mt-3 inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted"
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={() =>
+                          downloadDirectSaleTicketPdf({
+                            attendee,
+                            order: createdDirectSale.order,
+                            qrDataUrl: qrImages[attendee.id],
+                            ticketPrice: formatMoney(
+                              Math.round(createdDirectSale.order.totalAmount / createdDirectSale.attendees.length),
+                              createdDirectSale.order.currency,
+                            ),
+                          })
+                        }
                       >
                         <Download className="h-3.5 w-3.5" />
-                        Download QR
-                      </a>
+                        Download ticket PDF
+                      </Button>
                     )}
                   </div>
                 ))}
