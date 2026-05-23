@@ -26,4 +26,15 @@ describe("TicketsClient", () => {
     expect(source).toContain("import(\"jspdf\")");
     expect(source).toContain("Download ticket PDF");
   });
+
+  it("supports downloading every direct-sale PDF as a zip", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/app/events/[slug]/tickets/client.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("downloadDirectSaleTicketZip");
+    expect(source).toContain("import(\"jszip\")");
+    expect(source).toContain("Download all PDFs");
+  });
 });

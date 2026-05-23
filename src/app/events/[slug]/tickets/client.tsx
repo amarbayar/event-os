@@ -185,17 +185,19 @@ async function loadImageDataUrl(src: string): Promise<string | null> {
   }
 }
 
-async function downloadDirectSaleTicketPdf({
-  attendee,
-  order,
-  qrDataUrl,
-  ticketPrice,
-}: {
+type DirectSaleTicketPdfInput = {
   attendee: CreatedDirectSale["attendees"][number];
   order: CreatedDirectSale["order"];
   qrDataUrl: string;
   ticketPrice: string;
-}) {
+};
+
+async function buildDirectSaleTicketPdf({
+  attendee,
+  order,
+  qrDataUrl,
+  ticketPrice,
+}: DirectSaleTicketPdfInput) {
   const logoDataUrl = await loadImageDataUrl("/logo.png");
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
@@ -284,7 +286,65 @@ async function downloadDirectSaleTicketPdf({
   doc.setFontSize(10);
   doc.text("devsummit.dev", 44, pageHeight - 42);
   doc.text("Powered by DevSummit registration", pageWidth - 198, pageHeight - 42);
-  doc.save(`devsummit-2026-ticket-${attendee.id}.pdf`);
+  return doc;
+}
+
+function directSaleTicketFileName(attendee: CreatedDirectSale["attendees"][number], index: number) {
+  const name = attendee.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return `devsummit-2026-ticket-${index + 1}-${name || attendee.id}.pdf`;
+}
+
+async function downloadDirectSaleTicketPdf(input: DirectSaleTicketPdfInput) {
+  const doc = await buildDirectSaleTicketPdf(input);
+  doc.save(`devsummit-2026-ticket-${input.attendee.id}.pdf`);
+}
+
+async function downloadDirectSaleTicketZip({
+  sale,
+  qrImages,
+}: {
+  sale: CreatedDirectSale;
+  qrImages: Record<string, string>;
+}) {
+  const { default: JSZip } = await import("jszip");
+  const zip = new JSZip();
+  const ticketPrice = formatMoney(
+    Math.round(sale.order.totalAmount / sale.attendees.length),
+    sale.order.currency,
+  );
+  let addedTickets = 0;
+
+  for (const [index, attendee] of sale.attendees.entries()) {
+    const qrDataUrl = qrImages[attendee.id];
+    if (!qrDataUrl) continue;
+
+    const doc = await buildDirectSaleTicketPdf({
+      attendee,
+      order: sale.order,
+      qrDataUrl,
+      ticketPrice,
+    });
+    zip.file(directSaleTicketFileName(attendee, index), doc.output("blob"));
+    addedTickets += 1;
+  }
+
+  if (addedTickets === 0) {
+    throw new Error("No QR ticket PDFs are ready to download yet");
+  }
+
+  const blob = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `devsummit-2026-direct-sale-${sale.order.id}.zip`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function TicketsClient() {
@@ -845,14 +905,35 @@ export function TicketsClient() {
 
           {createdDirectSale && (
             <div className="rounded-lg border bg-muted/20 p-4">
-              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="font-medium">Direct sale created</h3>
                   <p className="text-xs text-muted-foreground">
                     Order {createdDirectSale.order.id} · {formatMoney(createdDirectSale.order.totalAmount, createdDirectSale.order.currency)}
                   </p>
                 </div>
-                <Badge className="w-fit">QR ready</Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="w-fit">QR ready</Badge>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={createdDirectSale.attendees.some((attendee) => !qrImages[attendee.id])}
+                    onClick={() => {
+                      void downloadDirectSaleTicketZip({
+                        sale: createdDirectSale,
+                        qrImages,
+                      })
+                        .then(() => toast.success("Ticket ZIP downloaded"))
+                        .catch((error) => {
+                          toast.error(error instanceof Error ? error.message : "Failed to create ticket ZIP");
+                        });
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download all PDFs
+                  </Button>
+                </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {createdDirectSale.attendees.map((attendee, index) => (
