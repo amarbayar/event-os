@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockFindOrder = vi.fn();
 const mockTxFindOrder = vi.fn();
 const mockTxFindItems = vi.fn();
+const mockTxFindAttendee = vi.fn();
 const getBonumInvoiceStatusMock = vi.fn();
 const postTicketSaleDiscordMessageMock = vi.fn();
 const updateSets: Record<string, unknown>[] = [];
@@ -31,6 +32,9 @@ const dbMock = {
         },
         ticketOrderItems: {
           findMany: (...args: unknown[]) => mockTxFindItems(...args),
+        },
+        attendees: {
+          findFirst: (...args: unknown[]) => mockTxFindAttendee(...args),
         },
       },
       update: vi.fn(() => {
@@ -72,6 +76,7 @@ describe("Bonum ticket webhook fulfillment", () => {
     mockFindOrder.mockReset();
     mockTxFindOrder.mockReset();
     mockTxFindItems.mockReset();
+    mockTxFindAttendee.mockReset().mockResolvedValue(null);
     getBonumInvoiceStatusMock.mockReset();
     postTicketSaleDiscordMessageMock.mockReset().mockResolvedValue(undefined);
     dbMock.update.mockClear();
@@ -213,6 +218,7 @@ describe("Bonum ticket webhook fulfillment", () => {
     expect(getBonumInvoiceStatusMock).toHaveBeenCalledWith("inv-1");
     expect(result).toEqual({ ok: true, orderId: "order-1" });
     expect(dbMock.transaction).toHaveBeenCalledOnce();
+    expect(mockTxFindAttendee).toHaveBeenCalledOnce();
     expect(txInserts).toHaveLength(1);
     expect(postTicketSaleDiscordMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({

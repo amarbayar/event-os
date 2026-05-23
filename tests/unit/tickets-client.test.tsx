@@ -9,6 +9,8 @@ describe("TicketsClient", () => {
     expect(html).toContain("Ticket Sales");
     expect(html).toContain("Server-priced checkout");
     expect(html).toContain("Create Ticket Type");
+    expect(html).toContain("Add Direct Sale");
+    expect(html).toContain("Company Registration Number");
     expect(html).toContain("Sales Progress");
   });
 });

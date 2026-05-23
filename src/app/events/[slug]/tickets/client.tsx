@@ -6,6 +6,7 @@ import {
   Banknote,
   CheckCircle2,
   Clock,
+  Download,
   Pencil,
   Loader2,
   Plus,
@@ -25,6 +26,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getApiError } from "@/lib/validation";
 
@@ -49,6 +57,36 @@ type TicketEditForm = {
   price: string;
   capacity: string;
   maxPerOrder: string;
+};
+
+type DirectSaleForm = {
+  ticketTypeId: string;
+  quantity: string;
+  name: string;
+  email: string;
+  phone: string;
+  purchaserType: "individual" | "company";
+  company: string;
+  companyRegistrationNumber: string;
+  paymentMethod: "bank_transfer" | "cash" | "invoice" | "complimentary" | "sponsor" | "other";
+  paymentReference: string;
+  notes: string;
+};
+
+type CreatedDirectSale = {
+  order: {
+    id: string;
+    status: string;
+    totalAmount: number;
+    currency: string;
+  };
+  attendees: Array<{
+    id: string;
+    name: string;
+    email: string;
+    ticketType: string;
+    qrHash: string;
+  }>;
 };
 
 type TicketSalesSummary = {
@@ -79,6 +117,20 @@ const emptySummary: TicketSalesSummary = {
   ticketsSold: 0,
   ticketsReserved: 0,
   byTicketType: [],
+};
+
+const emptyDirectSale: DirectSaleForm = {
+  ticketTypeId: "",
+  quantity: "1",
+  name: "",
+  email: "",
+  phone: "",
+  purchaserType: "individual",
+  company: "",
+  companyRegistrationNumber: "",
+  paymentMethod: "bank_transfer",
+  paymentReference: "",
+  notes: "",
 };
 
 function formatMoney(amount: number, currency: string) {
@@ -113,6 +165,10 @@ export function TicketsClient() {
   const [capacity, setCapacity] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<TicketEditForm | null>(null);
+  const [directSale, setDirectSale] = useState<DirectSaleForm>(emptyDirectSale);
+  const [creatingDirectSale, setCreatingDirectSale] = useState(false);
+  const [createdDirectSale, setCreatedDirectSale] = useState<CreatedDirectSale | null>(null);
+  const [qrImages, setQrImages] = useState<Record<string, string>>({});
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -144,6 +200,11 @@ export function TicketsClient() {
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
+
+  useEffect(() => {
+    if (directSale.ticketTypeId || !ticketTypes[0]?.id) return;
+    setDirectSale((current) => ({ ...current, ticketTypeId: ticketTypes[0].id }));
+  }, [directSale.ticketTypeId, ticketTypes]);
 
   const progressByType = useMemo(() => {
     return new Map(summary.byTicketType.map((item) => [item.ticketTypeId, item]));
@@ -206,6 +267,93 @@ export function TicketsClient() {
   const cancelEditing = () => {
     setEditingId(null);
     setEditForm(null);
+  };
+
+  const updateDirectSale = (field: keyof DirectSaleForm, value: string) => {
+    setDirectSale((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "purchaserType" && value === "individual"
+        ? { companyRegistrationNumber: "" }
+        : {}),
+    }));
+  };
+
+  const createDirectSale = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const quantity = Number(directSale.quantity);
+    if (!directSale.ticketTypeId) {
+      toast.error("Choose a ticket type");
+      return;
+    }
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      toast.error("Quantity must be a whole number");
+      return;
+    }
+    if (!directSale.name.trim() || !directSale.email.trim()) {
+      toast.error("Enter buyer name and email");
+      return;
+    }
+    if (directSale.purchaserType === "company" && !directSale.companyRegistrationNumber.trim()) {
+      toast.error("Company registration number is required for company buyers");
+      return;
+    }
+
+    setCreatingDirectSale(true);
+    try {
+      const res = await fetch("/api/ticket-sales/direct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticketTypeId: directSale.ticketTypeId,
+          quantity,
+          purchaser: {
+            name: directSale.name.trim(),
+            email: directSale.email.trim(),
+            phone: directSale.phone.trim() || undefined,
+            purchaserType: directSale.purchaserType,
+            company: directSale.company.trim() || undefined,
+            companyRegistrationNumber:
+              directSale.purchaserType === "company"
+                ? directSale.companyRegistrationNumber.trim()
+                : undefined,
+          },
+          paymentMethod: directSale.paymentMethod,
+          paymentReference: directSale.paymentReference.trim() || undefined,
+          notes: directSale.notes.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await getApiError(res, "Failed to create direct sale"));
+
+      const json = (await res.json()) as { data: CreatedDirectSale };
+      const { toDataURL } = await import("qrcode");
+      const images = Object.fromEntries(
+        await Promise.all(
+          json.data.attendees.map(async (attendee) => [
+            attendee.id,
+            await toDataURL(attendee.qrHash, {
+              width: 280,
+              margin: 1,
+              color: { dark: "#111827", light: "#ffffff" },
+            }),
+          ]),
+        ),
+      ) as Record<string, string>;
+
+      setCreatedDirectSale(json.data);
+      setQrImages(images);
+      setDirectSale((current) => ({
+        ...emptyDirectSale,
+        ticketTypeId: current.ticketTypeId,
+        paymentMethod: current.paymentMethod,
+      }));
+      toast.success("Direct sale created with QR tickets");
+      await loadTickets();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create direct sale");
+    } finally {
+      setCreatingDirectSale(false);
+    }
   };
 
   const updateEditField = (field: keyof TicketEditForm, value: string) => {
@@ -409,6 +557,197 @@ export function TicketsClient() {
           Add
         </Button>
       </form>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Ticket className="h-4 w-4 text-primary" />
+            Add Direct Sale
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={createDirectSale} className="grid gap-3 lg:grid-cols-4">
+            <div className="space-y-1.5 lg:col-span-2">
+              <Label>Ticket Type</Label>
+              <Select
+                value={directSale.ticketTypeId}
+                onValueChange={(value) => updateDirectSale("ticketTypeId", value || "")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose ticket type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ticketTypes.map((ticket) => (
+                    <SelectItem key={ticket.id} value={ticket.id}>
+                      {ticket.name} · {formatMoney(ticket.price, ticket.currency)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="direct-quantity">Quantity</Label>
+              <Input
+                id="direct-quantity"
+                inputMode="numeric"
+                value={directSale.quantity}
+                onChange={(event) => updateDirectSale("quantity", event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Payment</Label>
+              <Select
+                value={directSale.paymentMethod}
+                onValueChange={(value) => updateDirectSale("paymentMethod", value || "bank_transfer")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="invoice">Invoice</SelectItem>
+                  <SelectItem value="complimentary">Complimentary</SelectItem>
+                  <SelectItem value="sponsor">Sponsor</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="direct-name">Buyer Name</Label>
+              <Input
+                id="direct-name"
+                value={directSale.name}
+                onChange={(event) => updateDirectSale("name", event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="direct-email">Buyer Email</Label>
+              <Input
+                id="direct-email"
+                type="email"
+                value={directSale.email}
+                onChange={(event) => updateDirectSale("email", event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="direct-phone">Phone</Label>
+              <Input
+                id="direct-phone"
+                value={directSale.phone}
+                onChange={(event) => updateDirectSale("phone", event.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Buyer Type</Label>
+              <Select
+                value={directSale.purchaserType}
+                onValueChange={(value) => updateDirectSale("purchaserType", value || "individual")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="individual">Individual</SelectItem>
+                  <SelectItem value="company">Company</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="direct-company">Company</Label>
+              <Input
+                id="direct-company"
+                value={directSale.company}
+                onChange={(event) => updateDirectSale("company", event.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="direct-company-registration">Company Registration Number</Label>
+              <Input
+                id="direct-company-registration"
+                value={directSale.companyRegistrationNumber}
+                onChange={(event) => updateDirectSale("companyRegistrationNumber", event.target.value)}
+                disabled={directSale.purchaserType !== "company"}
+                placeholder="Required for company"
+              />
+            </div>
+            <div className="space-y-1.5 lg:col-span-2">
+              <Label htmlFor="direct-reference">Payment Reference</Label>
+              <Input
+                id="direct-reference"
+                value={directSale.paymentReference}
+                onChange={(event) => updateDirectSale("paymentReference", event.target.value)}
+                placeholder="Bank transaction, invoice, or receipt number"
+              />
+            </div>
+            <div className="space-y-1.5 lg:col-span-2">
+              <Label htmlFor="direct-notes">Notes</Label>
+              <Textarea
+                id="direct-notes"
+                value={directSale.notes}
+                onChange={(event) => updateDirectSale("notes", event.target.value)}
+                placeholder="Optional internal note"
+              />
+            </div>
+            <div className="flex items-end lg:col-span-2">
+              <Button type="submit" disabled={creatingDirectSale || ticketTypes.length === 0}>
+                {creatingDirectSale ? <Loader2 className="animate-spin" /> : <Plus />}
+                Create QR Tickets
+              </Button>
+            </div>
+          </form>
+
+          {createdDirectSale && (
+            <div className="rounded-lg border bg-muted/20 p-4">
+              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-medium">Direct sale created</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Order {createdDirectSale.order.id} · {formatMoney(createdDirectSale.order.totalAmount, createdDirectSale.order.currency)}
+                  </p>
+                </div>
+                <Badge className="w-fit">QR ready</Badge>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {createdDirectSale.attendees.map((attendee, index) => (
+                  <div key={attendee.id} className="rounded-lg border bg-background p-3">
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium">Ticket {index + 1}</p>
+                        <p className="text-xs text-muted-foreground">{attendee.name}</p>
+                      </div>
+                      <Badge variant="outline" className="capitalize">{attendee.ticketType}</Badge>
+                    </div>
+                    {qrImages[attendee.id] && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={qrImages[attendee.id]}
+                        alt={`QR code for ${attendee.name}`}
+                        className="mx-auto h-44 w-44 rounded-md bg-white p-2"
+                      />
+                    )}
+                    <p className="mt-2 break-all font-mono text-[11px] text-muted-foreground">
+                      {attendee.qrHash}
+                    </p>
+                    {qrImages[attendee.id] && (
+                      <a
+                        href={qrImages[attendee.id]}
+                        download={`ticket-${attendee.id}.png`}
+                        className="mt-3 inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Download QR
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">

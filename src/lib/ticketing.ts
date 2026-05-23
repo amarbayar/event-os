@@ -40,6 +40,30 @@ export type CheckoutInput = {
   idempotencyKey?: string | null;
 };
 
+type DirectSalePaymentMethod =
+  | "bank_transfer"
+  | "cash"
+  | "invoice"
+  | "complimentary"
+  | "sponsor"
+  | "other";
+
+export type DirectSaleInput = {
+  editionId: string;
+  organizationId: string;
+  ticketTypeId: string;
+  quantity: number;
+  purchaser: CheckoutInput["purchaser"];
+  paymentMethod: DirectSalePaymentMethod;
+  paymentReference?: string;
+  notes?: string;
+  createdBy?: {
+    id?: string;
+    name?: string | null;
+    email?: string | null;
+  };
+};
+
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -78,6 +102,18 @@ function generateQrHash(input: string): string {
     .update(`${input}-${randomBytes(16).toString("hex")}`)
     .digest("hex")
     .slice(0, 32);
+}
+
+async function generateUniqueQrHash(tx: DbLike, editionId: string, input: string): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const qrHash = generateQrHash(`${input}-${attempt}`);
+    const existing = await tx.query.attendees.findFirst({
+      where: and(eq(attendees.editionId, editionId), eq(attendees.qrHash, qrHash)),
+    });
+    if (!existing) return qrHash;
+  }
+
+  throw new Error("Could not generate a unique attendee QR code");
 }
 
 function parseProviderList(value: string | undefined): string[] | undefined {
@@ -124,6 +160,57 @@ function validateCheckoutInput(input: CheckoutInput): string | null {
     return "purchaser.companyRegistrationNumber is too long";
   }
   return null;
+}
+
+function validatePurchaser(purchaser: CheckoutInput["purchaser"]): string | null {
+  const name = purchaser.name?.trim();
+  const email = purchaser.email?.trim();
+  if (!name || name.length < 2 || name.length > 255) return "purchaser.name is invalid";
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "purchaser.email is invalid";
+  if (purchaser.phone && purchaser.phone.length > 50) return "purchaser.phone is too long";
+  if (purchaser.company && purchaser.company.length > 255) {
+    return "purchaser.company is too long";
+  }
+  if (
+    purchaser.purchaserType &&
+    purchaser.purchaserType !== "individual" &&
+    purchaser.purchaserType !== "company"
+  ) {
+    return "purchaser.purchaserType is invalid";
+  }
+  const purchaserType = purchaser.purchaserType || "individual";
+  const companyRegistrationNumber = purchaser.companyRegistrationNumber?.trim() || "";
+  if (purchaserType === "company" && companyRegistrationNumber.length < 2) {
+    return "purchaser.companyRegistrationNumber is required";
+  }
+  if (companyRegistrationNumber.length > 50) {
+    return "purchaser.companyRegistrationNumber is too long";
+  }
+  return null;
+}
+
+function validateDirectSaleInput(input: DirectSaleInput): string | null {
+  if (!input.editionId || !input.organizationId) return "editionId and organizationId are required";
+  if (!input.ticketTypeId) return "ticketTypeId is required";
+  if (!Number.isInteger(input.quantity) || input.quantity < 1) return "quantity must be a positive integer";
+  if (input.quantity > 50) return "quantity cannot exceed 50";
+  if (
+    ![
+      "bank_transfer",
+      "cash",
+      "invoice",
+      "complimentary",
+      "sponsor",
+      "other",
+    ].includes(input.paymentMethod)
+  ) {
+    return "paymentMethod is invalid";
+  }
+  if (input.paymentReference && input.paymentReference.length > 120) {
+    return "paymentReference is too long";
+  }
+  if (input.notes && input.notes.length > 1000) return "notes is too long";
+  return validatePurchaser(input.purchaser);
 }
 
 function checkoutFingerprint(input: CheckoutInput, ticketTypeId: string): string {
@@ -437,6 +524,161 @@ export async function createBonumTicketCheckout(input: CheckoutInput) {
   }
 }
 
+export async function createDirectTicketSale(input: DirectSaleInput) {
+  const validationError = validateDirectSaleInput(input);
+  if (validationError) {
+    return { ok: false as const, status: 400, error: validationError };
+  }
+
+  const purchaserEmail = normalizeEmail(input.purchaser.email);
+  const paidAt = new Date();
+  const transactionId = `direct_${randomBytes(16).toString("hex")}`;
+  const purchaserType = input.purchaser.purchaserType || "individual";
+  const companyRegistrationNumber =
+    purchaserType === "company"
+      ? input.purchaser.companyRegistrationNumber?.trim() || null
+      : null;
+
+  const sale = await ticketingTransaction(async (tx) => {
+    const ticket = await tx.query.ticketTypes.findFirst({
+      where: and(
+        eq(ticketTypes.id, input.ticketTypeId),
+        eq(ticketTypes.editionId, input.editionId),
+        eq(ticketTypes.organizationId, input.organizationId),
+      ),
+    });
+
+    if (!ticket) {
+      return { ok: false as const, status: 404, error: "Ticket type not found" };
+    }
+    if (input.quantity > ticket.maxPerOrder) {
+      return {
+        ok: false as const,
+        status: 400,
+        error: `quantity cannot exceed ${ticket.maxPerOrder} for this ticket type`,
+      };
+    }
+
+    const [updatedTicket] = await tx
+      .update(ticketTypes)
+      .set({
+        soldCount: sql`${ticketTypes.soldCount} + ${input.quantity}`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(ticketTypes.id, ticket.id),
+          eq(ticketTypes.editionId, input.editionId),
+          eq(ticketTypes.organizationId, input.organizationId),
+          or(
+            sql`${ticketTypes.capacity} is null`,
+            sql`${ticketTypes.capacity} - ${ticketTypes.soldCount} - ${ticketTypes.reservedCount} >= ${input.quantity}`,
+          ),
+        ),
+      )
+      .returning();
+
+    if (!updatedTicket) {
+      return { ok: false as const, status: 409, error: "Ticket type is sold out" };
+    }
+
+    const effectiveUnitAmount = input.paymentMethod === "complimentary" ? 0 : ticket.price;
+    const totalAmount = effectiveUnitAmount * input.quantity;
+    const [order] = await tx
+      .insert(ticketOrders)
+      .values({
+        editionId: input.editionId,
+        organizationId: input.organizationId,
+        purchaserName: input.purchaser.name.trim(),
+        purchaserEmail,
+        purchaserPhone: input.purchaser.phone?.trim() || null,
+        purchaserCompany: input.purchaser.company?.trim() || null,
+        status: "paid",
+        totalAmount,
+        currency: ticket.currency,
+        provider: "bank",
+        providerTransactionId: transactionId,
+        quantity: input.quantity,
+        paidAt,
+        fulfilledAt: paidAt,
+        metadata: {
+          directSale: true,
+          paymentMethod: input.paymentMethod,
+          paymentReference: input.paymentReference?.trim() || null,
+          notes: input.notes?.trim() || null,
+          listUnitAmount: ticket.price,
+          purchaserType,
+          companyRegistrationNumber,
+          createdBy: input.createdBy || null,
+        },
+      })
+      .returning();
+
+    const [item] = await tx
+      .insert(ticketOrderItems)
+      .values({
+        orderId: order.id,
+        ticketTypeId: ticket.id,
+        ticketTypeName: ticket.name,
+        ticketTypeSlug: ticket.slug,
+        unitAmount: effectiveUnitAmount,
+        totalAmount,
+        currency: ticket.currency,
+        quantity: input.quantity,
+      })
+      .returning();
+
+    const ticketRows = [];
+    for (let i = 0; i < input.quantity; i++) {
+      const [attendee] = await tx
+        .insert(attendees)
+        .values({
+          editionId: input.editionId,
+          organizationId: input.organizationId,
+          ticketOrderId: order.id,
+          ticketOrderItemId: item.id,
+          name: order.purchaserName,
+          email: order.purchaserEmail,
+          ticketType: item.ticketTypeSlug,
+          qrHash: await generateUniqueQrHash(tx, input.editionId, `${order.id}-${item.id}-${i}`),
+          source: "offline",
+          stage: "confirmed",
+        })
+        .returning();
+      ticketRows.push(attendee);
+    }
+
+    return {
+      ok: true as const,
+      order,
+      item,
+      ticket,
+      attendees: ticketRows,
+    };
+  });
+
+  if (sale.ok) {
+    await postTicketSaleDiscordMessage({
+      orderId: sale.order.id,
+      purchaserName: sale.order.purchaserName,
+      purchaserEmail: sale.order.purchaserEmail,
+      totalAmount: sale.order.totalAmount,
+      currency: sale.order.currency,
+      paidAt,
+      items: [
+        {
+          ticketTypeName: sale.item.ticketTypeName,
+          quantity: sale.item.quantity,
+          totalAmount: sale.item.totalAmount,
+          currency: sale.item.currency,
+        },
+      ],
+    });
+  }
+
+  return sale;
+}
+
 export async function getPublicTicketOrder(
   orderId: string,
   customerAccessToken?: string | null,
@@ -525,7 +767,7 @@ async function fulfillPaidOrder(orderId: string, paidAt: Date) {
           name: order.purchaserName,
           email: order.purchaserEmail,
           ticketType: item.ticketTypeSlug,
-          qrHash: generateQrHash(`${order.id}-${item.id}-${i}`),
+          qrHash: await generateUniqueQrHash(tx, order.editionId, `${order.id}-${item.id}-${i}`),
           source: "ticket",
           stage: "confirmed",
         });

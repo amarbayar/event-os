@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { testDb } from "../setup";
 import { createTestFixtures, type TestFixtures } from "../fixtures";
 import * as schema from "@/db/schema";
 
 const createBonumInvoiceMock = vi.fn();
+const requirePermissionMock = vi.fn();
 type AttendeeRow = typeof schema.attendees.$inferSelect;
 let invoiceSequence = 0;
 
@@ -16,6 +18,11 @@ vi.mock("@/db", async () => {
 vi.mock("@/lib/payments/bonum", () => ({
   createBonumInvoice: (...args: unknown[]) => createBonumInvoiceMock(...args),
   getBonumTerminalId: vi.fn(() => "terminal-test"),
+}));
+
+vi.mock("@/lib/rbac", () => ({
+  requirePermission: (...args: unknown[]) => requirePermissionMock(...args),
+  isRbacError: (value: unknown) => value instanceof Response,
 }));
 
 describe("ticketing checkout and Bonum fulfillment", () => {
@@ -42,6 +49,17 @@ describe("ticketing checkout and Bonum fulfillment", () => {
         invoiceId,
         followUpLink: `https://ecommerce.bonum.mn/ecommerce?invoiceId=${invoiceId}`,
       });
+    });
+    requirePermissionMock.mockReset().mockResolvedValue({
+      user: {
+        id: f.users.TestOrganizer.id,
+        role: "organizer",
+        name: "Organizer",
+        email: "organizer@test.local",
+      },
+      orgId: f.orgId,
+      editionId: f.editionId,
+      source: "web",
     });
 
     await testDb
@@ -163,6 +181,102 @@ describe("ticketing checkout and Bonum fulfillment", () => {
       where: eq(schema.ticketTypes.slug, "regular"),
     });
     expect(ticket?.reservedCount).toBe(2);
+  });
+
+  it("creates a paid direct sale with unique QR-backed attendees", async () => {
+    const { createDirectTicketSale } = await import("@/lib/ticketing");
+
+    const result = await createDirectTicketSale({
+      editionId: f.editionId,
+      organizationId: f.orgId,
+      ticketTypeId: "11111111-1111-4111-8111-111111111111",
+      quantity: 2,
+      purchaser: {
+        name: "Direct Buyer",
+        email: "DIRECT@example.com",
+        purchaserType: "company",
+        company: "Direct Co",
+        companyRegistrationNumber: "7654321",
+      },
+      paymentMethod: "bank_transfer",
+      paymentReference: "WIRE-100",
+      notes: "Paid outside Bonum",
+      createdBy: {
+        id: f.users.TestOrganizer.id,
+        email: "organizer@test.local",
+        name: "Organizer",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const order = await testDb.query.ticketOrders.findFirst({
+      where: eq(schema.ticketOrders.id, result.order.id),
+    });
+    const ticket = await testDb.query.ticketTypes.findFirst({
+      where: eq(schema.ticketTypes.id, "11111111-1111-4111-8111-111111111111"),
+    });
+    const attendees = await testDb.query.attendees.findMany({
+      where: and(
+        eq(schema.attendees.organizationId, f.orgId),
+        eq(schema.attendees.ticketOrderId, result.order.id),
+      ),
+    });
+
+    expect(order).toMatchObject({
+      status: "paid",
+      provider: "bank",
+      totalAmount: 200_000,
+      currency: "MNT",
+      purchaserEmail: "direct@example.com",
+      purchaserCompany: "Direct Co",
+    });
+    expect(order?.metadata).toMatchObject({
+      directSale: true,
+      paymentMethod: "bank_transfer",
+      paymentReference: "WIRE-100",
+      notes: "Paid outside Bonum",
+      purchaserType: "company",
+      companyRegistrationNumber: "7654321",
+      createdBy: expect.objectContaining({ id: f.users.TestOrganizer.id }),
+    });
+    expect(order?.paidAt).toBeTruthy();
+    expect(order?.fulfilledAt).toBeTruthy();
+    expect(ticket?.soldCount).toBe(2);
+    expect(ticket?.reservedCount).toBe(0);
+    expect(attendees).toHaveLength(2);
+    expect(attendees.every((attendee: AttendeeRow) => attendee.source === "offline")).toBe(true);
+    expect(new Set(attendees.map((attendee: AttendeeRow) => attendee.qrHash)).size).toBe(2);
+
+    const { POST: checkIn } = await import("@/app/api/check-in/route");
+    const scanRes = await checkIn(
+      new NextRequest("http://localhost/api/check-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          editionId: f.editionId,
+          qrHash: attendees[0].qrHash,
+          stationId: "direct-sale-test-station",
+        }),
+      }),
+    );
+    const scanJson = await scanRes.json();
+    const checkedIn = await testDb.query.attendees.findFirst({
+      where: eq(schema.attendees.id, attendees[0].id),
+    });
+
+    expect(scanRes.status).toBe(200);
+    expect(scanJson.data).toMatchObject({
+      id: attendees[0].id,
+      checkedIn: true,
+      checkedInBy: "direct-sale-test-station",
+    });
+    expect(checkedIn).toMatchObject({
+      id: attendees[0].id,
+      checkedIn: true,
+      checkedInBy: "direct-sale-test-station",
+    });
   });
 
   it("fulfills a paid Bonum webhook once and creates QR-backed attendees", async () => {
