@@ -78,6 +78,11 @@ type CreatedDirectSale = {
     status: string;
     totalAmount: number;
     currency: string;
+    paidAt?: string | null;
+    fulfilledAt?: string | null;
+    purchaserName?: string | null;
+    purchaserEmail?: string | null;
+    purchaserCompany?: string | null;
   };
   attendees: Array<{
     id: string;
@@ -86,7 +91,20 @@ type CreatedDirectSale = {
     ticketType: string;
     ticketTypeName?: string;
     qrHash: string;
+    checkedIn?: boolean;
   }>;
+};
+
+type DirectSaleRecord = CreatedDirectSale & {
+  item: {
+    ticketTypeName: string;
+    quantity: number;
+    unitAmount: number;
+    totalAmount: number;
+    currency: string;
+  };
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
 };
 
 type TicketSalesSummary = {
@@ -147,6 +165,13 @@ const purchaserTypeLabels: Record<DirectSaleForm["purchaserType"], string> = {
   company: "Company",
 };
 
+function directSalePaymentLabel(value?: string | null) {
+  if (!value) return "Payment recorded";
+  return value in directSalePaymentLabels
+    ? directSalePaymentLabels[value as DirectSaleForm["paymentMethod"]]
+    : value.replace(/_/g, " ");
+}
+
 function formatMoney(amount: number, currency: string) {
   return `${new Intl.NumberFormat("en-US").format(amount)} ${currency}`;
 }
@@ -183,6 +208,22 @@ async function loadImageDataUrl(src: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+async function generateQrImagesForAttendees(attendees: CreatedDirectSale["attendees"]) {
+  const { toDataURL } = await import("qrcode");
+  return Object.fromEntries(
+    await Promise.all(
+      attendees.map(async (attendee) => [
+        attendee.id,
+        await toDataURL(attendee.qrHash, {
+          width: 280,
+          margin: 1,
+          color: { dark: "#111827", light: "#ffffff" },
+        }),
+      ]),
+    ),
+  ) as Record<string, string>;
 }
 
 type DirectSaleTicketPdfInput = {
@@ -358,6 +399,7 @@ export function TicketsClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<TicketEditForm | null>(null);
   const [directSale, setDirectSale] = useState<DirectSaleForm>(emptyDirectSale);
+  const [directSales, setDirectSales] = useState<DirectSaleRecord[]>([]);
   const [creatingDirectSale, setCreatingDirectSale] = useState(false);
   const [createdDirectSale, setCreatedDirectSale] = useState<CreatedDirectSale | null>(null);
   const [qrImages, setQrImages] = useState<Record<string, string>>({});
@@ -389,9 +431,32 @@ export function TicketsClient() {
     }
   }, []);
 
+  const loadDirectSales = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ticket-sales/direct");
+      if (!res.ok) throw new Error(await getApiError(res, "Failed to load direct sales"));
+
+      const json = (await res.json()) as { data: DirectSaleRecord[] };
+      const sales = json.data || [];
+      setDirectSales(sales);
+
+      const attendees = sales.flatMap((sale) => sale.attendees);
+      if (attendees.length > 0) {
+        const images = await generateQrImagesForAttendees(attendees);
+        setQrImages((current) => ({ ...current, ...images }));
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load direct sales");
+    }
+  }, []);
+
+  const refreshTickets = useCallback(async () => {
+    await Promise.all([loadTickets(), loadDirectSales()]);
+  }, [loadDirectSales, loadTickets]);
+
   useEffect(() => {
-    void loadTickets();
-  }, [loadTickets]);
+    void refreshTickets();
+  }, [refreshTickets]);
 
   useEffect(() => {
     if (directSale.ticketTypeId || !ticketTypes[0]?.id) return;
@@ -522,29 +587,17 @@ export function TicketsClient() {
       if (!res.ok) throw new Error(await getApiError(res, "Failed to create direct sale"));
 
       const json = (await res.json()) as { data: CreatedDirectSale };
-      const { toDataURL } = await import("qrcode");
-      const images = Object.fromEntries(
-        await Promise.all(
-          json.data.attendees.map(async (attendee) => [
-            attendee.id,
-            await toDataURL(attendee.qrHash, {
-              width: 280,
-              margin: 1,
-              color: { dark: "#111827", light: "#ffffff" },
-            }),
-          ]),
-        ),
-      ) as Record<string, string>;
+      const images = await generateQrImagesForAttendees(json.data.attendees);
 
       setCreatedDirectSale(json.data);
-      setQrImages(images);
+      setQrImages((current) => ({ ...current, ...images }));
       setDirectSale((current) => ({
         ...emptyDirectSale,
         ticketTypeId: current.ticketTypeId,
         paymentMethod: current.paymentMethod,
       }));
       toast.success("Direct sale created with QR tickets");
-      await loadTickets();
+      await refreshTickets();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create direct sale");
     } finally {
@@ -660,7 +713,7 @@ export function TicketsClient() {
             Bonum checkout, sales counters, and QR-ready attendees.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadTickets} disabled={loading}>
+        <Button variant="outline" size="sm" onClick={refreshTickets} disabled={loading}>
           {loading ? <Loader2 className="animate-spin" /> : <RefreshCcw />}
           Refresh
         </Button>
@@ -983,6 +1036,80 @@ export function TicketsClient() {
               </div>
             </div>
           )}
+
+          <div className="space-y-3">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-medium">Previous Direct Sales</h3>
+                <p className="text-xs text-muted-foreground">
+                  Re-download branded PDF tickets without creating new attendees or QR codes.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={loadDirectSales}>
+                <RefreshCcw className="h-3.5 w-3.5" />
+                Refresh
+              </Button>
+            </div>
+
+            {directSales.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+                No direct sales recorded yet.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {directSales.map((sale) => (
+                  <div
+                    key={sale.order.id}
+                    className="rounded-lg border bg-background p-3"
+                  >
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">
+                            {sale.order.purchaserName || sale.attendees[0]?.name || "Direct sale"}
+                          </p>
+                          <Badge variant="outline">
+                            {sale.item.quantity} {sale.item.quantity === 1 ? "ticket" : "tickets"}
+                          </Badge>
+                          <Badge variant="secondary">
+                            {directSalePaymentLabel(sale.paymentMethod)}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {sale.item.ticketTypeName} · {formatMoney(sale.order.totalAmount, sale.order.currency)}
+                        </p>
+                        <p className="break-all text-xs text-muted-foreground">
+                          {sale.order.purchaserEmail}
+                          {sale.paymentReference ? ` · Ref ${sale.paymentReference}` : ""}
+                          {" · "}
+                          Order {sale.order.id}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={sale.attendees.some((attendee) => !qrImages[attendee.id])}
+                        onClick={() => {
+                          void downloadDirectSaleTicketZip({
+                            sale,
+                            qrImages,
+                          })
+                            .then(() => toast.success("Ticket ZIP downloaded"))
+                            .catch((error) => {
+                              toast.error(error instanceof Error ? error.message : "Failed to create ticket ZIP");
+                            });
+                        }}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Re-download PDFs
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

@@ -37,4 +37,15 @@ describe("TicketsClient", () => {
     expect(source).toContain("import(\"jszip\")");
     expect(source).toContain("Download all PDFs");
   });
+
+  it("shows prior direct sales so QR ticket PDFs can be downloaded again", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/app/events/[slug]/tickets/client.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("loadDirectSales");
+    expect(source).toContain("Previous Direct Sales");
+    expect(source).toContain("Re-download PDFs");
+  });
 });

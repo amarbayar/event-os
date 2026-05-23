@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requirePermissionMock = vi.fn();
 const createDirectTicketSaleMock = vi.fn();
+const listDirectTicketSalesMock = vi.fn();
 
 vi.mock("@/lib/rbac", () => ({
   requirePermission: (...args: unknown[]) => requirePermissionMock(...args),
@@ -11,6 +12,7 @@ vi.mock("@/lib/rbac", () => ({
 
 vi.mock("@/lib/ticketing", () => ({
   createDirectTicketSale: (...args: unknown[]) => createDirectTicketSaleMock(...args),
+  listDirectTicketSales: (...args: unknown[]) => listDirectTicketSalesMock(...args),
 }));
 
 function ctx() {
@@ -42,6 +44,36 @@ describe("direct ticket sales route", () => {
         { id: "attendee-2", name: "Buyer", email: "buyer@example.com", qrHash: "qr-2", ticketType: "regular" },
       ],
     });
+    listDirectTicketSalesMock.mockReset().mockResolvedValue([
+      {
+        order: {
+          id: "order-1",
+          status: "paid",
+          totalAmount: 200000,
+          currency: "MNT",
+          paidAt: new Date("2026-05-23T01:00:00.000Z"),
+          fulfilledAt: new Date("2026-05-23T01:00:00.000Z"),
+          purchaserName: "Buyer",
+          purchaserEmail: "buyer@example.com",
+          purchaserCompany: null,
+        },
+        item: {
+          ticketTypeName: "Regular",
+          quantity: 2,
+          unitAmount: 100000,
+          totalAmount: 200000,
+          currency: "MNT",
+        },
+        metadata: {
+          paymentMethod: "bank_transfer",
+          paymentReference: "INV-100",
+        },
+        attendees: [
+          { id: "attendee-1", name: "Buyer", email: "buyer@example.com", qrHash: "qr-1", ticketType: "regular", checkedIn: false },
+          { id: "attendee-2", name: "Buyer", email: "buyer@example.com", qrHash: "qr-2", ticketType: "regular", checkedIn: false },
+        ],
+      },
+    ]);
   });
 
   it("creates a paid direct sale through the server-side ticketing service", async () => {
@@ -119,5 +151,35 @@ describe("direct ticket sales route", () => {
 
     expect(res.status).toBe(409);
     expect(json.error).toBe("Ticket type is sold out");
+  });
+
+  it("lists prior direct sales for ticket PDF re-downloads", async () => {
+    const { GET } = await import("@/app/api/ticket-sales/direct/route");
+    const req = new NextRequest("http://localhost/api/ticket-sales/direct");
+
+    const res = await GET(req);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(requirePermissionMock).toHaveBeenCalledWith(req, "ticket", "read");
+    expect(listDirectTicketSalesMock).toHaveBeenCalledWith({
+      editionId: "edition-1",
+      organizationId: "org-1",
+    });
+    expect(json.data).toHaveLength(1);
+    expect(json.data[0]).toMatchObject({
+      order: {
+        id: "order-1",
+        purchaserName: "Buyer",
+        purchaserEmail: "buyer@example.com",
+      },
+      item: {
+        ticketTypeName: "Regular",
+      },
+      paymentMethod: "bank_transfer",
+      paymentReference: "INV-100",
+    });
+    expect(json.data[0].attendees).toHaveLength(2);
+    expect(json.data[0].attendees[0]).toMatchObject({ qrHash: "qr-1", ticketTypeName: "Regular" });
   });
 });

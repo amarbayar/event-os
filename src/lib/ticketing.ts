@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
-import { and, asc, eq, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   attendees,
@@ -677,6 +677,72 @@ export async function createDirectTicketSale(input: DirectSaleInput) {
   }
 
   return sale;
+}
+
+function directSaleMetadata(order: typeof ticketOrders.$inferSelect) {
+  const metadata = (order.metadata || {}) as Record<string, unknown>;
+  return {
+    paymentMethod:
+      typeof metadata.paymentMethod === "string" ? metadata.paymentMethod : null,
+    paymentReference:
+      typeof metadata.paymentReference === "string" ? metadata.paymentReference : null,
+  };
+}
+
+export async function listDirectTicketSales(input: {
+  editionId: string;
+  organizationId: string;
+}) {
+  const orders = await db.query.ticketOrders.findMany({
+    where: and(
+      eq(ticketOrders.editionId, input.editionId),
+      eq(ticketOrders.organizationId, input.organizationId),
+      eq(ticketOrders.provider, "bank"),
+      like(ticketOrders.providerTransactionId, "direct_%"),
+    ),
+    orderBy: [desc(ticketOrders.createdAt)],
+  });
+
+  const orderRows = orders as Array<typeof ticketOrders.$inferSelect>;
+  const orderIds = orderRows.map((order) => order.id);
+  if (orderIds.length === 0) return [];
+
+  const [items, ticketRows] = await Promise.all([
+    db.query.ticketOrderItems.findMany({
+      where: inArray(ticketOrderItems.orderId, orderIds),
+    }),
+    db.query.attendees.findMany({
+      where: inArray(attendees.ticketOrderId, orderIds),
+      orderBy: [asc(attendees.createdAt), asc(attendees.id)],
+    }),
+  ]);
+
+  const itemByOrderId = new Map(
+    (items as TicketOrderItemRow[]).map((item) => [item.orderId, item]),
+  );
+  const attendeesByOrderId = new Map<
+    string,
+    Array<typeof attendees.$inferSelect>
+  >();
+  for (const attendee of ticketRows as Array<typeof attendees.$inferSelect>) {
+    if (!attendee.ticketOrderId) continue;
+    const list = attendeesByOrderId.get(attendee.ticketOrderId) || [];
+    list.push(attendee);
+    attendeesByOrderId.set(attendee.ticketOrderId, list);
+  }
+
+  return orderRows.flatMap((order) => {
+    const item = itemByOrderId.get(order.id);
+    if (!item) return [];
+    return [
+      {
+        order,
+        item,
+        metadata: directSaleMetadata(order),
+        attendees: attendeesByOrderId.get(order.id) || [],
+      },
+    ];
+  });
 }
 
 export async function getPublicTicketOrder(

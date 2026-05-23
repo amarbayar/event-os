@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isRbacError, requirePermission } from "@/lib/rbac";
-import { createDirectTicketSale } from "@/lib/ticketing";
+import { createDirectTicketSale, listDirectTicketSales } from "@/lib/ticketing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,4 +109,48 @@ export async function POST(req: NextRequest) {
     },
     { status: 201 },
   );
+}
+
+export async function GET(req: NextRequest) {
+  const ctx = await requirePermission(req, "ticket", "read");
+  if (isRbacError(ctx)) return ctx;
+
+  const sales = await listDirectTicketSales({
+    editionId: ctx.editionId,
+    organizationId: ctx.orgId,
+  });
+
+  return NextResponse.json({
+    data: sales.map((sale) => ({
+      order: {
+        id: sale.order.id,
+        status: sale.order.status,
+        totalAmount: sale.order.totalAmount,
+        currency: sale.order.currency,
+        paidAt: sale.order.paidAt,
+        fulfilledAt: sale.order.fulfilledAt,
+        purchaserName: sale.order.purchaserName,
+        purchaserEmail: sale.order.purchaserEmail,
+        purchaserCompany: sale.order.purchaserCompany,
+      },
+      item: {
+        ticketTypeName: sale.item.ticketTypeName,
+        quantity: sale.item.quantity,
+        unitAmount: sale.item.unitAmount,
+        totalAmount: sale.item.totalAmount,
+        currency: sale.item.currency,
+      },
+      paymentMethod: sale.metadata.paymentMethod,
+      paymentReference: sale.metadata.paymentReference,
+      attendees: sale.attendees.map((attendee) => ({
+        id: attendee.id,
+        name: attendee.name,
+        email: attendee.email,
+        ticketType: attendee.ticketType,
+        ticketTypeName: sale.item.ticketTypeName,
+        qrHash: attendee.qrHash,
+        checkedIn: attendee.checkedIn,
+      })),
+    })),
+  });
 }
