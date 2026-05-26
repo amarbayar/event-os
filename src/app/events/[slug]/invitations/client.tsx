@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Send, X } from "lucide-react";
+import { Download, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequired, validateEmail, getApiError } from "@/lib/validation";
 
@@ -52,6 +52,138 @@ type Invitation = {
   sourceType: string | null;
   qrHash: string | null;
 };
+
+async function loadImageDataUrl(src: string): Promise<string | null> {
+  try {
+    const response = await fetch(src);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function invitationFileName(invitation: Invitation) {
+  const name = invitation.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return `devsummit-2026-invitation-${name || invitation.id}.pdf`;
+}
+
+async function downloadInvitationTicketPdf(invitation: Invitation) {
+  if (!invitation.qrHash) {
+    throw new Error("This invitation does not have a QR code yet");
+  }
+
+  const [{ jsPDF }, { toDataURL }] = await Promise.all([
+    import("jspdf"),
+    import("qrcode"),
+  ]);
+  const [logoDataUrl, qrDataUrl] = await Promise.all([
+    loadImageDataUrl("/logo.png"),
+    toDataURL(invitation.qrHash, {
+      width: 280,
+      margin: 1,
+      color: { dark: "#111827", light: "#ffffff" },
+    }),
+  ]);
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const invitationType =
+    typeConfig[invitation.type as InvitationType]?.label || invitation.type;
+
+  doc.setFillColor("#070A12");
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+  doc.setFillColor("#00D1B2");
+  doc.circle(pageWidth - 48, 58, 138, "F");
+  doc.setFillColor("#F5B642");
+  doc.circle(18, pageHeight - 28, 118, "F");
+
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, "PNG", 44, 38, 112, 40, undefined, "FAST");
+  } else {
+    doc.setTextColor("#ffffff");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.text("DevSummit", 44, 62);
+  }
+
+  doc.setTextColor("#B9C3D5");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text("May 30-31, 2026 - Ulaanbaatar", 44, 98);
+
+  doc.setFillColor("#ffffff");
+  doc.roundedRect(38, 132, pageWidth - 76, 560, 18, 18, "F");
+  doc.setDrawColor("#E5EAF3");
+  doc.roundedRect(38, 132, pageWidth - 76, 560, 18, 18);
+
+  doc.setTextColor("#0B1020");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(28);
+  doc.text("DevSummit 2026 Guest Pass", 70, 190);
+  doc.setFontSize(13);
+  doc.setTextColor("#556070");
+  doc.text("Show this QR code at registration for check-in.", 70, 214);
+
+  doc.setFillColor("#F7F9FC");
+  doc.roundedRect(70, 248, 220, 220, 12, 12, "F");
+  doc.addImage(qrDataUrl, "PNG", 88, 266, 184, 184, undefined, "FAST");
+
+  const detailsX = 324;
+  const detailRows = [
+    ["Guest", invitation.name],
+    ["Invitation type", invitationType],
+    ["Invited by", invitation.invitedBy || "DevSummit"],
+    ["Invitation ID", invitation.id],
+  ];
+
+  detailRows.forEach(([label, value], index) => {
+    const y = 264 + index * 62;
+    doc.setTextColor("#7A8494");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text(label.toUpperCase(), detailsX, y);
+    doc.setTextColor("#0B1020");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(index === 3 ? 9 : 14);
+    doc.text(doc.splitTextToSize(value, 190).slice(0, 2), detailsX, y + 20);
+  });
+
+  doc.setFillColor("#0B1020");
+  doc.roundedRect(70, 518, pageWidth - 140, 86, 12, 12, "F");
+  doc.setTextColor("#ffffff");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Registration note", 94, 548);
+  doc.setTextColor("#C9D3E3");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(
+    doc.splitTextToSize(
+      "If your QR code cannot be scanned, organizers can look up your guest pass by name, email, invitation ID, or QR code.",
+      pageWidth - 188,
+    ),
+    94,
+    572,
+  );
+
+  doc.setTextColor("#B9C3D5");
+  doc.setFontSize(10);
+  doc.text("devsummit.dev", 44, pageHeight - 42);
+  doc.text("DevSummit guest registration", pageWidth - 180, pageHeight - 42);
+  doc.save(invitationFileName(invitation));
+}
 
 export function InvitationsClient({ initialInvitations }: { initialInvitations: Invitation[] }) {
   const [typeFilter, setTypeFilter] = useState<InvitationType | "all">("all");
@@ -108,7 +240,6 @@ export function InvitationsClient({ initialInvitations }: { initialInvitations: 
           <p className="text-sm text-muted-foreground">Special guests, speaker/organizer invitees, and student passes</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm"><Send className="mr-2 h-3 w-3" /> Send Batch</Button>
           <Button size="sm" onClick={() => setShowForm(!showForm)}>
             {showForm ? <><X className="mr-2 h-3 w-3" /> Cancel</> : <><Plus className="mr-2 h-3 w-3" /> Invite Guest</>}
           </Button>
@@ -223,11 +354,23 @@ export function InvitationsClient({ initialInvitations }: { initialInvitations: 
                   </p>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  {!inv.qrHash && inv.status !== "declined" && (
-                    <Button size="sm" variant="outline">Generate QR</Button>
-                  )}
-                  {inv.status === "pending" && (
-                    <Button size="sm"><Send className="mr-1 h-3 w-3" /> Send</Button>
+                  {inv.qrHash ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void downloadInvitationTicketPdf(inv).catch((error) => {
+                          toast.error(error instanceof Error ? error.message : "Failed to download invitation PDF");
+                        });
+                      }}
+                    >
+                      <Download className="mr-1 h-3 w-3" />
+                      Download QR PDF
+                    </Button>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px]">
+                      QR missing
+                    </Badge>
                   )}
                 </div>
               </div>

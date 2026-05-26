@@ -30,4 +30,46 @@ describe("AttendeesClient", () => {
     expect(html).toContain("DevSummit LLC");
     expect(html).toContain("1234567");
   });
+
+  it("includes a buyer type filter for individual and company registrations", () => {
+    const html = renderToStaticMarkup(
+      <AttendeesClient
+        stats={{ total: 2, checkedIn: 0, remaining: 2, percentage: 0 }}
+        initialAttendees={[
+          {
+            id: "attendee-1",
+            name: "Individual Buyer",
+            email: "individual@example.com",
+            ticketType: "regular",
+            qrHash: "qr-1",
+            checkedIn: false,
+            checkedInAt: null,
+            source: "ticket",
+            ticketOrderId: "order-1",
+            purchaserType: "individual",
+            purchaserCompany: null,
+            companyRegistrationNumber: null,
+          },
+          {
+            id: "attendee-2",
+            name: "Company Buyer",
+            email: "company@example.com",
+            ticketType: "regular",
+            qrHash: "qr-2",
+            checkedIn: false,
+            checkedInAt: null,
+            source: "ticket",
+            ticketOrderId: "order-2",
+            purchaserType: "company",
+            purchaserCompany: "DevSummit LLC",
+            companyRegistrationNumber: "1234567",
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("All Buyers");
+    expect(html).toContain("Individuals");
+    expect(html).toContain("Companies");
+  });
 });

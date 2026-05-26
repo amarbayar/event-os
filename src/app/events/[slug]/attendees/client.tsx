@@ -46,6 +46,10 @@ type Stats = {
   percentage: number;
 };
 
+function buyerType(attendee: Attendee): "individual" | "company" {
+  return attendee.purchaserType === "company" ? "company" : "individual";
+}
+
 export function AttendeesClient({
   initialAttendees,
   stats,
@@ -64,9 +68,11 @@ export function AttendeesClient({
   const [importResult, setImportResult] = useState<string | null>(null);
   const [checkInFilter, setCheckInFilter] = useState<"all" | "checked_in" | "not_checked_in">("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [buyerTypeFilter, setBuyerTypeFilter] = useState<"all" | "individual" | "company">("all");
 
   const filtered = attendees
     .filter((a) => sourceFilter === "all" || a.source === sourceFilter)
+    .filter((a) => buyerTypeFilter === "all" || buyerType(a) === buyerTypeFilter)
     .filter((a) => {
       if (checkInFilter === "checked_in") return a.checkedIn;
       if (checkInFilter === "not_checked_in") return !a.checkedIn;
@@ -294,6 +300,12 @@ export function AttendeesClient({
         {(["all", "online", "offline", "internal"] as const).map((s) => (
           <Button key={s} variant={sourceFilter === s ? "default" : "outline"} size="sm" onClick={() => setSourceFilter(s)} className="capitalize">
             {s === "all" ? "All" : s === "internal" ? "Guest" : s}
+          </Button>
+        ))}
+        <div className="h-4 w-px bg-border" />
+        {(["all", "individual", "company"] as const).map((f) => (
+          <Button key={f} variant={buyerTypeFilter === f ? "secondary" : "ghost"} size="sm" onClick={() => setBuyerTypeFilter(f)}>
+            {f === "all" ? "All Buyers" : f === "individual" ? "Individuals" : "Companies"}
           </Button>
         ))}
         <div className="h-4 w-px bg-border" />
