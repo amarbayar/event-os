@@ -72,4 +72,47 @@ describe("AttendeesClient", () => {
     expect(html).toContain("Individuals");
     expect(html).toContain("Companies");
   });
+
+  it("supports filtering by ticket type and exporting the current view to XLSX", () => {
+    const html = renderToStaticMarkup(
+      <AttendeesClient
+        stats={{ total: 2, checkedIn: 0, remaining: 2, percentage: 0 }}
+        initialAttendees={[
+          {
+            id: "attendee-1",
+            name: "Regular Buyer",
+            email: "regular@example.com",
+            ticketType: "regular",
+            qrHash: "qr-1",
+            checkedIn: false,
+            checkedInAt: null,
+            source: "ticket",
+            ticketOrderId: "order-1",
+            purchaserType: "individual",
+            purchaserCompany: null,
+            companyRegistrationNumber: null,
+          },
+          {
+            id: "attendee-2",
+            name: "VIP Buyer",
+            email: "vip@example.com",
+            ticketType: "vip",
+            qrHash: "qr-2",
+            checkedIn: false,
+            checkedInAt: null,
+            source: "ticket",
+            ticketOrderId: "order-2",
+            purchaserType: "company",
+            purchaserCompany: "DevSummit LLC",
+            companyRegistrationNumber: "1234567",
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("All Ticket Types");
+    expect(html).toContain("regular");
+    expect(html).toContain("vip");
+    expect(html).toContain("Export XLSX");
+  });
 });

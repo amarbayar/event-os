@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
   Upload,
   Search,
   CheckCircle2,
+  Download,
   X,
   Loader2,
 } from "lucide-react";
@@ -50,6 +51,19 @@ function buyerType(attendee: Attendee): "individual" | "company" {
   return attendee.purchaserType === "company" ? "company" : "individual";
 }
 
+function formatTicketTypeLabel(ticketType: string) {
+  return ticketType
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatCheckInDate(value: Date | string | null) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString();
+}
+
 export function AttendeesClient({
   initialAttendees,
   stats,
@@ -69,9 +83,15 @@ export function AttendeesClient({
   const [checkInFilter, setCheckInFilter] = useState<"all" | "checked_in" | "not_checked_in">("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [buyerTypeFilter, setBuyerTypeFilter] = useState<"all" | "individual" | "company">("all");
+  const [ticketTypeFilter, setTicketTypeFilter] = useState<string>("all");
+
+  const ticketTypeOptions = useMemo(() => {
+    return Array.from(new Set(attendees.map((attendee) => attendee.ticketType).filter(Boolean))).sort();
+  }, [attendees]);
 
   const filtered = attendees
     .filter((a) => sourceFilter === "all" || a.source === sourceFilter)
+    .filter((a) => ticketTypeFilter === "all" || a.ticketType === ticketTypeFilter)
     .filter((a) => buyerTypeFilter === "all" || buyerType(a) === buyerTypeFilter)
     .filter((a) => {
       if (checkInFilter === "checked_in") return a.checkedIn;
@@ -94,6 +114,43 @@ export function AttendeesClient({
   };
 
   const refreshData = useCallback(() => { window.location.reload(); }, []);
+
+  const exportAttendeesXlsx = async () => {
+    const XLSX = await import("xlsx");
+    const rows = tableRows.map((attendee) => ({
+      Name: attendee.name,
+      Email: attendee.email,
+      "Ticket Type": attendee.ticketType,
+      "Buyer Type": buyerType(attendee),
+      Company: attendee.purchaserCompany || "",
+      "Company Registration Number": attendee.companyRegistrationNumber || "",
+      Source: attendee.source || "",
+      "Checked In": attendee.checkedIn ? "Yes" : "No",
+      "Checked In At": formatCheckInDate(attendee.checkedInAt),
+      "Order ID": attendee.ticketOrderId || "",
+      "QR Hash": attendee.qrHash,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet["!cols"] = [
+      { wch: 24 },
+      { wch: 30 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 24 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 24 },
+      { wch: 38 },
+      { wch: 34 },
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendees");
+    XLSX.writeFile(
+      workbook,
+      `devsummit-attendees-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+  };
 
   const openDrawer = (attendee: Attendee) => {
     setSelectedAttendee(attendee);
@@ -250,9 +307,14 @@ export function AttendeesClient({
           <h1 className="font-heading text-2xl font-bold tracking-tight">Attendees</h1>
           <p className="text-sm text-muted-foreground">{attendees.length} registered</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setShowImport(!showImport)}>
-          <Upload className="mr-2 h-3 w-3" /> Import CSV
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={exportAttendeesXlsx} disabled={tableRows.length === 0}>
+            <Download className="mr-2 h-3 w-3" /> Export XLSX
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowImport(!showImport)}>
+            <Upload className="mr-2 h-3 w-3" /> Import CSV
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -302,6 +364,22 @@ export function AttendeesClient({
             {s === "all" ? "All" : s === "internal" ? "Guest" : s}
           </Button>
         ))}
+        <div className="h-4 w-px bg-border" />
+        <Select value={ticketTypeFilter} onValueChange={(value) => setTicketTypeFilter(value || "all")}>
+          <SelectTrigger className="h-7 w-[170px] rounded-[min(var(--radius-md),12px)] text-[0.8rem]">
+            <span className="truncate">
+              {ticketTypeFilter === "all" ? "All Ticket Types" : formatTicketTypeLabel(ticketTypeFilter)}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Ticket Types</SelectItem>
+            {ticketTypeOptions.map((ticketType) => (
+              <SelectItem key={ticketType} value={ticketType}>
+                {formatTicketTypeLabel(ticketType)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="h-4 w-px bg-border" />
         {(["all", "individual", "company"] as const).map((f) => (
           <Button key={f} variant={buyerTypeFilter === f ? "secondary" : "ghost"} size="sm" onClick={() => setBuyerTypeFilter(f)}>
