@@ -115,4 +115,30 @@ describe("AttendeesClient", () => {
     expect(html).toContain("vip");
     expect(html).toContain("Export XLSX");
   });
+
+  it("lets organizers re-download branded QR PDFs for attendee tickets", () => {
+    const html = renderToStaticMarkup(
+      <AttendeesClient
+        stats={{ total: 1, checkedIn: 0, remaining: 1, percentage: 0 }}
+        initialAttendees={[
+          {
+            id: "attendee-1",
+            name: "Ticket Holder",
+            email: "holder@example.com",
+            ticketType: "regular",
+            qrHash: "qr-hash",
+            checkedIn: false,
+            checkedInAt: null,
+            source: "ticket",
+            ticketOrderId: "order-1",
+            purchaserType: "individual",
+            purchaserCompany: null,
+            companyRegistrationNumber: null,
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("Download Ticket PDF");
+  });
 });

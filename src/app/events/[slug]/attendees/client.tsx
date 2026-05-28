@@ -24,6 +24,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 type Attendee = {
   id: string;
@@ -62,6 +63,139 @@ function formatCheckInDate(value: Date | string | null) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toISOString();
+}
+
+async function loadImageDataUrl(src: string): Promise<string | null> {
+  try {
+    const response = await fetch(src);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function attendeeTicketFileName(attendee: Attendee) {
+  const name = attendee.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return `devsummit-2026-ticket-${name || attendee.id}.pdf`;
+}
+
+async function downloadAttendeeTicketPdf(attendee: Attendee) {
+  if (!attendee.qrHash) {
+    throw new Error("This attendee does not have a QR code yet");
+  }
+
+  const [{ jsPDF }, { toDataURL }] = await Promise.all([
+    import("jspdf"),
+    import("qrcode"),
+  ]);
+  const [logoDataUrl, qrDataUrl] = await Promise.all([
+    loadImageDataUrl("/logo.png"),
+    toDataURL(attendee.qrHash, {
+      width: 280,
+      margin: 1,
+      color: { dark: "#111827", light: "#ffffff" },
+    }),
+  ]);
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const ticketType = formatTicketTypeLabel(attendee.ticketType || "ticket");
+
+  doc.setFillColor("#070A12");
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+  doc.setFillColor("#00D1B2");
+  doc.circle(pageWidth - 48, 58, 138, "F");
+  doc.setFillColor("#F5B642");
+  doc.circle(18, pageHeight - 28, 118, "F");
+
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, "PNG", 44, 38, 112, 40, undefined, "FAST");
+  } else {
+    doc.setTextColor("#ffffff");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.text("DevSummit", 44, 62);
+  }
+
+  doc.setTextColor("#B9C3D5");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text("May 30-31, 2026 - Ulaanbaatar", 44, 98);
+
+  doc.setFillColor("#ffffff");
+  doc.roundedRect(38, 132, pageWidth - 76, 560, 18, 18, "F");
+  doc.setDrawColor("#E5EAF3");
+  doc.roundedRect(38, 132, pageWidth - 76, 560, 18, 18);
+
+  doc.setTextColor("#0B1020");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(28);
+  doc.text("DevSummit 2026 Ticket", 70, 190);
+  doc.setFontSize(13);
+  doc.setTextColor("#556070");
+  doc.text("Show this QR code at registration for check-in.", 70, 214);
+
+  doc.setFillColor("#F7F9FC");
+  doc.roundedRect(70, 248, 220, 220, 12, 12, "F");
+  doc.addImage(qrDataUrl, "PNG", 88, 266, 184, 184, undefined, "FAST");
+
+  const detailsX = 324;
+  const detailRows = [
+    ["Ticket holder", attendee.name || "Attendee"],
+    ["Ticket type", ticketType],
+    ["Buyer type", buyerType(attendee) === "company" ? "Company" : "Individual"],
+    ["Order number", attendee.ticketOrderId || attendee.id],
+    ["Ticket ID", attendee.id],
+  ];
+
+  detailRows.forEach(([label, value], index) => {
+    const y = 264 + index * 58;
+    doc.setTextColor("#7A8494");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text(label.toUpperCase(), detailsX, y);
+    doc.setTextColor("#0B1020");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(index >= 3 ? 9 : 14);
+    const lines = doc.splitTextToSize(value, 190);
+    doc.text(lines.slice(0, 2), detailsX, y + 20);
+  });
+
+  doc.setFillColor("#0B1020");
+  doc.roundedRect(70, 518, pageWidth - 140, 86, 12, 12, "F");
+  doc.setTextColor("#ffffff");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Registration note", 94, 548);
+  doc.setTextColor("#C9D3E3");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(
+    doc.splitTextToSize(
+      "If your QR code cannot be scanned, organizers can look up your ticket by name, email, order number, ticket ID, or QR code.",
+      pageWidth - 188,
+    ),
+    94,
+    572,
+  );
+
+  doc.setTextColor("#B9C3D5");
+  doc.setFontSize(10);
+  doc.text("devsummit.dev", 44, pageHeight - 42);
+  doc.text("Powered by DevSummit registration", pageWidth - 198, pageHeight - 42);
+  doc.save(attendeeTicketFileName(attendee));
 }
 
 export function AttendeesClient({
@@ -415,6 +549,7 @@ export function AttendeesClient({
                 <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[100px]">Ticket</th>
                 <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[80px]">Source</th>
                 <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[130px]">Check-in</th>
+                <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 w-[170px]">QR PDF</th>
               </tr>
             </thead>
             <tbody>
@@ -452,6 +587,23 @@ export function AttendeesClient({
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="whitespace-nowrap"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void downloadAttendeeTicketPdf(a).catch((error) => {
+                          toast.error(error instanceof Error ? error.message : "Failed to download ticket PDF");
+                        });
+                      }}
+                    >
+                      <Download className="mr-1 h-3 w-3" />
+                      Download Ticket PDF
+                    </Button>
                   </td>
                 </tr>
               ))}
