@@ -262,6 +262,17 @@ describe("Coordinator check-in confinement", () => {
     });
   }
 
+  async function removeCoordinatorFromOperationsTeam() {
+    await testDb
+      .delete(schema.teamMembers)
+      .where(
+        and(
+          eq(schema.teamMembers.userId, fixtures.users["TestCoordinator"].id),
+          eq(schema.teamMembers.teamId, fixtures.teams["Operations"]),
+        ),
+      );
+  }
+
   function mockCoordinatorSession() {
     authMock.mockResolvedValue({
       user: {
@@ -315,8 +326,8 @@ describe("Coordinator check-in confinement", () => {
     expect(res.status).toBe(403);
   });
 
-  it("allows attendee-scoped coordinators to use check-in APIs", async () => {
-    await addCoordinatorToOperationsTeam();
+  it("allows coordinators to use check-in APIs without manual team assignment", async () => {
+    await removeCoordinatorFromOperationsTeam();
     mockCoordinatorSession();
 
     const readStats = await requirePermission(

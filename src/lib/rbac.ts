@@ -163,19 +163,11 @@ export async function requirePermission(
         action !== "read" &&
         pathname.startsWith("/api/check-in");
 
-      if (isCheckInStats) {
-        const hasScope = await userOwnsEntityType(userId, entityType, orgId);
-        if (!hasScope) {
-          return forbidden(
-            "You don't have permission to use check-in. Ask an admin to add you to a team that manages attendees."
-          );
-        }
+      if (isCheckInStats || isCheckInWrite) {
         return ctx;
       }
 
-      if (!isCheckInWrite) {
-        return forbidden("Coordinators can only access check-in.");
-      }
+      return forbidden("Coordinators can only access check-in.");
     }
 
     // Everyone else can read
