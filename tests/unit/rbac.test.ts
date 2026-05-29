@@ -251,3 +251,101 @@ describe("Invitation permissions", () => {
     expect(res.user.role).toBe("organizer");
   });
 });
+
+describe("Coordinator check-in confinement", () => {
+  async function addCoordinatorToOperationsTeam() {
+    await testDb.insert(schema.teamMembers).values({
+      userId: fixtures.users["TestCoordinator"].id,
+      teamId: fixtures.teams["Operations"],
+      name: "TestCoordinator",
+      role: "member",
+    });
+  }
+
+  function mockCoordinatorSession() {
+    authMock.mockResolvedValue({
+      user: {
+        id: fixtures.users["TestCoordinator"].id,
+        role: "coordinator",
+        organizationId: fixtures.orgId,
+      },
+    });
+  }
+
+  it("blocks coordinators from ticket financial reads", async () => {
+    mockCoordinatorSession();
+
+    const res = await requirePermission(
+      new NextRequest("https://platform.devsummit.dev/api/ticket-sales/summary"),
+      "ticket",
+      "read",
+    );
+
+    expect(isRbacError(res)).toBe(true);
+    if (!isRbacError(res)) throw new Error("Expected coordinator ticket read to be blocked");
+    expect(res.status).toBe(403);
+  });
+
+  it("blocks coordinators from non-check-in organizer reads", async () => {
+    mockCoordinatorSession();
+
+    const res = await requirePermission(
+      new NextRequest("https://platform.devsummit.dev/api/speakers"),
+      "speaker",
+      "read",
+    );
+
+    expect(isRbacError(res)).toBe(true);
+    if (!isRbacError(res)) throw new Error("Expected coordinator speaker read to be blocked");
+    expect(res.status).toBe(403);
+  });
+
+  it("blocks coordinators from attendee admin reads even with attendee team scope", async () => {
+    await addCoordinatorToOperationsTeam();
+    mockCoordinatorSession();
+
+    const res = await requirePermission(
+      new NextRequest("https://platform.devsummit.dev/api/attendees"),
+      "attendee",
+      "read",
+    );
+
+    expect(isRbacError(res)).toBe(true);
+    if (!isRbacError(res)) throw new Error("Expected coordinator attendee admin read to be blocked");
+    expect(res.status).toBe(403);
+  });
+
+  it("allows attendee-scoped coordinators to use check-in APIs", async () => {
+    await addCoordinatorToOperationsTeam();
+    mockCoordinatorSession();
+
+    const readStats = await requirePermission(
+      new NextRequest("https://platform.devsummit.dev/api/check-in/stats"),
+      "attendee",
+      "read",
+    );
+    const scan = await requirePermission(
+      new NextRequest("https://platform.devsummit.dev/api/check-in"),
+      "attendee",
+      "update",
+    );
+
+    expect(isRbacError(readStats)).toBe(false);
+    expect(isRbacError(scan)).toBe(false);
+  });
+
+  it("blocks attendee-scoped coordinators from non-check-in attendee writes", async () => {
+    await addCoordinatorToOperationsTeam();
+    mockCoordinatorSession();
+
+    const res = await requirePermission(
+      new NextRequest("https://platform.devsummit.dev/api/attendees/attendee-1"),
+      "attendee",
+      "update",
+    );
+
+    expect(isRbacError(res)).toBe(true);
+    if (!isRbacError(res)) throw new Error("Expected coordinator attendee admin write to be blocked");
+    expect(res.status).toBe(403);
+  });
+});

@@ -89,6 +89,13 @@ export default async function OrgHomePage() {
     orderBy: desc(eventEditions.startDate),
   });
 
+  if (membership.role === "coordinator") {
+    const checkInEdition =
+      editions.find((edition: typeof editions[number]) => edition.status !== "archived") ||
+      editions[0];
+    if (checkInEdition) redirect(`/events/${checkInEdition.slug}/check-in`);
+  }
+
   // Fetch stats for all editions in parallel
   const editionsWithStats: EditionWithStats[] = await Promise.all(
     editions.map(async (edition: typeof editions[number]) => {

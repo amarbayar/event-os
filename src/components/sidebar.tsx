@@ -26,7 +26,7 @@ import {
   ArrowLeft,
   Ticket,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 type NavItem = { href: string; labelKey: string; icon: React.ElementType };
@@ -72,13 +72,31 @@ const topItems: NavItem[] = [
   { href: "/", labelKey: "dashboard", icon: LayoutDashboard },
 ];
 
+const mobileItems: NavItem[] = [
+  { href: "/", labelKey: "home", icon: LayoutDashboard },
+  { href: "/speakers", labelKey: "people", icon: Users },
+  { href: "/agenda", labelKey: "event", icon: Calendar },
+  { href: "/tasks", labelKey: "ops", icon: CheckSquare },
+  { href: "/check-in", labelKey: "checkIn", icon: ScanLine },
+];
+
 type Edition = {
   id: string;
   name: string;
   slug: string;
 };
 
-export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleChat?: () => void; chatOpen?: boolean; basePath?: string }) {
+export function Sidebar({
+  onToggleChat,
+  chatOpen,
+  basePath = "",
+  userRole,
+}: {
+  onToggleChat?: () => void;
+  chatOpen?: boolean;
+  basePath?: string;
+  userRole?: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations("Nav");
@@ -96,6 +114,7 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
 
   // Poll for notification count every 30s
   useEffect(() => {
+    if (userRole === "coordinator") return;
     const fetchCount = () => {
       fetch("/api/notifications?count=true")
         .then((r) => r.json())
@@ -105,10 +124,11 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
     fetchCount();
     const interval = setInterval(fetchCount, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [userRole]);
 
   // Fetch editions on mount
   useEffect(() => {
+    if (userRole === "coordinator") return;
     fetch("/api/editions")
       .then((r) => r.json())
       .then((d) => {
@@ -119,12 +139,43 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
         }
       })
       .catch(() => {});
-  }, []);
+  }, [userRole]);
 
   const normPath = pathname.replace(/\/$/, "") || "/";
   const fullHref = useCallback(
     (href: string) => (href === "/" ? (basePath || "/") : `${basePath}${href}`),
     [basePath]
+  );
+  const visibleTopItems = useMemo(
+    () => (userRole === "coordinator" ? [] : topItems),
+    [userRole],
+  );
+  const visibleNavGroups = useMemo(
+    () =>
+      navGroups
+        .map((group) => {
+          if (userRole === "coordinator") {
+            if (group.key !== "attendees") {
+              return { ...group, items: [] };
+            }
+            return {
+              ...group,
+              items: group.items.filter(
+                ({ href }) => href === "/check-in",
+              ),
+            };
+          }
+          return group;
+        })
+        .filter((group) => group.items.length > 0),
+    [userRole],
+  );
+  const visibleMobileItems = useMemo(
+    () =>
+      userRole === "coordinator"
+        ? mobileItems.filter(({ href }) => href === "/check-in")
+        : mobileItems,
+    [userRole],
   );
 
   useEffect(() => {
@@ -136,7 +187,7 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
 
   // Auto-expand the group that contains the active page
   useEffect(() => {
-    const activeGroups = navGroups
+    const activeGroups = visibleNavGroups
       .filter((group) =>
         group.items.some((item) => {
           const href = fullHref(item.href);
@@ -158,7 +209,7 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [fullHref, normPath]);
+  }, [fullHref, normPath, visibleNavGroups]);
 
   const toggleGroup = (label: string) => {
     setExpandedGroups((prev) => {
@@ -299,10 +350,10 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
         {/* Top items */}
-        {topItems.map((item) => navLink(item))}
+        {visibleTopItems.map((item) => navLink(item))}
 
         {/* Agent chat trigger */}
-        {onToggleChat && (
+        {onToggleChat && userRole !== "coordinator" && (
           <button
             onClick={onToggleChat}
             className={cn(
@@ -319,7 +370,7 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
         )}
 
         {/* Grouped sections */}
-        {navGroups.map((group) => {
+        {visibleNavGroups.map((group) => {
           const isExpanded = expandedGroups.has(group.key);
           const hasActive = group.items.some((item) => isActive(item.href));
 
@@ -354,39 +405,41 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-stone-800 px-2 py-3 space-y-1">
-        <Link
-          href={fullHref("/notifications")}
-          suppressHydrationWarning
-          className={cn(
-            "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors relative",
-            isActive("/notifications")
-              ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-              : "text-stone-400 hover:bg-white/5 hover:text-white"
-          )}
-        >
-          <Bell className="h-4 w-4 shrink-0" />
-          <span>{t("notifications")}</span>
-          {unreadCount > 0 && (
-            <span className="absolute right-2 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </Link>
-        <Link
-          href={fullHref("/settings")}
-          suppressHydrationWarning
-          className={cn(
-            "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors",
-            isActive("/settings")
-              ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-              : "text-stone-400 hover:bg-white/5 hover:text-white"
-          )}
-        >
-          <Settings className="h-4 w-4 shrink-0" />
-          <span>{t("settings")}</span>
-        </Link>
-      </div>
+      {userRole !== "coordinator" && (
+        <div className="border-t border-stone-800 px-2 py-3 space-y-1">
+          <Link
+            href={fullHref("/notifications")}
+            suppressHydrationWarning
+            className={cn(
+              "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors relative",
+              isActive("/notifications")
+                ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                : "text-stone-400 hover:bg-white/5 hover:text-white"
+            )}
+          >
+            <Bell className="h-4 w-4 shrink-0" />
+            <span>{t("notifications")}</span>
+            {unreadCount > 0 && (
+              <span className="absolute right-2 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </Link>
+          <Link
+            href={fullHref("/settings")}
+            suppressHydrationWarning
+            className={cn(
+              "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors",
+              isActive("/settings")
+                ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                : "text-stone-400 hover:bg-white/5 hover:text-white"
+            )}
+          >
+            <Settings className="h-4 w-4 shrink-0" />
+            <span>{t("settings")}</span>
+          </Link>
+        </div>
+      )}
     </>
   );
 
@@ -396,7 +449,7 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
       <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-stone-200 bg-white px-4 lg:hidden">
         <span className="text-lg font-bold tracking-tight">Event OS</span>
         <div className="flex items-center gap-2">
-          {onToggleChat && (
+          {onToggleChat && userRole !== "coordinator" && (
             <button
               onClick={onToggleChat}
               className="rounded-md p-2 text-primary hover:bg-primary/10"
@@ -437,13 +490,7 @@ export function Sidebar({ onToggleChat, chatOpen, basePath = "" }: { onToggleCha
 
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-stone-200 bg-white py-2 lg:hidden">
-        {([
-          { href: "/", labelKey: "home", icon: LayoutDashboard },
-          { href: "/speakers", labelKey: "people", icon: Users },
-          { href: "/agenda", labelKey: "event", icon: Calendar },
-          { href: "/tasks", labelKey: "ops", icon: CheckSquare },
-          { href: "/check-in", labelKey: "checkIn", icon: ScanLine },
-        ] as const).map((item) => (
+        {visibleMobileItems.map((item) => (
           <Link
             key={item.href}
             href={fullHref(item.href)}

@@ -57,9 +57,11 @@ export function formatEventDates(startDate: string | null, endDate: string | nul
 
 export function EventWorkspaceShell({
   event,
+  userRole,
   children,
 }: {
   event: SerializedEvent;
+  userRole: string;
   children: React.ReactNode;
 }) {
   const [chatOpen, setChatOpen] = useState(false);
@@ -133,12 +135,12 @@ export function EventWorkspaceShell({
               </div>
             </div>
             {/* Render the standard sidebar nav below the event header */}
-            <Sidebar onToggleChat={toggleChat} chatOpen={chatOpen} basePath={`/events/${event.slug}`} />
+            <Sidebar onToggleChat={toggleChat} chatOpen={chatOpen} basePath={`/events/${event.slug}`} userRole={userRole} />
           </div>
 
           {/* Mobile: show standard sidebar with the header baked in */}
           <div className="lg:hidden">
-            <Sidebar onToggleChat={toggleChat} chatOpen={chatOpen} basePath={`/events/${event.slug}`} />
+            <Sidebar onToggleChat={toggleChat} chatOpen={chatOpen} basePath={`/events/${event.slug}`} userRole={userRole} />
           </div>
 
           <main

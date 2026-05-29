@@ -28,12 +28,35 @@ const stakeholderAllowedApiPaths = [
   "/api/upload",
 ];
 
+const coordinatorAllowedApiPaths = ["/api/auth", "/api/check-in"];
+
 function isStakeholderAllowedPath(pathname: string): boolean {
   return (
     pathname === "/portal" ||
     pathname.startsWith("/portal/") ||
     pathname === "/change-password" ||
     stakeholderAllowedApiPaths.some((path) => pathname.startsWith(path))
+  );
+}
+
+function isCoordinatorCheckInPath(pathname: string): boolean {
+  return /^\/events\/[^/]+\/check-in(?:\/.*)?$/.test(pathname);
+}
+
+function getCoordinatorCheckInRedirect(pathname: string, requestUrl: string): URL {
+  const match = pathname.match(/^\/events\/([^/]+)/);
+  if (match) {
+    return new URL(`/events/${match[1]}/check-in`, requestUrl);
+  }
+  return new URL("/", requestUrl);
+}
+
+function isCoordinatorAllowedPath(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname === "/change-password" ||
+    isCoordinatorCheckInPath(pathname) ||
+    coordinatorAllowedApiPaths.some((path) => pathname.startsWith(path))
   );
 }
 
@@ -93,6 +116,17 @@ export async function middleware(request: NextRequest) {
     }
 
     return NextResponse.redirect(new URL("/portal", request.url));
+  }
+
+  if (token?.role === "coordinator" && !isCoordinatorAllowedPath(pathname)) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Forbidden", message: "Coordinators can only access check-in." },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.redirect(getCoordinatorCheckInRedirect(pathname, request.url));
   }
 
   return NextResponse.next();

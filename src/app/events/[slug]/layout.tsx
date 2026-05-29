@@ -52,7 +52,7 @@ export default async function EventWorkspaceLayout({
   };
 
   return (
-    <EventWorkspaceShell event={eventValue}>
+    <EventWorkspaceShell event={eventValue} userRole={membership.role}>
       {children}
     </EventWorkspaceShell>
   );

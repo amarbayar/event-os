@@ -151,6 +151,33 @@ export async function requirePermission(
       return forbidden("Stakeholder accounts can only access the portal.");
     }
 
+    if (effectiveRole === "coordinator") {
+      const pathname = req.nextUrl.pathname;
+
+      const isCheckInStats =
+        entityType === "attendee" &&
+        action === "read" &&
+        pathname.startsWith("/api/check-in/stats");
+      const isCheckInWrite =
+        entityType === "attendee" &&
+        action !== "read" &&
+        pathname.startsWith("/api/check-in");
+
+      if (isCheckInStats) {
+        const hasScope = await userOwnsEntityType(userId, entityType, orgId);
+        if (!hasScope) {
+          return forbidden(
+            "You don't have permission to use check-in. Ask an admin to add you to a team that manages attendees."
+          );
+        }
+        return ctx;
+      }
+
+      if (!isCheckInWrite) {
+        return forbidden("Coordinators can only access check-in.");
+      }
+    }
+
     // Everyone else can read
     if (action === "read") {
       return ctx;
